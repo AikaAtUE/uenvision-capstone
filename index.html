@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UEnvision — Curriculum Mapping System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<section id="screen-login" class="auth-screen is-active">
+  <div class="auth-photo" aria-hidden="true"></div>
+  <div class="auth-card">
+    <div class="auth-brand">
+      <svg class="auth-logo" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M10 8 C10 8 10 30 10 34 C10 44 18 50 26 50 C30 50 33 48 35 45 L50 30 L58 22" fill="none" stroke="var(--red)" stroke-width="7" stroke-linecap="round"/>
+        <path d="M35 45 C37 48 40 50 44 50 C52 50 58 44 58 34 L58 8" fill="none" stroke="var(--navy)" stroke-width="7" stroke-linecap="round"/>
+      </svg>
+      <p class="auth-wordmark"><span class="w-red">UE</span><span class="w-navy">NVISION</span></p>
+    </div>
+
+    <form class="auth-form" id="login-form" novalidate>
+      <label class="field">
+        <span>Email address</span>
+        <input type="email" id="login-email" placeholder="juan.delacruz@ue.edu.ph" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+      </label>
+      <p class="form-error" id="login-error" hidden></p>
+      <button type="button" class="link-inline" data-goto="screen-forgot">Forgot password</button>
+      <button type="submit" class="btn btn-navy btn-block">Log in</button>
+      <p class="auth-foot">Don't have an account? <button type="button" class="link-inline" data-goto="screen-signup">Sign up</button></p>
+    </form>
+  </div>
+</section>
+
+<!-- ===================== SIGN UP ===================== -->
+<section id="screen-signup" class="auth-screen">
+  <div class="auth-photo" aria-hidden="true"></div>
+  <div class="auth-card">
+    <div class="auth-brand auth-brand--compact">
+      <svg class="auth-logo auth-logo--sm" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M10 8 C10 8 10 30 10 34 C10 44 18 50 26 50 C30 50 33 48 35 45 L50 30 L58 22" fill="none" stroke="var(--red)" stroke-width="7" stroke-linecap="round"/>
+        <path d="M35 45 C37 48 40 50 44 50 C52 50 58 44 58 34 L58 8" fill="none" stroke="var(--navy)" stroke-width="7" stroke-linecap="round"/>
+      </svg>
+      <p class="auth-wordmark"><span class="w-red">UE</span><span class="w-navy">NVISION</span></p>
+    </div>
+    <form class="auth-form" id="signup-form" novalidate>
+      <label class="field"><span>Last name</span><input type="text" id="signup-lastname" autocomplete="family-name" required></label>
+      <label class="field"><span>First name</span><input type="text" id="signup-firstname" autocomplete="given-name" required></label>
+      <label class="field"><span>Middle name</span><input type="text" id="signup-middlename" autocomplete="additional-name"></label>
+      <label class="field"><span>UE email</span><input type="email" id="signup-email" placeholder="juan.delacruz@ue.edu.ph" autocomplete="email" required></label>
+      <label class="field"><span>Password</span><input type="password" id="signup-password" autocomplete="new-password" required></label>
+      <label class="field"><span>Re-enter password</span><input type="password" id="signup-password2" autocomplete="new-password" required></label>
+      <p class="form-error" id="signup-error" hidden></p>
+      <button type="submit" class="btn btn-navy btn-block">Create account</button>
+      <p class="auth-foot">Already have an account? <button type="button" class="link-inline" data-goto="screen-login">Log in</button></p>
+    </form>
+  </div>
+</section>
+
+<!-- ===================== FORGOT PASSWORD: SEND CODE ===================== -->
+<section id="screen-forgot" class="auth-screen">
+  <div class="auth-photo" aria-hidden="true"></div>
+  <div class="auth-card auth-card--narrow">
+    <h1 class="auth-title">Trouble logging in?</h1>
+    <p class="auth-sub">Enter your email and we'll send you a code to get back into your account.</p>
+    <form class="auth-form" id="forgot-form" novalidate>
+      <label class="field"><span>Email address</span><input type="email" id="forgot-email" autocomplete="email" required></label>
+      <button type="submit" class="btn btn-navy btn-block">Send code</button>
+      <label class="field field--spaced"><span>Enter code</span><input type="text" id="forgot-code" inputmode="numeric" placeholder="6-digit code"></label>
+      <p class="form-error" id="forgot-error" hidden></p>
+      <button type="button" class="btn btn-navy btn-block" id="forgot-submit" data-goto="screen-reset">Submit</button>
+      <p class="auth-foot"><button type="button" class="link-inline" data-goto="screen-login">Back to log in</button></p>
+    </form>
+  </div>
+</section>
+
+<!-- ===================== FORGOT PASSWORD: RESET ===================== -->
+<section id="screen-reset" class="auth-screen">
+  <div class="auth-photo" aria-hidden="true"></div>
+  <div class="auth-card auth-card--narrow">
+    <div class="lock-icon" aria-hidden="true">
+      <svg viewBox="0 0 64 64"><path d="M20 28V22a12 12 0 0 1 24 0v6" fill="none" stroke="#1b2540" stroke-width="4.5" stroke-linecap="round"/><rect x="14" y="28" width="36" height="26" rx="6" fill="none" stroke="#1b2540" stroke-width="4.5"/><circle cx="26" cy="41" r="2.6" fill="#1b2540"/><circle cx="32" cy="41" r="2.6" fill="#1b2540"/><circle cx="38" cy="41" r="2.6" fill="#1b2540"/></svg>
+    </div>
+    <h1 class="auth-title">Trouble logging in?</h1>
+    <form class="auth-form" id="reset-form" novalidate>
+      <label class="field"><span>Enter new password</span><input type="password" id="reset-password" autocomplete="new-password" required></label>
+      <label class="field"><span>Re-enter new password</span><input type="password" id="reset-password2" autocomplete="new-password" required></label>
+      <p class="form-error" id="reset-error" hidden></p>
+      <button type="submit" class="btn btn-navy btn-block">Submit</button>
+    </form>
+  </div>
+</section>
+
+<!-- ===================== MAIN APP ===================== -->
+<section id="app">
+  <div class="app-shell">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <svg class="sidebar-logo" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M10 8 C10 8 10 30 10 34 C10 44 18 50 26 50 C30 50 33 48 35 45 L50 30 L58 22" fill="none" stroke="var(--red)" stroke-width="7" stroke-linecap="round"/>
+          <path d="M35 45 C37 48 40 50 44 50 C52 50 58 44 58 34 L58 8" fill="none" stroke="var(--navy)" stroke-width="7" stroke-linecap="round"/>
+        </svg>
+        <p class="sidebar-wordmark"><span class="w-red">UE</span><span class="w-navy">NVISION</span></p>
+      </div>
+
+      <button class="profile" id="profile-btn" type="button">
+        <span class="avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor"/></svg>
+        </span>
+        <span class="profile-text">
+          <span class="profile-name" id="profile-name">Jose Rizal</span>
+          <span class="profile-role" id="profile-role">Faculty</span>
+        </span>
+      </button>
+
+      <nav class="nav" aria-label="Main">
+        <button class="nav-item is-active" type="button" data-page="dashboard">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor"/><rect x="13" y="3" width="8" height="5" rx="1.5" fill="currentColor"/><rect x="13" y="10" width="8" height="11" rx="1.5" fill="currentColor"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="currentColor"/></svg>
+          </span>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-item" type="button" data-page="data">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M6 2h9l4 4v16H6z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 2v4h4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          </span>
+          <span>Data</span>
+        </button>
+        <button class="nav-item" type="button" data-page="feedback">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16v12H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </span>
+          <span>Feedback</span>
+        </button>
+        <button class="nav-item" type="button" data-page="about">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="11" x2="12" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7.5" r="1.2" fill="currentColor"/></svg>
+          </span>
+          <span>About</span>
+        </button>
+        <button class="nav-item" type="button" data-page="settings">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </span>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <button class="nav-item nav-item--collapse" type="button" id="collapse-btn" aria-label="Collapse sidebar">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M9 5l-7 7 7 7M2 12h20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span>Collapse</span>
+      </button>
+    </aside>
+
+    <!-- Main content -->
+    <main class="content">
+
+      <!-- ---------- DASHBOARD ---------- -->
+      <section class="page is-active" id="page-dashboard">
+        <header class="page-header">
+          <h1>Dashboard</h1>
+        </header>
+        <div class="page-body">
+          <div class="dash-toolbar">
+            <p class="muted">Last analyzation: <em id="last-analyzation"></em></p>
+            <button class="btn btn-ghost btn-sm" type="button" id="filter-btn">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Filter
+            </button>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat-card">
+              <p class="stat-label">Total job postings analyzed</p>
+              <p class="stat-value" id="stat-total-postings"></p>
+              <p class="stat-note" id="stat-total-postings-note"></p>
+            </div>
+            <div class="stat-card">
+              <p class="stat-label">Unique skills identified</p>
+              <p class="stat-value" id="stat-unique-skills"></p>
+              <p class="stat-note" id="stat-unique-skills-note"></p>
+            </div>
+            <div class="stat-card">
+              <p class="stat-label">Most in-demand skill</p>
+              <p class="stat-value" id="stat-top-skill"></p>
+              <p class="stat-note" id="stat-top-skill-note"></p>
+            </div>
+            <div class="stat-card">
+              <p class="stat-label">Alignment score</p>
+              <p class="stat-value" id="stat-alignment"></p>
+              <p class="stat-note" id="stat-alignment-note"></p>
+            </div>
+            <div class="stat-card">
+              <p class="stat-label">High-priority skill gaps</p>
+              <p class="stat-value" id="stat-skill-gaps"></p>
+              <p class="stat-note" id="stat-skill-gaps-note"></p>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="tabs" role="tablist">
+              <button class="tab is-active" type="button" data-tab="top-skills">Top in-demand skills</button>
+              <button class="tab" type="button" data-tab="skill-trends">Skill trends over time</button>
+            </div>
+
+            <div class="tab-panel is-active" id="tab-top-skills">
+              <p class="chart-legend"><span class="dot"></span>Number of job postings</p>
+              <div class="bars" id="bar-chart"></div>
+            </div>
+
+            <div class="tab-panel" id="tab-skill-trends">
+              <p class="chart-legend" id="skill-trends-legend"></p>
+              <svg viewBox="0 0 640 260" class="line-chart" preserveAspectRatio="none" id="line-chart">
+                <line x1="0" y1="220" x2="640" y2="220" stroke="#e4e2dc" stroke-width="1"/>
+                <line x1="0" y1="160" x2="640" y2="160" stroke="#e4e2dc" stroke-width="1"/>
+                <line x1="0" y1="100" x2="640" y2="100" stroke="#e4e2dc" stroke-width="1"/>
+                <line x1="0" y1="40" x2="640" y2="40" stroke="#e4e2dc" stroke-width="1"/>
+              </svg>
+              <div class="line-labels" id="line-labels"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- DATA ---------- -->
+      <section class="page" id="page-data">
+        <header class="page-header">
+          <h1>Data</h1>
+        </header>
+        <div class="page-body">
+          <h2 class="section-title">View &amp; export data</h2>
+          <div class="data-toolbar">
+            <label class="select-field">
+              <span>Source</span>
+              <select id="data-source">
+                <option value="raw">Raw Job Data</option>
+                <option value="extracted">Extracted Skills</option>
+                <option value="survey">Survey</option>
+                <option value="category">Skill Category</option>
+              </select>
+            </label>
+            <button class="btn btn-red btn-sm" type="button" id="export-btn">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+              Export
+            </button>
+          </div>
+
+          <div class="table-wrap">
+            <table id="data-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- FEEDBACK ---------- -->
+      <section class="page" id="page-feedback">
+        <header class="page-header">
+          <h1>Feedback</h1>
+        </header>
+        <div class="page-body page-body--photo">
+
+          <div id="feedback-home">
+            <p class="feedback-intro">For the improvement of UEnvision, we're asking a moment of your time to evaluate the system through the following surveys.</p>
+            <div class="feedback-list">
+              <a class="feedback-item" href="#" data-survey="sus">
+                <span>System Usability Scale (SUS) evaluation</span>
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </a>
+              <a class="feedback-item" href="#" data-survey="uat">
+                <span>User Acceptance Testing survey</span>
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </a>
+              <a class="feedback-item" href="#" data-survey="functional">
+                <span>Functional test case sheet</span>
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </a>
+            </div>
+          </div>
+
+          <!-- ===== SUS survey ===== -->
+          <div class="survey-wrap" id="survey-sus" hidden>
+            <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
+            <div class="panel survey-panel">
+              <h2 class="section-title">System Usability Scale (SUS) evaluation</h2>
+              <p class="muted survey-desc">For each statement, choose how much you agree — from 1 (Strongly disagree) to 5 (Strongly agree).</p>
+              <form id="sus-form" novalidate>
+                <div class="survey-row-2">
+                  <label class="field"><span>Your role</span>
+                    <select id="sus-role">
+                      <option>Student</option>
+                      <option>Faculty</option>
+                      <option>Industry partner</option>
+                      <option>Other</option>
+                    </select>
+                  </label>
+                  <label class="field"><span>Program</span>
+                    <select id="sus-program">
+                      <option>BSIT</option>
+                      <option>BSCS</option>
+                      <option>N/A</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="likert-list" id="sus-questions"></div>
+
+                <label class="field"><span>Additional comments (optional)</span><textarea id="sus-comments" rows="3"></textarea></label>
+                <p class="form-error" id="sus-error" hidden></p>
+                <button type="submit" class="btn btn-navy">Submit evaluation</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- ===== UAT survey ===== -->
+          <div class="survey-wrap" id="survey-uat" hidden>
+            <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
+            <div class="panel survey-panel">
+              <h2 class="section-title">User Acceptance Testing survey</h2>
+              <p class="muted survey-desc">Tell us whether UEnvision's core features worked as expected during your test session.</p>
+              <form id="uat-form" novalidate>
+                <div class="survey-row-2">
+                  <label class="field"><span>Your name</span><input type="text" id="uat-name" required></label>
+                  <label class="field"><span>Role</span>
+                    <select id="uat-role">
+                      <option>Student</option>
+                      <option>Faculty</option>
+                      <option>Industry partner</option>
+                      <option>Other</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="survey-row-2">
+                  <label class="field"><span>Program</span>
+                    <select id="uat-program">
+                      <option>BSIT</option>
+                      <option>BSCS</option>
+                      <option>N/A</option>
+                    </select>
+                  </label>
+                  <label class="field"><span>Test date</span><input type="date" id="uat-date"></label>
+                </div>
+
+                <div class="uat-checks" id="uat-checks"></div>
+
+                <label class="field"><span>Overall satisfaction (1 = Poor, 5 = Excellent)</span>
+                  <select id="uat-satisfaction">
+                    <option value="5">5 — Excellent</option>
+                    <option value="4">4 — Good</option>
+                    <option value="3" selected>3 — Okay</option>
+                    <option value="2">2 — Needs work</option>
+                    <option value="1">1 — Poor</option>
+                  </select>
+                </label>
+                <label class="field"><span>Comments (optional)</span><textarea id="uat-comments" rows="3"></textarea></label>
+                <p class="form-error" id="uat-error" hidden></p>
+                <button type="submit" class="btn btn-navy">Submit survey</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- ===== Functional test case sheet ===== -->
+          <div class="survey-wrap" id="survey-functional" hidden>
+            <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
+            <div class="panel survey-panel survey-panel--wide">
+              <h2 class="section-title">Functional test case sheet</h2>
+              <p class="muted survey-desc">Run through each test case, record the actual result, and mark it Pass, Fail, or Blocked.</p>
+              <form id="functional-form" novalidate>
+                <label class="field"><span>Tester name</span><input type="text" id="functional-tester" required></label>
+
+                <div class="table-wrap functional-table-wrap">
+                  <table id="functional-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th><th>Feature</th><th>Steps</th><th>Expected result</th><th>Actual result</th><th>Status</th><th>Notes</th><th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="functional-rows"></tbody>
+                  </table>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" id="functional-add-row">+ Add test case</button>
+
+                <p class="form-error" id="functional-error" hidden></p>
+                <button type="submit" class="btn btn-navy">Submit test results</button>
+              </form>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ---------- ABOUT ---------- -->
+      <section class="page" id="page-about">
+        <header class="page-header">
+          <h1>About</h1>
+        </header>
+        <div class="page-body page-body--photo">
+          <div class="about-card">
+            <div class="about-brand">
+              <svg class="about-logo" viewBox="0 0 64 64" aria-hidden="true">
+                <path d="M10 8 C10 8 10 30 10 34 C10 44 18 50 26 50 C30 50 33 48 35 45 L50 30 L58 22" fill="none" stroke="var(--red)" stroke-width="7" stroke-linecap="round"/>
+                <path d="M35 45 C37 48 40 50 44 50 C52 50 58 44 58 34 L58 8" fill="none" stroke="var(--navy)" stroke-width="7" stroke-linecap="round"/>
+              </svg>
+              <p class="about-wordmark"><span class="w-red">UE</span><span class="w-navy">NVISION</span></p>
+            </div>
+            <h2>About UEnvision</h2>
+            <p>UEnvision is a data-driven curriculum mapping system that analyzes industry demand for technical computing skills. The platform collects job postings from the Philippine job market and identifies the most in-demand skills for Information Technology and Computer Science roles, then compares them with academic competencies to surface potential skill gaps.</p>
+            <h2>Purpose of the system</h2>
+            <p>UEnvision analyzes job market data to identify the most in-demand technical skills in the computing industry. By comparing industry requirements with academic competencies from the BSIT and BSCS programs, it helps surface skill gaps and supports curriculum improvement and student readiness for industry needs.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- SETTINGS ---------- -->
+      <section class="page" id="page-settings">
+        <header class="page-header">
+          <h1>Settings</h1>
+        </header>
+        <div class="page-body">
+          <h2 class="section-title">Account settings</h2>
+          <dl class="settings-list">
+            <div class="settings-row"><dt>User ID</dt><dd id="settings-userid">24601</dd></div>
+            <div class="settings-row"><dt>User name</dt><dd id="settings-username">Jose Rizal</dd></div>
+            <div class="settings-row"><dt>Password</dt><dd id="settings-password">••••••••••••••••</dd></div>
+            <div class="settings-row"><dt>Email</dt><dd id="settings-email">jose.rizal@ue.edu.ph</dd></div>
+          </dl>
+          <div class="settings-actions">
+            <button class="btn btn-ghost" type="button" id="logout-btn">Log out</button>
+            <div class="settings-actions-group">
+              <button class="btn btn-red" type="button" id="delete-btn">Delete</button>
+              <button class="btn btn-navy" type="button" id="edit-btn">Edit</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</section>
+
+<!-- ===================== FILTER DRAWER ===================== -->
+<div class="drawer-backdrop" id="filter-backdrop"></div>
+<aside class="drawer" id="filter-drawer" aria-label="Filters" aria-hidden="true">
+  <div class="drawer-head">
+    <button class="drawer-close" type="button" id="filter-close" aria-label="Close filters">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <h3>Filters</h3>
+    <button class="link-inline" type="button" id="filter-clear-all">Clear all</button>
+  </div>
+
+  <div class="drawer-section">
+    <h4>Date range</h4>
+    <label class="checkbox"><input type="checkbox" checked><span>2026</span></label>
+    <label class="checkbox"><input type="checkbox" checked><span>2025</span></label>
+  </div>
+
+  <div class="drawer-section">
+    <div class="drawer-section-head"><h4>Program</h4><button class="link-inline link-inline--sm" type="button" data-clear-section>Clear</button></div>
+    <label class="checkbox"><input type="checkbox" checked><span>Computer Science</span></label>
+    <label class="checkbox"><input type="checkbox" checked><span>Information Technology</span></label>
+  </div>
+
+  <div class="drawer-section">
+    <div class="drawer-section-head"><h4>Skill category</h4><button class="link-inline link-inline--sm" type="button" data-clear-section>Clear</button></div>
+    <div class="chip-grid" id="skill-chip-grid">
+      <label class="checkbox"><input type="checkbox" checked><span>Python</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>R</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Excel</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Tableau</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Java</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Azure</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>AWS</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>PowerBI</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>NoSQL</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>PySpark</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Snowflake</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Hadoop</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>TensorFlow</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Pandas</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>C++</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>HTML</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Linux</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>JavaScript</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>C</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>Ruby</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>SAS</span></label>
+      <label class="checkbox"><input type="checkbox" checked><span>SQL</span></label>
+    </div>
+  </div>
+
+  <div class="drawer-foot">
+    <button class="btn btn-navy btn-block" type="button" id="filter-apply">Apply filters</button>
+  </div>
+</aside>
+
+<!-- ===================== DELETE MODAL ===================== -->
+<div class="modal-backdrop" id="delete-backdrop">
+  <div class="modal" role="alertdialog" aria-labelledby="delete-title" aria-modal="true">
+    <p id="delete-title">Your account will be permanently deleted from the system. Confirm?</p>
+    <div class="modal-actions">
+      <button class="btn btn-red" type="button" id="delete-yes">Yes</button>
+      <button class="btn btn-cancel" type="button" id="delete-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== TOAST ===================== -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
