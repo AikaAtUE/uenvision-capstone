@@ -1,4 +1,6 @@
 print ("hello world")
-code
-cod
-code
+
+print("update")
+
+print("Aika")
+
