@@ -1,0 +1,27 @@
+{% extends "app_base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-settings">
+  <header class="page-header"><h1>Settings</h1></header>
+  <div class="page-body">
+    <h2 class="section-title">Account settings</h2>
+    <p class="form-msg" id="settings-msg"></p>
+    <dl class="settings-list">
+      <div class="settings-row"><dt>User ID</dt><dd id="set-userid">24601</dd></div>
+      <div class="settings-row"><dt>User name</dt><dd id="set-name" data-editable data-type="text">Jose Rizal</dd></div>
+      <div class="settings-row"><dt>Password</dt><dd id="set-password" data-editable data-type="password" data-real="rizal123">••••••••••••••••</dd></div>
+      <div class="settings-row"><dt>Email</dt><dd id="set-email" data-editable data-type="email">jose.rizal@ue.edu.ph</dd></div>
+    </dl>
+    <div class="settings-actions">
+      <button class="btn btn-red" id="delete-btn">Delete</button>
+      <span class="settings-actions-right">
+        <button class="btn btn-ghost" id="cancel-edit-btn" hidden>Cancel</button>
+        <button class="btn btn-navy" id="edit-btn">Edit</button>
+      </span>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_partials %}
+  {% include "_delete_modal.html" %}
+{% endblock %}

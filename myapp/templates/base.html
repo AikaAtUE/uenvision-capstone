@@ -1,0 +1,37 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}UEnvision{% endblock %} — Curriculum Mapping System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'myapp/styles.css' %}">
+{% block extra_head %}{% endblock %}
+</head>
+<!--
+  These data-* attributes give script.js the real Django URLs to redirect to,
+  so the JS never has to hardcode a path.
+-->
+<body
+  data-login-url="{% url 'login' %}"
+  data-signup-url="{% url 'signup' %}"
+  data-forgot-url="{% url 'forgot_password' %}"
+  data-reset-url="{% url 'reset_password' %}"
+  data-dashboard-url="{% url 'dashboard' %}"
+  data-data-url="{% url 'data' %}"
+  data-feedback-url="{% url 'feedback' %}"
+  data-about-url="{% url 'about' %}"
+  data-settings-url="{% url 'settings' %}"
+>
+
+{% block content %}{% endblock %}
+
+<div class="toast" id="toast"></div>
+
+<script src="{% static 'myapp/script.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

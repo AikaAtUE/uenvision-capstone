@@ -1,0 +1,24 @@
+{% extends "app_base.html" %}
+{% block title %}Feedback{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-feedback">
+  <header class="page-header"><h1>Feedback</h1></header>
+  <div class="page-body page-body--photo">
+    <p class="feedback-intro">For the improvement of UEnvision, we're asking a moment of your time to evaluate the system through the following surveys.</p>
+    <div class="feedback-list">
+      <a class="feedback-item" href="#" onclick="return false;">
+        <span>System Usability Scale (SUS) evaluation</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a class="feedback-item" href="#" onclick="return false;">
+        <span>User Acceptance Testing survey</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a class="feedback-item" href="#" onclick="return false;">
+        <span>Functional test case sheet</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}

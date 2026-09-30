@@ -1,0 +1,19 @@
+{% extends "app_base.html" %}
+{% block title %}About{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-about">
+  <header class="page-header"><h1>About</h1></header>
+  <div class="page-body page-body--photo">
+    <div class="about-card">
+      <div class="about-brand">
+        {% include "_logo.html" with logo_class="about-logo" %}
+        <p class="about-wordmark"><span class="w-red">UE</span><span class="w-navy">NVISION</span></p>
+      </div>
+      <h2>About UEnvision</h2>
+      <p>UEnvision is a data-driven curriculum mapping system that analyzes industry demand for technical computing skills. The platform collects job postings from the Philippine job market and identifies the most in-demand skills for Information Technology and Computer Science roles, then compares them with academic competencies to surface potential skill gaps.</p>
+      <h2>Purpose of the system</h2>
+      <p>UEnvision analyzes job market data to identify the most in-demand technical skills in the computing industry. By comparing industry requirements with academic competencies from the BSIT and BSCS programs, it helps surface skill gaps and supports curriculum improvement and student readiness for industry needs.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

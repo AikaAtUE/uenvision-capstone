@@ -1,0 +1,75 @@
+{% extends "app_base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-dashboard">
+  <header class="page-header"><h1>Dashboard</h1></header>
+  <div class="page-body">
+    <div class="dash-toolbar">
+      <p class="muted">Last analyzation: <em>09/07/2026</em></p>
+      <button class="btn btn-ghost btn-sm" id="filter-btn">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Filter
+      </button>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <p class="stat-label">Total job postings analyzed</p>
+        <p class="stat-value" id="stat-total">—</p>
+        <p class="stat-note" id="stat-total-note">Your postings after filtering</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Unique skills identified</p>
+        <p class="stat-value" id="stat-unique">—</p>
+        <p class="stat-note" id="stat-unique-note">Top category: Programming</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Most in-demand skill</p>
+        <p class="stat-value" id="stat-topskill">—</p>
+        <p class="stat-note" id="stat-topskill-note">Appears in — of postings</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Alignment score</p>
+        <p class="stat-value" id="stat-alignment">—</p>
+        <p class="stat-note" id="stat-alignment-note">Cosine similarity: —</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">High-priority skill gaps</p>
+        <p class="stat-value" id="stat-gaps">—</p>
+        <p class="stat-note" id="stat-gaps-note">Top gap: —</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="tabs" role="tablist">
+        <button class="tab is-active" data-tab="top-skills">Top in-demand skills</button>
+        <button class="tab" data-tab="skill-trends">Skill trends over time</button>
+      </div>
+
+      <div class="tab-panel is-active" id="tab-top-skills">
+        <p class="chart-legend"><span class="dot"></span>Number of job postings</p>
+        <div class="bars" id="bar-chart"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-skill-trends">
+        <p class="chart-legend"><span class="dot dot--navy"></span>Python &nbsp; <span class="dot"></span>SQL &nbsp; <span class="dot dot--muted"></span>AWS</p>
+        <svg viewBox="0 0 640 260" class="line-chart" preserveAspectRatio="none">
+          <line x1="0" y1="220" x2="640" y2="220" stroke="#e4e2dc" stroke-width="1"/>
+          <line x1="0" y1="160" x2="640" y2="160" stroke="#e4e2dc" stroke-width="1"/>
+          <line x1="0" y1="100" x2="640" y2="100" stroke="#e4e2dc" stroke-width="1"/>
+          <line x1="0" y1="40" x2="640" y2="40" stroke="#e4e2dc" stroke-width="1"/>
+          <polyline points="0,190 110,175 220,150 330,120 440,95 550,60 640,40" fill="none" stroke="#c8202f" stroke-width="3"/>
+          <polyline points="0,205 110,195 220,180 330,165 440,150 550,130 640,110" fill="none" stroke="#1b2a4a" stroke-width="3"/>
+          <polyline points="0,215 110,212 220,205 330,196 440,188 550,178 640,168" fill="none" stroke="#a7abb8" stroke-width="3"/>
+        </svg>
+        <div class="line-labels">
+          <span>2023</span><span>2024 Q1</span><span>2024 Q3</span><span>2025 Q1</span><span>2025 Q3</span><span>2026 Q1</span><span>2026 Q3</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_partials %}
+  {% include "_filter_drawer.html" %}
+{% endblock %}
