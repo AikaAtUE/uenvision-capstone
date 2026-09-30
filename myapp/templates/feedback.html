@@ -1,24 +1,133 @@
 {% extends "app_base.html" %}
+{% load static %}
 {% block title %}Feedback{% endblock %}
 {% block page_content %}
-<section class="page is-active" id="page-feedback">
+{# If you add a URL named 'survey_submit', responses are POSTed there; otherwise they are kept in the browser only. #}
+{% url 'survey_submit' as survey_submit_url %}
+<section class="page is-active" id="page-feedback" data-submit-url="{{ survey_submit_url }}">
   <header class="page-header"><h1>Feedback</h1></header>
   <div class="page-body page-body--photo">
-    <p class="feedback-intro">For the improvement of UEnvision, we're asking a moment of your time to evaluate the system through the following surveys.</p>
-    <div class="feedback-list">
-      <a class="feedback-item" href="#" onclick="return false;">
-        <span>System Usability Scale (SUS) evaluation</span>
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-      <a class="feedback-item" href="#" onclick="return false;">
-        <span>User Acceptance Testing survey</span>
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-      <a class="feedback-item" href="#" onclick="return false;">
-        <span>Functional test case sheet</span>
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
+
+    <div id="feedback-home">
+      <p class="feedback-intro">For the improvement of UEnvision, we're asking a moment of your time to evaluate the system through the following surveys.</p>
+      <div class="feedback-list">
+        <a class="feedback-item" href="#" data-survey="sus">
+          <span>System Usability Scale (SUS) evaluation</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="feedback-item" href="#" data-survey="uat">
+          <span>User Acceptance Testing survey</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a class="feedback-item" href="#" data-survey="functional">
+          <span>Functional test case sheet</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
     </div>
+
+    <!-- ===== SUS survey ===== -->
+    <div class="survey-wrap" id="survey-sus" hidden>
+      <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
+      <div class="panel survey-panel">
+        <h2 class="section-title">System Usability Scale (SUS) evaluation</h2>
+        <p class="muted survey-desc">For each statement, choose how much you agree — from 1 (Strongly disagree) to 5 (Strongly agree).</p>
+        <form id="sus-form" novalidate>
+          {% csrf_token %}
+          <div class="survey-row-2">
+            <label class="field"><span>Your role</span>
+              <select id="sus-role">
+                <option>Student</option><option>Faculty</option><option>Industry partner</option><option>Other</option>
+              </select>
+            </label>
+            <label class="field"><span>Program</span>
+              <select id="sus-program">
+                <option>BSIT</option><option>BSCS</option><option>N/A</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="likert-list" id="sus-questions"></div>
+
+          <label class="field"><span>Additional comments (optional)</span><textarea id="sus-comments" rows="3"></textarea></label>
+          <p class="form-msg form-msg--error form-error" id="sus-error" hidden></p>
+          <button type="submit" class="btn btn-navy">Submit evaluation</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== UAT survey ===== -->
+    <div class="survey-wrap" id="survey-uat" hidden>
+      <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
+      <div class="panel survey-panel">
+        <h2 class="section-title">User Acceptance Testing survey</h2>
+        <p class="muted survey-desc">Tell us whether UEnvision's core features worked as expected during your test session.</p>
+        <form id="uat-form" novalidate>
+          {% csrf_token %}
+          <div class="survey-row-2">
+            <label class="field"><span>Your name</span><input type="text" id="uat-name" required></label>
+            <label class="field"><span>Role</span>
+              <select id="uat-role">
+                <option>Student</option><option>Faculty</option><option>Industry partner</option><option>Other</option>
+              </select>
+            </label>
+          </div>
+          <div class="survey-row-2">
+            <label class="field"><span>Program</span>
+              <select id="uat-program">
+                <option>BSIT</option><option>BSCS</option><option>N/A</option>
+              </select>
+            </label>
+            <label class="field"><span>Test date</span><input type="date" id="uat-date"></label>
+          </div>
+
+          <div class="uat-checks" id="uat-checks"></div>
+
+          <label class="field"><span>Overall satisfaction (1 = Poor, 5 = Excellent)</span>
+            <select id="uat-satisfaction">
+              <option value="5">5 — Excellent</option>
+              <option value="4">4 — Good</option>
+              <option value="3" selected>3 — Okay</option>
+              <option value="2">2 — Needs work</option>
+              <option value="1">1 — Poor</option>
+            </select>
+          </label>
+          <label class="field"><span>Comments (optional)</span><textarea id="uat-comments" rows="3"></textarea></label>
+          <p class="form-msg form-msg--error form-error" id="uat-error" hidden></p>
+          <button type="submit" class="btn btn-navy">Submit survey</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== Functional test case sheet ===== -->
+    <div class="survey-wrap" id="survey-functional" hidden>
+      <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
+      <div class="panel survey-panel survey-panel--wide">
+        <h2 class="section-title">Functional test case sheet</h2>
+        <p class="muted survey-desc">Run through each test case, record the actual result, and mark it Pass, Fail, or Blocked.</p>
+        <form id="functional-form" novalidate>
+          {% csrf_token %}
+          <label class="field"><span>Tester name</span><input type="text" id="functional-tester" required></label>
+
+          <div class="table-wrap functional-table-wrap">
+            <table id="functional-table">
+              <thead>
+                <tr><th>ID</th><th>Feature</th><th>Steps</th><th>Expected result</th><th>Actual result</th><th>Status</th><th>Notes</th><th></th></tr>
+              </thead>
+              <tbody id="functional-rows"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="functional-add-row">+ Add test case</button>
+
+          <p class="form-msg form-msg--error form-error" id="functional-error" hidden></p>
+          <button type="submit" class="btn btn-navy">Submit test results</button>
+        </form>
+      </div>
+    </div>
+
   </div>
 </section>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/survey.js' %}?v={% now 'U' %}"></script>
 {% endblock %}

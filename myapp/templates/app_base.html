@@ -1,14 +1,15 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
 <section id="app" class="is-active">
   <div class="app-shell">
 
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-top">
-        {% include "_logo.html" with logo_class="sidebar-logo" %}
-        <p class="sidebar-wordmark"><span class="w-red">UE</span><span class="w-navy">NVISION</span></p>
-        <button class="collapse-toggle" id="collapse-btn" aria-label="Collapse sidebar">
-          <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {# The logo itself is the collapse/expand button (keeps id="collapse-btn" so script.js still finds it). #}
+        <button type="button" class="logo-toggle" id="collapse-btn" aria-label="Collapse or expand sidebar" title="Collapse / expand sidebar">
+          {% include "_logo.html" with logo_class="sidebar-logo sidebar-logo--full" %}
+          <img class="sidebar-logo sidebar-logo--mark" src="{% static 'myapp/img/uenvision-mark.png' %}" alt="UEnvision">
         </button>
       </div>
 
@@ -55,7 +56,7 @@
         </a>
       </nav>
 
-      <a class="nav-item nav-item--collapse" id="logout-btn" href="{% url 'login' %}">
+      <a class="nav-item nav-item--collapse" id="logout-btn" href="{% url 'logout' %}">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M9 5l-7 7 7 7M2 12h20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>

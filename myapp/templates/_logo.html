@@ -1,4 +1,2 @@
-<svg class="{{ logo_class|default:"auth-logo" }}" viewBox="0 0 64 64" aria-hidden="true">
-  <path d="M10 8 C10 8 10 30 10 34 C10 44 18 50 26 50 C30 50 33 48 35 45 L50 30 L58 22" fill="none" stroke="var(--red)" stroke-width="7" stroke-linecap="round"/>
-  <path d="M35 45 C37 48 40 50 44 50 C52 50 58 44 58 34 L58 8" fill="none" stroke="var(--navy)" stroke-width="7" stroke-linecap="round"/>
-</svg>
+{% load static %}{# Full UEnvision logo (mark + wordmark) — replaces the old inline SVG. #}
+<img class="{{ logo_class|default:"auth-logo" }}" src="{% static 'myapp/img/uenvision-logo.png' %}" alt="UEnvision">

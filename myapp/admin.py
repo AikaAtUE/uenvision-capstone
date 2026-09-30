@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import CustomUser
+from .models import CustomUser, SurveyResponse
 
 
 class CustomUserAdmin(UserAdmin):
@@ -25,3 +25,9 @@ class CustomUserAdmin(UserAdmin):
 
 
 admin.site.register(CustomUser, CustomUserAdmin)
+
+@admin.register(SurveyResponse)
+class SurveyResponseAdmin(admin.ModelAdmin):
+    list_display = ["id", "survey_type", "user", "created_at"]
+    list_filter = ["survey_type", "created_at"]
+    readonly_fields = ["survey_type", "user", "data", "created_at"]

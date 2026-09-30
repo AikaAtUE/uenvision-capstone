@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 
@@ -35,3 +36,39 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self):
         return self.first_name
+
+class SurveyResponse(models.Model):
+    """
+    One row per submitted survey record.
+    - SUS and UAT: one row per submission.
+    - Functional test sheet: one row per test case (rows of the same submission share
+      data["submission_id"]).
+    The answers themselves live in `data` (JSON) using the same field names as the old
+    Supabase tables (q1..q10, sus_score, login_worked, test_case_id, ...).
+    """
+
+    SUS = "sus"
+    UAT = "uat"
+    FUNCTIONAL = "functional"
+    SURVEY_TYPES = [
+        (SUS, "System Usability Scale"),
+        (UAT, "User Acceptance Testing"),
+        (FUNCTIONAL, "Functional test case"),
+    ]
+
+    survey_type = models.CharField(max_length=20, choices=SURVEY_TYPES, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="survey_responses",
+    )
+    data = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_survey_type_display()} #{self.pk}"

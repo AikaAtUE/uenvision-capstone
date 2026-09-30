@@ -8,7 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'myapp/styles.css' %}">
+{# ?v= forces the browser to re-download after every change (remove once you deploy) #}
+<link rel="stylesheet" href="{% static 'myapp/styles.css' %}?v={% now 'U' %}">
+<link rel="icon" type="image/png" href="{% static 'myapp/img/uenvision-mark.png' %}">
 {% block extra_head %}{% endblock %}
 </head>
 <!--
@@ -31,7 +33,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="{% static 'myapp/script.js' %}"></script>
+<script src="{% static 'myapp/script.js' %}?v={% now 'U' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

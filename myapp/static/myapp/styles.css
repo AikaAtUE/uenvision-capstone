@@ -128,20 +128,13 @@ a{color:inherit;}
   padding: 22px 14px; transition: width .2s ease;
 }
 .sidebar.is-collapsed{width:76px;}
-.sidebar-top{display:flex; align-items:center; gap:10px; padding: 0 6px 22px;}
+.sidebar-top{display:flex; align-items:center; justify-content:center; gap:10px; padding: 0 6px 22px;}
 .sidebar-logo{width:30px; height:30px; flex-shrink:0;}
 .sidebar-wordmark{font-family:var(--font-head); font-weight:700; font-size:1.05rem; white-space:nowrap; flex:1;}
-.collapse-toggle{
-  width:26px; height:26px; border-radius:50%; border:1px solid rgba(22,35,63,.25); background:#fff;
-  color:var(--navy); display:flex; align-items:center; justify-content:center; flex-shrink:0;
-}
-.collapse-toggle svg{width:14px; height:14px; transition: transform .2s ease;}
-.collapse-toggle:hover{background:rgba(22,35,63,.08);}
 .sidebar.is-collapsed .sidebar-wordmark,
 .sidebar.is-collapsed .profile-text,
 .sidebar.is-collapsed .nav-item span:not(.nav-icon){display:none;}
 .sidebar.is-collapsed .sidebar-top{flex-direction:column; gap:12px;}
-.sidebar.is-collapsed .collapse-toggle svg{transform: rotate(180deg);}
 
 .profile{
   display:flex; align-items:center; gap:10px; background:none; border:none; text-align:left;
@@ -328,3 +321,90 @@ tbody tr:hover{background:#fafafa;}
   .page-body{padding:20px;}
   .chip-grid{grid-template-columns:1fr;}
 }
+
+/* UEnvision additions — loaded AFTER styles.css (see base.html).
+   1) PNG logo sizing   2) Feedback surveys.   Safe to merge into styles.css later. */
+
+/* ---------- 1. Logo (PNG replaces the old 64x64 SVG + text wordmark) ---------- */
+img.auth-logo, img.about-logo, img.sidebar-logo { display: block; height: auto; }
+img.auth-logo   { width: 200px; max-width: 70%; margin: 0 auto; }
+img.auth-logo--sm { width: 140px; }
+img.about-logo  { width: 180px; max-width: 60%; margin: 0 auto; }
+img.sidebar-logo--full { width: 132px; max-width: 100%; }
+img.sidebar-logo--mark { display: none; width: 34px; }
+/* Collapsed sidebar: swap to the mark-only image. Adjust the selector to your collapse class. */
+.sidebar.is-collapsed img.sidebar-logo--full, .sidebar.collapsed img.sidebar-logo--full,
+.app-shell.is-collapsed img.sidebar-logo--full, .app-shell.collapsed img.sidebar-logo--full { display: none; }
+.sidebar.is-collapsed img.sidebar-logo--mark, .sidebar.collapsed img.sidebar-logo--mark,
+.app-shell.is-collapsed img.sidebar-logo--mark, .app-shell.collapsed img.sidebar-logo--mark { display: block; margin: 0 auto; }
+
+/* ---------- 2. Feedback surveys ---------- */
+.survey-wrap[hidden], #feedback-home[hidden] { display: none; }
+.survey-wrap { max-width: 780px; }
+.survey-back { margin-bottom: 12px; }
+.survey-panel { padding: 24px; }
+.survey-panel--wide { max-width: 100%; }
+.survey-wrap:has(.survey-panel--wide) { max-width: 100%; }
+.survey-desc { margin: 4px 0 18px; }
+.survey-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.survey-panel form > .field, .survey-panel form > .survey-row-2 { margin-bottom: 14px; }
+.survey-panel .field textarea, .survey-panel .field select {
+  width: 100%; font: inherit; font-size: .95rem; font-weight: 400; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #f7f7f8; color: inherit;
+}
+.survey-panel .field textarea:focus, .survey-panel .field select:focus { background: #fff; border-color: var(--navy); outline: none;
+}
+.survey-panel .field textarea { resize: vertical; }
+.survey-panel .btn[type=submit] { margin-top: 6px; }
+.form-msg--error { color: var(--red, #c8202f); margin: 8px 0; }
+.form-msg--error[hidden] { display: none; }
+
+/* SUS (class names match the original script.js) */
+.likert-list { display: grid; gap: 10px; margin: 6px 0 18px; }
+.likert-group { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.likert-question { margin: 0 0 8px; font-weight: 500; }
+.likert-scale { display: flex; align-items: center; gap: 8px; }
+.likert-end { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+.likert-option { flex: 1; text-align: center; cursor: pointer; }
+.likert-option input { position: absolute; opacity: 0; pointer-events: none; }
+.likert-option span { display: block; padding: 8px 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; transition: background .12s, color .12s, border-color .12s; }
+.likert-option:hover span { border-color: var(--navy, #1b2a4a); }
+.likert-option input:checked + span { background: var(--navy, #1b2a4a); border-color: var(--navy, #1b2a4a); color: #fff; }
+.likert-option input:focus-visible + span { outline: 2px solid var(--red, #c8202f); outline-offset: 2px; }
+
+/* UAT */
+.uat-checks { margin: 10px 0 18px; border-top: 1px solid var(--line); }
+.uat-check-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.uat-check-label { margin: 0; }
+.uat-check-options { display: flex; gap: 6px; flex-shrink: 0; }
+.uat-radio { cursor: pointer; }
+.uat-radio input { position: absolute; opacity: 0; pointer-events: none; }
+.uat-radio span { display: block; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: .9rem; }
+.uat-radio input:checked + span { background: var(--navy, #1b2a4a); border-color: var(--navy, #1b2a4a); color: #fff; }
+.uat-radio input:focus-visible + span { outline: 2px solid var(--red, #c8202f); outline-offset: 2px; }
+
+/* Functional test sheet */
+.functional-table-wrap { overflow-x: auto; margin: 6px 0 12px; }
+#functional-table { min-width: 900px; }
+#functional-table td { vertical-align: top; padding: 6px; }
+#functional-table td input, #functional-table td textarea, #functional-table td select {
+  width: 100%; font: inherit; font-size: .88rem; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff;
+}
+#functional-table td input[type=text] { min-width: 105px; }
+#functional-table td .ft-status { min-width: 92px; }
+#functional-table td .ft-remove { width: auto; min-width: 0; white-space: nowrap; }
+#functional-table td:first-child { white-space: nowrap; font-weight: 600; padding-top: 12px; }
+#functional-add-row { margin: 0 10px 16px 0; }
+
+@media (max-width: 640px) {
+  .survey-row-2 { grid-template-columns: 1fr; }
+  .uat-check-row { flex-direction: column; align-items: flex-start; }
+  .likert-end { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .likert-option span { transition: none; } }
+
+.toast.is-error { background: var(--red, #c8202f); }
+
+/* ---------- Sidebar: the logo is the collapse/expand button, centered ---------- */
+.logo-toggle { display: flex; align-items: center; justify-content: center; width: 100%; padding: 6px 0; background: none; border: 0; border-radius: 8px; cursor: pointer; }
+.logo-toggle:hover { background: rgba(22,35,63,.06); }
+img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }

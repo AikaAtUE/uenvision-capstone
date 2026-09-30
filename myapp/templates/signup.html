@@ -6,16 +6,15 @@
   <div class="auth-card">
     <div class="auth-brand auth-brand--compact">
       {% include "_logo.html" with logo_class="auth-logo auth-logo--sm" %}
-      <p class="auth-wordmark"><span class="w-red">UE</span><span class="w-navy">NVISION</span></p>
     </div>
     <form class="auth-form" id="signup-form" method="post" action="{% url 'signup' %}">
       {% csrf_token %}
-      <label class="field"><span>Last name</span><input type="text" id="signup-lastname" name="last_name" required></label>
-      <label class="field"><span>First name</span><input type="text" id="signup-firstname" name="first_name" required></label>
-      <label class="field"><span>Middle name</span><input type="text" id="signup-middlename" name="middle_name"></label>
-      <label class="field"><span>UE email</span><input type="email" id="signup-email" name="email" placeholder="juan.delacruz@ue.edu.ph" required></label>
-      <label class="field"><span>Password</span><input type="password" id="signup-password" name="password" required></label>
-      <label class="field"><span>Re-enter password</span><input type="password" id="signup-password2" name="password2" required></label>
+      <label class="field"><span>Last name</span><input type="text" id="signup-lastname" autocomplete="family-name" name="last_name" required></label>
+      <label class="field"><span>First name</span><input type="text" id="signup-firstname" autocomplete="given-name" name="first_name" required></label>
+      <label class="field"><span>Middle name</span><input type="text" id="signup-middlename" autocomplete="additional-name" name="middle_name"></label>
+      <label class="field"><span>UE email</span><input type="email" id="signup-email" autocomplete="email" name="email" placeholder="juan.delacruz@ue.edu.ph" required></label>
+      <label class="field"><span>Password</span><input type="password" id="signup-password" autocomplete="new-password" name="password" required></label>
+      <label class="field"><span>Re-enter password</span><input type="password" id="signup-password2" autocomplete="new-password" name="password2" required></label>
       <p class="form-msg" id="signup-msg">{% if error %}{{ error }}{% endif %}</p>
       <button type="submit" class="btn btn-navy btn-block">Create account</button>
       <p class="auth-foot">Already have an account? <a class="link-inline" href="{% url 'login' %}">Log in</a></p>

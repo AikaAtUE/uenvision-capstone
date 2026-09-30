@@ -9,6 +9,8 @@ urlpatterns = [
     path("dashboard/", views.dashboard_view, name="dashboard"),
     path("data/", views.data_view, name="data"),
     path("feedback/", views.feedback_view, name="feedback"),
+    path("feedback/submit/", views.survey_submit_view, name="survey_submit"),
     path("about/", views.about_view, name="about"),
     path("settings/", views.settings_view, name="settings"),
+    path("logout/", views.logout_view, name="logout"),
 ]

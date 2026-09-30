@@ -6,18 +6,17 @@
   <div class="auth-card">
     <div class="auth-brand">
       {% include "_logo.html" with logo_class="auth-logo" %}
-      <p class="auth-wordmark"><span class="w-red">UE</span><span class="w-navy">NVISION</span></p>
     </div>
 
     <form class="auth-form" id="login-form" method="post" action="{% url 'login' %}">
       {% csrf_token %}
       <label class="field">
         <span>Email address</span>
-        <input type="email" id="login-email" name="email" placeholder="jose.rizal@ue.edu.ph" required>
+        <input type="email" id="login-email" name="email" autocomplete="username" placeholder="jose.rizal@ue.edu.ph" required>
       </label>
       <label class="field">
         <span>Password</span>
-        <input type="password" id="login-password" name="password" placeholder="••••••••" required>
+        <input type="password" id="login-password" name="password" autocomplete="current-password" placeholder="••••••••" required>
       </label>
       <p class="form-msg" id="login-msg">{% if error %}{{ error }}{% endif %}</p>
       <a class="link-inline" href="{% url 'forgot_password' %}">Forgot password</a>
