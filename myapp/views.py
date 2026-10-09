@@ -8,11 +8,12 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
 from django.views.decorators.http import require_POST
 
 from .models import CustomUser, SurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
+from .pipeline import manager as pipeline
 
 # Create your views here.
 
@@ -75,11 +76,6 @@ def reset_password_view(request):
 @login_required
 def dashboard_view(request):
     return render(request, "dashboard.html", {"active_page": "dashboard"})
-
-
-@login_required
-def data_view(request):
-    return render(request, "data.html", {"active_page": "data"})
 
 
 @login_required
@@ -275,3 +271,172 @@ def survey_submit_view(request):
         [SurveyResponse(survey_type=kind, user=request.user, data=row) for row in rows]
     )
     return JsonResponse({"ok": True, "saved": len(rows)})
+
+
+# ---------------------------------------------------------------------------
+# Data  (three separate pages: View Data / Import Data / Scrape Data)
+# View Data is open to every logged-in user. Import and Scrape change files on the
+# server (and Scrape spends API quota / makes outbound requests), so they are
+# Administrator-only.
+# ---------------------------------------------------------------------------
+def _data_ctx(request, tab, **extra):
+    return {"active_page": "data", "data_tab": tab, **extra}
+
+
+@login_required
+def data_view(request):
+    summary = pipeline.disk_summary()
+    tables = []
+    for key, (label, _fn) in pipeline.TABLES.items():
+        info = summary["extracted"] if key == "extracted" else summary["sources"][key]["compiled"]
+        tables.append({"key": key, "label": label, "exists": info["exists"]})
+    default = next((t["key"] for t in tables if t["exists"]), tables[0]["key"])
+    return render(request, "data_view.html", _data_ctx(request, "view", tables=tables, default_table=default))
+
+
+@login_required
+def data_table_view(request):
+    key = request.GET.get("source", "")
+    if key not in pipeline.TABLES:
+        return JsonResponse({"ok": False, "error": "Unknown data source."}, status=400)
+    try:
+        page = int(request.GET.get("page", 1))
+        size = int(request.GET.get("page_size", 50))
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Bad paging values."}, status=400)
+    try:
+        data = pipeline.query_table(key, request.GET.get("q", ""), page, size)
+    except (OSError, UnicodeDecodeError) as exc:
+        return JsonResponse({"ok": False, "error": f"Couldn't read that file: {exc}"}, status=500)
+    return JsonResponse({"ok": True, **data})
+
+
+@login_required
+def data_download_view(request, key):
+    if key not in pipeline.TABLES:
+        raise Http404
+    path = pipeline.table_path(key)
+    if not path.is_file():
+        raise Http404("That file doesn't exist yet.")
+    return FileResponse(open(path, "rb"), as_attachment=True, filename=path.name, content_type="text/csv")
+
+
+@administrator_required
+def data_import_view(request):
+    if request.method == "POST":
+        kind = request.POST.get("import_type", "")
+        files = request.FILES.getlist("files")
+        if kind not in pipeline.IMPORT_TYPES:
+            messages.error(request, "Choose what you are importing.")
+            return redirect("data_import")
+        if not files:
+            messages.error(request, "Choose at least one file to import.")
+            return redirect("data_import")
+        label, fmt, target = pipeline.IMPORT_TYPES[kind]
+
+        if fmt == "json":
+            res = pipeline.import_json_files(target, files, overwrite=request.POST.get("mode") == "replace")
+            for err in res["errors"]:
+                messages.error(request, err)
+            if res["added"] or res["existing"]:
+                msg = f"{label}: {res['added']} file(s) added to data/jsons/{target}/"
+                if res["existing"]:
+                    msg += f", {res['existing']} already existed (skipped)"
+                if res["invalid"]:
+                    msg += f", {res['invalid']} didn't look like {pipeline.SOURCE_LABELS[target]} job files (ignored)"
+                messages.success(request, msg + ".")
+                if res["added"] and request.POST.get("compile_after") == "on":
+                    ok, last = pipeline.compile_now(target)
+                    if ok:
+                        messages.success(request, f"Rebuilt data/compiled_{target}.csv from the JSON files.")
+                    else:
+                        messages.error(request, f"Imported, but compiling failed: {last}")
+            elif not res["errors"]:
+                messages.error(request, f"None of those files looked like {pipeline.SOURCE_LABELS[target]} job JSONs.")
+        else:
+            if len(files) > 1:
+                messages.error(request, "Import one CSV at a time.")
+                return redirect("data_import")
+            try:
+                res = pipeline.import_csv(target, files[0], merge=request.POST.get("mode") != "replace")
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f"{label}: {res['added']} row(s) added, {res['skipped']} skipped (duplicate or missing job_id); "
+                    f"{res['total']} row(s) now in {pipeline.table_path(target).name}.")
+        return redirect("data_import")
+
+    return render(request, "data_import.html", _data_ctx(
+        request, "import", summary=pipeline.disk_summary(), import_types=pipeline.IMPORT_TYPES))
+
+
+def _scrape_ctx(request, form=None):
+    return _data_ctx(
+        request, "scrape",
+        form=form or pipeline.get_scrape_settings(),
+        run=pipeline.get_run_state(),
+        summary=pipeline.disk_summary(),
+        keys_text=pipeline.read_api_keys_text(),
+        key_count=pipeline.count_api_keys(),
+        max_batch=pipeline.MAX_BATCH_SIZE,
+        default_model=pipeline.DEFAULT_MODEL,
+    )
+
+
+@administrator_required
+def data_scrape_view(request):
+    return render(request, "data_scrape.html", _scrape_ctx(request))
+
+
+@administrator_required
+@require_POST
+def scrape_run_view(request):
+    cfg, error = pipeline.parse_scrape_form(request.POST)
+    if not error:
+        error = pipeline.start_run(cfg)
+    if error:
+        messages.error(request, error)
+        return render(request, "data_scrape.html", _scrape_ctx(request, form=cfg))
+    pipeline.save_scrape_settings(cfg)
+    messages.success(request, "Run started. You can leave this page — it keeps going in the background.")
+    return redirect("data_scrape")
+
+
+@administrator_required
+@require_POST
+def scrape_stop_view(request):
+    if pipeline.stop_run():
+        messages.success(request, "Run stopped. Progress so far is saved; run again to resume.")
+    else:
+        messages.error(request, "There's no run in progress.")
+    return redirect("data_scrape")
+
+
+@administrator_required
+def scrape_status_view(request):
+    st = pipeline.get_run_state()
+    return JsonResponse({
+        "status": st.get("status", "idle"),
+        "current": st.get("current"),
+        "steps": st.get("steps", []),
+        "source": st.get("source"),
+        "started_at": st.get("started_at"),
+        "finished_at": st.get("finished_at"),
+        "error": st.get("error"),
+        "log": pipeline.read_log_tail(),
+        "summary": pipeline.disk_summary(),
+    })
+
+
+@administrator_required
+@require_POST
+def api_keys_save_view(request):
+    error = pipeline.save_api_keys_text(request.POST.get("keys", ""))
+    if error:
+        messages.error(request, error)
+    else:
+        n = pipeline.count_api_keys()
+        messages.success(request, f"api_keys.txt saved ({n} key{'s' if n != 1 else ''}).")
+    return redirect("data_scrape")

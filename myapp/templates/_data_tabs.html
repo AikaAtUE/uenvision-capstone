@@ -1,0 +1,8 @@
+{# Sub-navigation for the three Data pages. Import / Scrape are Administrator-only. #}
+<nav class="data-tabs" aria-label="Data sections">
+  <a class="data-tab{% if data_tab == 'view' %} is-active{% endif %}" href="{% url 'data' %}"{% if data_tab == 'view' %} aria-current="page"{% endif %}>View Data</a>
+  {% if user.is_administrator %}
+  <a class="data-tab{% if data_tab == 'import' %} is-active{% endif %}" href="{% url 'data_import' %}"{% if data_tab == 'import' %} aria-current="page"{% endif %}>Import Data</a>
+  <a class="data-tab{% if data_tab == 'scrape' %} is-active{% endif %}" href="{% url 'data_scrape' %}"{% if data_tab == 'scrape' %} aria-current="page"{% endif %}>Scrape Data</a>
+  {% endif %}
+</nav>

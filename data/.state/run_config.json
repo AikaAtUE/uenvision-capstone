@@ -1,0 +1,24 @@
+{
+  "state_file": "D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\data\\.state\\run.json",
+  "log_file": "D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\data\\.state\\run.log",
+  "cwd": "D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone",
+  "steps": [
+    {
+      "name": "extract",
+      "label": "Extract skills with Gemini",
+      "argv": [
+        "C:\\Users\\Raphael\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+        "-u",
+        "D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\myapp\\pipeline\\extract_skills_gemini.py",
+        "D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\data\\compiled_kalibrr.csv",
+        "--keys=D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\api_keys.txt",
+        "--output=extracted_skills",
+        "--output-dir=D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\data",
+        "--json-dir=D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\data\\.state",
+        "--model=gemini-3.5-flash-lite",
+        "--batch-size=20",
+        "--source-label=kalibrr"
+      ]
+    }
+  ]
+}

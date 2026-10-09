@@ -1,0 +1,53 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Import Data{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-data-import">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
+    <h2 class="section-title">Import data</h2>
+    <p class="muted data-lede">Bring in files you already have (for example from a teammate's scrape). Files are stored in the <code>data/</code> folder exactly where the scrapers would have put them.</p>
+
+    <form class="settings-card data-card" method="post" enctype="multipart/form-data" action="{% url 'data_import' %}" id="import-form">
+      {% csrf_token %}
+      <label class="field"><span>What are you importing?</span>
+        <select name="import_type" id="import-type">
+          <optgroup label="Raw job postings (one JSON per job)">
+            <option value="json_kalibrr">Kalibrr job JSONs → data/jsons/kalibrr/</option>
+            <option value="json_trabajo">Trabajo job JSONs → data/jsons/trabajo/</option>
+          </optgroup>
+          <optgroup label="Compiled tables">
+            <option value="csv_kalibrr">Compiled Kalibrr CSV → data/compiled_kalibrr.csv</option>
+            <option value="csv_trabajo">Compiled Trabajo CSV → data/compiled_trabajo.csv</option>
+            <option value="csv_extracted">Extracted skills CSV → data/extracted_skills.csv</option>
+          </optgroup>
+        </select>
+      </label>
+
+      <label class="field"><span id="file-label">Files</span>
+        <input type="file" name="files" id="import-files" multiple required accept=".json,.zip">
+        <small class="field-hint" id="file-hint">Select .json files, or one .zip containing them (best for hundreds of files).</small>
+      </label>
+
+      <fieldset class="field-group" id="mode-group">
+        <legend>If a file or row already exists</legend>
+        <label class="checkbox"><input type="radio" name="mode" value="merge" checked><span id="mode-merge-text">Keep what I have and add only new jobs</span></label>
+        <label class="checkbox"><input type="radio" name="mode" value="replace"><span id="mode-replace-text">Replace with the imported version</span></label>
+      </fieldset>
+
+      <label class="checkbox" id="compile-row"><input type="checkbox" name="compile_after" checked><span>Rebuild the compiled CSV from the JSON files afterwards</span></label>
+
+      <button type="submit" class="btn btn-navy">Import</button>
+    </form>
+
+    <h2 class="section-title settings-section-gap">What's in data/ right now</h2>
+    {% include "_data_summary.html" %}
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/data-import.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

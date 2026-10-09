@@ -1,0 +1,109 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Scrape Data{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-data-scrape">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
+    <h2 class="section-title">Scrape data</h2>
+    <p class="muted data-lede">Collect job postings from a source, compile them into a CSV, then have Gemini extract the skills. Everything is saved in the <code>data/</code> folder, and every step resumes where it left off if you stop and run it again.</p>
+
+    {# ---------- Live run status ---------- #}
+    <div class="run-panel" id="run-panel" data-status="{{ run.status }}" data-status-url="{% url 'scrape_status' %}"{% if run.status == 'idle' %} hidden{% endif %}>
+      <div class="run-head">
+        <div>
+          <span class="run-badge" id="run-badge">{{ run.status|title }}</span>
+          <span class="muted" id="run-meta"></span>
+        </div>
+        <form method="post" action="{% url 'scrape_stop' %}" id="stop-form"{% if run.status != 'running' %} hidden{% endif %}>
+          {% csrf_token %}
+          <button type="submit" class="btn btn-red btn-sm">Stop</button>
+        </form>
+      </div>
+      <ol class="run-steps" id="run-steps"></ol>
+      <p class="form-msg is-error" id="run-error"></p>
+      <pre class="run-log" id="run-log" tabindex="0" aria-label="Run log"></pre>
+    </div>
+
+    <form class="data-card-wide" method="post" action="{% url 'scrape_run' %}" id="scrape-form">
+      {% csrf_token %}
+
+      <div class="settings-card data-card">
+        <h3 class="card-title">1 · Scraping</h3>
+
+        <fieldset class="field-group">
+          <legend>Data source</legend>
+          <div class="source-choice">
+            <label class="source-opt"><input type="radio" name="source" value="trabajo"{% if form.source == 'trabajo' %} checked{% endif %}>
+              <span><strong>Trabajo</strong><small>ph.trabajo.org</small></span></label>
+            <label class="source-opt"><input type="radio" name="source" value="kalibrr"{% if form.source == 'kalibrr' %} checked{% endif %}>
+              <span><strong>Kalibrr</strong><small>kalibrr.com</small></span></label>
+          </div>
+        </fieldset>
+
+        <label class="field"><span>Search keyword</span>
+          <input type="text" name="keyword" value="{{ form.keyword }}" maxlength="100" placeholder="computer science">
+        </label>
+
+        <div class="field-row">
+          <label class="field"><span>Minimum interval (seconds)</span>
+            <input type="number" name="delay_min" value="{{ form.delay_min }}" min="0" max="600" step="0.1" required>
+          </label>
+          <label class="field"><span>Maximum interval (seconds)</span>
+            <input type="number" name="delay_max" value="{{ form.delay_max }}" min="0" max="600" step="0.1" required>
+          </label>
+        </div>
+        <small class="field-hint">A random pause between these two values is taken before every request, so the site isn't hammered. Longer is gentler.</small>
+
+        <label class="field"><span>Max new jobs <em class="opt">(optional)</em></span>
+          <input type="number" name="max_jobs" value="{{ form.max_jobs }}" min="1" step="1" placeholder="No limit">
+          <small class="field-hint">Handy for a quick test run. Jobs already downloaded are skipped and don't count.</small>
+        </label>
+      </div>
+
+      <div class="settings-card data-card">
+        <h3 class="card-title">2 · Skill extraction (Gemini)</h3>
+
+        <label class="field"><span>Rows per prompt</span>
+          <input type="number" name="batch_size" value="{{ form.batch_size }}" min="1" max="{{ max_batch }}" step="1" required>
+          <small class="field-hint">How many job postings are sent to Gemini in one request (1–{{ max_batch }}). Smaller batches are slower but fail less often.</small>
+        </label>
+
+        <label class="field"><span>Gemini model</span>
+          <input type="text" name="model" value="{{ form.model }}" placeholder="{{ default_model }}" spellcheck="false" autocomplete="off" maxlength="80">
+          <small class="field-hint">Any model name your API keys can use, e.g. <code>{{ default_model }}</code>. If Gemini answers “model not found”, change it here.</small>
+        </label>
+      </div>
+
+      <div class="settings-card data-card">
+        <h3 class="card-title">3 · What to run</h3>
+        <label class="checkbox"><input type="checkbox" name="do_scrape"{% if form.do_scrape %} checked{% endif %}><span><strong>Scrape</strong> job postings into <code>data/jsons/&lt;source&gt;/</code></span></label>
+        <label class="checkbox"><input type="checkbox" name="do_compile"{% if form.do_compile %} checked{% endif %}><span><strong>Compile</strong> the JSONs into <code>data/compiled_&lt;source&gt;.csv</code></span></label>
+        <label class="checkbox"><input type="checkbox" name="do_extract"{% if form.do_extract %} checked{% endif %}><span><strong>Extract skills</strong> into <code>data/extracted_skills.csv</code></span></label>
+        <button type="submit" class="btn btn-navy" id="run-btn"{% if run.status == 'running' %} disabled{% endif %}>Run</button>
+        <small class="field-hint" id="run-hint">{% if run.status == 'running' %}A run is in progress.{% else %}Runs in the background — you can leave this page.{% endif %}</small>
+      </div>
+    </form>
+
+    {# ---------- api_keys.txt ---------- #}
+    <h2 class="section-title settings-section-gap">api_keys.txt</h2>
+    <form class="settings-card data-card" method="post" action="{% url 'api_keys_save' %}">
+      {% csrf_token %}
+      <label class="field"><span>Gemini API keys — one per line</span>
+        <textarea name="keys" id="keys-text" rows="6" spellcheck="false" autocomplete="off" wrap="off" placeholder="AIza…">{{ keys_text }}</textarea>
+        <small class="field-hint">When a key runs out of daily quota or is rejected, extraction moves on to the next line. Lines starting with <code>#</code> are ignored. Currently {{ key_count }} key{{ key_count|pluralize }}. Only administrators can see and edit this.</small>
+      </label>
+      <button type="submit" class="btn btn-navy">Save api_keys.txt</button>
+    </form>
+
+    <h2 class="section-title settings-section-gap">What's in data/ right now</h2>
+    <div id="summary-wrap">{% include "_data_summary.html" %}</div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/data-scrape.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

@@ -1,0 +1,12 @@
+{
+  "source": "kalibrr",
+  "keyword": "computer science",
+  "delay_min": 1.5,
+  "delay_max": 4.0,
+  "max_jobs": "",
+  "do_scrape": false,
+  "do_compile": false,
+  "do_extract": true,
+  "batch_size": 20,
+  "model": "gemini-3.5-flash-lite"
+}

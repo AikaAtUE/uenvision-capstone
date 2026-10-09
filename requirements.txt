@@ -1,0 +1,8 @@
+Django>=5.2
+requests
+beautifulsoup4
+lxml
+pandas
+pydantic
+tqdm
+google-genai

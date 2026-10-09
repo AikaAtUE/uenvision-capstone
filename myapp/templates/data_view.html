@@ -1,0 +1,45 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}View Data{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-data" data-table-url="{% url 'data_table' %}"{% if user.is_administrator %} data-import-url="{% url 'data_import' %}" data-scrape-url="{% url 'data_scrape' %}"{% endif %}>
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    <h2 class="section-title">View &amp; export data</h2>
+
+    <div class="data-toolbar">
+      <label class="select-field">
+        <span>Source</span>
+        <select id="data-source">
+          {% for t in tables %}
+          <option value="{{ t.key }}"{% if t.key == default_table %} selected{% endif %}>{{ t.label }}{% if not t.exists %} (no data yet){% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="select-field select-field--grow">
+        <span>Search</span>
+        <input type="text" id="data-search" placeholder="Search this table…" autocomplete="off">
+      </label>
+      <a class="btn btn-red btn-sm" id="export-btn" href="{% url 'data_download' default_table %}" data-url-template="{% url 'data_download' 'KEY' %}">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        Export CSV
+      </a>
+    </div>
+    <p class="muted table-count" id="table-count" aria-live="polite"></p>
+
+    <div class="table-wrap">
+      <table id="view-table"></table>
+    </div>
+    <div class="pager" id="pager" hidden>
+      <button type="button" class="btn btn-ghost btn-sm" id="pager-prev">‹ Previous</button>
+      <span class="muted" id="pager-info"></span>
+      <button type="button" class="btn btn-ghost btn-sm" id="pager-next">Next ›</button>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/data-view.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

@@ -1,0 +1,23 @@
+
+=== Step 1/1: Extract skills with Gemini ===
+Loading D:\School Documents\Official UEnvision (Github)\uenvision-capstone\data\compiled_kalibrr.csv ...
+Columns (41): job_id, job_title, slug, job_url, company_name, company_code, company_industry, company_url, company_verified, function, tenure, number_of_openings, work_experience_code, months_work_experience, education_level_code, open_to_fresh_grads, is_hybrid, is_work_from_home, city, region, country, formatted_address, latitude, longitude, salary_shown, base_salary, maximum_salary, salary_currency, salary_interval, description, qualifications, duties, created_at, activation_date, application_end_date, updated_at, is_active, is_expired, is_featured, visibility, scraped_at
+
+Loaded 2 API key(s). Using key #1/2 (…ZJ7A). Model: gemini-3.5-flash-lite
+Batch 1/12: sent 20 jobs, got skills for 20
+Batch 2/12: sent 20 jobs, got skills for 20
+Batch 3/12: sent 20 jobs, got skills for 20
+Batch 4/12: sent 20 jobs, got skills for 20
+Batch 5/12: sent 20 jobs, got skills for 20
+Batch 6/12: sent 20 jobs, got skills for 20
+Batch 7/12: sent 20 jobs, got skills for 20
+Batch 8/12: sent 20 jobs, got skills for 20
+Batch 9/12: sent 20 jobs, got skills for 20
+Batch 10/12: sent 20 jobs, got skills for 20
+Batch 11/12: sent 20 jobs, got skills for 20
+Batch 12/12: sent 8 jobs, got skills for 8
+
+Done! 228 of 228 jobs saved to:
+  -> D:\School Documents\Official UEnvision (Github)\uenvision-capstone\data\extracted_skills.csv
+  -> D:\School Documents\Official UEnvision (Github)\uenvision-capstone\data\.state\extracted_skills.json
+=== Extract skills with Gemini: finished OK ===

@@ -1,0 +1,16 @@
+<div class="table-wrap">
+  <table class="summary-table" id="summary-table">
+    <thead><tr><th>Path</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for key, s in summary.sources.items %}
+      <tr><td><code>data/jsons/{{ key }}/</code></td><td>{{ s.json_count }} job file{{ s.json_count|pluralize }}</td></tr>
+    {% endfor %}
+    {% for key, s in summary.sources.items %}
+      <tr><td><code>data/compiled_{{ key }}.csv</code></td>
+        <td>{% if s.compiled.exists %}{{ s.compiled.size|filesizeformat }} · updated <time datetime="{{ s.compiled.modified }}" class="js-time">{{ s.compiled.modified }}</time>{% else %}<span class="muted">not created yet</span>{% endif %}</td></tr>
+    {% endfor %}
+      <tr><td><code>data/extracted_skills.csv</code></td>
+        <td>{% if summary.extracted.exists %}{{ summary.extracted.size|filesizeformat }} · updated <time datetime="{{ summary.extracted.modified }}" class="js-time">{{ summary.extracted.modified }}</time>{% else %}<span class="muted">not created yet</span>{% endif %}</td></tr>
+    </tbody>
+  </table>
+</div>

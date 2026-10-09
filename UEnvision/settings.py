@@ -126,3 +126,17 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ---------------------------------------------------------------------------
+# Data pipeline (Data page: View / Import / Scrape)
+# ---------------------------------------------------------------------------
+# data/jsons/kalibrr/, data/jsons/trabajo/        one JSON file per scraped job
+# data/compiled_kalibrr.csv, compiled_trabajo.csv  compiled from those JSONs
+# data/extracted_skills.csv                        Gemini skill extraction output
+DATA_DIR = BASE_DIR / "data"
+# One Gemini API key per line. Editable from Data > Scrape Data (administrators only).
+API_KEYS_FILE = BASE_DIR / "api_keys.txt"
+
+# Importing a folder of job JSONs can post hundreds of files at once (Django's default is 100).
+DATA_UPLOAD_MAX_NUMBER_FILES = 5000
