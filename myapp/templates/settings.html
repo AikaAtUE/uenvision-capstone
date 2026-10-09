@@ -4,13 +4,14 @@
 <section class="page is-active" id="page-settings">
   <header class="page-header"><h1>Settings</h1></header>
   <div class="page-body">
+    {% include "_messages.html" %}
     <h2 class="section-title">Account settings</h2>
     <p class="form-msg" id="settings-msg"></p>
     <dl class="settings-list">
-      <div class="settings-row"><dt>User ID</dt><dd id="set-userid">24601</dd></div>
-      <div class="settings-row"><dt>User name</dt><dd id="set-name" data-editable data-type="text">Jose Rizal</dd></div>
-      <div class="settings-row"><dt>Password</dt><dd id="set-password" data-editable data-type="password" data-real="rizal123">••••••••••••••••</dd></div>
-      <div class="settings-row"><dt>Email</dt><dd id="set-email" data-editable data-type="email">jose.rizal@ue.edu.ph</dd></div>
+      <div class="settings-row"><dt>User ID</dt><dd id="set-userid">{{ user.pk }}</dd></div>
+      <div class="settings-row"><dt>User name</dt><dd id="set-name" data-editable data-type="text">{{ user.get_full_name }}</dd></div>
+      <div class="settings-row"><dt>Email</dt><dd id="set-email" data-editable data-type="email">{{ user.email }}</dd></div>
+      <div class="settings-row"><dt>Role</dt><dd id="set-role">{{ user.get_role_display }}</dd></div>
     </dl>
     <div class="settings-actions">
       <button class="btn btn-red" id="delete-btn">Delete</button>
@@ -19,9 +20,45 @@
         <button class="btn btn-navy" id="edit-btn">Edit</button>
       </span>
     </div>
+
+    <h2 class="section-title settings-section-gap">Change password</h2>
+    <form class="settings-card" id="password-form" method="post" action="{% url 'change_password' %}">
+      {% csrf_token %}
+      <label class="field"><span>Current password</span>
+        <input type="password" name="current_password" id="pw-current" autocomplete="current-password" required></label>
+      <label class="field"><span>New password</span>
+        <input type="password" name="new_password" id="pw-new" autocomplete="new-password" minlength="{{ min_password_length }}" required>
+        <small class="field-hint">At least {{ min_password_length }} characters.</small></label>
+      <label class="field"><span>Confirm new password</span>
+        <input type="password" name="confirm_password" id="pw-confirm" autocomplete="new-password" minlength="{{ min_password_length }}" required></label>
+      <p class="form-msg" id="pw-msg"></p>
+      <button type="submit" class="btn btn-navy">Update password</button>
+    </form>
   </div>
 </section>
 {% endblock %}
 {% block extra_partials %}
   {% include "_delete_modal.html" %}
+{% endblock %}
+{% block extra_js %}
+<script>
+  // Client-side check for instant feedback; the server re-checks everything.
+  (function () {
+    const form = document.getElementById('password-form');
+    const msg = document.getElementById('pw-msg');
+    const min = {{ min_password_length }};
+    form.addEventListener('submit', e => {
+      const next = document.getElementById('pw-new').value;
+      const confirm = document.getElementById('pw-confirm').value;
+      let problem = '';
+      if (next.length < min) problem = 'New password must be at least ' + min + ' characters.';
+      else if (next !== confirm) problem = 'New password and confirmation do not match.';
+      if (problem) {
+        e.preventDefault();
+        msg.textContent = problem;
+        msg.classList.add('is-error');
+      }
+    });
+  })();
+</script>
 {% endblock %}

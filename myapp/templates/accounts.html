@@ -1,0 +1,99 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Accounts{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-accounts">
+  <header class="page-header"><h1>Accounts</h1></header>
+  <div class="page-body">
+    {% include "_messages.html" %}
+    <div class="data-toolbar">
+      <h2 class="section-title" style="margin:0">Manage accounts</h2>
+      <button type="button" class="btn btn-navy btn-sm" id="add-account-btn">+ Add account</button>
+    </div>
+    <p class="muted table-count">{{ accounts|length }} account{{ accounts|length|pluralize }}</p>
+
+    <div class="table-wrap">
+      <table id="accounts-table">
+        <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for a in accounts %}
+          <tr
+            data-last="{{ a.last_name }}" data-first="{{ a.first_name }}" data-middle="{{ a.middle_name }}"
+            data-email="{{ a.email }}" data-name="{{ a.get_full_name }}"
+            data-edit-url="{% url 'account_edit' a.pk %}"
+            data-reset-url="{% url 'account_reset_password' a.pk %}"
+            data-delete-url="{% url 'account_delete' a.pk %}">
+            <td>{{ a.pk }}</td>
+            <td>{{ a.get_full_name }}{% if a.pk == user.pk %} <span class="pill pill--you">You</span>{% endif %}</td>
+            <td>{{ a.email }}</td>
+            <td><span class="pill pill--{{ a.role }}">{{ a.get_role_display }}</span></td>
+            <td>{{ a.date_joined|date:"M j, Y" }}</td>
+            <td class="row-actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-action="edit">Edit</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-action="reset">Reset password</button>
+              {% if a.pk != user.pk %}<button type="button" class="btn btn-red btn-sm" data-action="delete">Remove</button>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_partials %}
+{# Shared hidden form used by Reset password / Remove (action URL is set by accounts.js) #}
+<form id="action-form" method="post" hidden>{% csrf_token %}</form>
+
+<div class="modal-backdrop" id="add-backdrop">
+  <div class="modal modal--form" role="dialog" aria-labelledby="add-title">
+    <h3 id="add-title">Add account</h3>
+    <form method="post" action="{% url 'account_create' %}" id="add-form">
+      {% csrf_token %}
+      <label class="field"><span>Last name</span><input type="text" name="last_name" required></label>
+      <label class="field"><span>First name</span><input type="text" name="first_name" required></label>
+      <label class="field"><span>Middle name (optional)</span><input type="text" name="middle_name"></label>
+      <label class="field"><span>Email</span><input type="email" name="email" placeholder="juan.delacruz@ue.edu.ph" required></label>
+      <label class="field"><span>Role</span>
+        <select name="role">{% for value, label in roles %}<option value="{{ value }}"{% if value == 'faculty' %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="field"><span>Password</span>
+        <input type="password" name="password" minlength="{{ min_password_length }}" autocomplete="new-password" placeholder="Leave blank to use {{ default_password }}">
+        <small class="field-hint">Leave blank to use the default password ({{ default_password }}); otherwise at least {{ min_password_length }} characters.</small></label>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-navy">Create account</button>
+        <button type="button" class="btn btn-cancel" data-close="add-backdrop">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="edit-backdrop">
+  <div class="modal modal--form" role="dialog" aria-labelledby="edit-title">
+    <h3 id="edit-title">Edit account</h3>
+    <form method="post" id="edit-form">
+      {% csrf_token %}
+      <label class="field"><span>Last name</span><input type="text" name="last_name" id="edit-last" required></label>
+      <label class="field"><span>First name</span><input type="text" name="first_name" id="edit-first" required></label>
+      <label class="field"><span>Middle name (optional)</span><input type="text" name="middle_name" id="edit-middle"></label>
+      <label class="field"><span>Email</span><input type="email" name="email" id="edit-email" required></label>
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-navy">Save changes</button>
+        <button type="button" class="btn btn-cancel" data-close="edit-backdrop">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# Confirmation dialog — must stay LAST so it stacks above the edit dialog #}
+<div class="modal-backdrop modal-backdrop--top" id="confirm-backdrop">
+  <div class="modal" role="alertdialog" aria-labelledby="confirm-text">
+    <p id="confirm-text"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-navy" id="confirm-yes">Yes</button>
+      <button type="button" class="btn btn-cancel" id="confirm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'myapp/accounts.js' %}?v={% now 'U' %}"></script>{% endblock %}

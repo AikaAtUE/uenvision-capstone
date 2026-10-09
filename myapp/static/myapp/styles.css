@@ -408,3 +408,27 @@ img.sidebar-logo--mark { display: none; width: 34px; }
 .logo-toggle { display: flex; align-items: center; justify-content: center; width: 100%; padding: 6px 0; background: none; border: 0; border-radius: 8px; cursor: pointer; }
 .logo-toggle:hover { background: rgba(22,35,63,.06); }
 img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }
+
+/* ============ Accounts page + password change + flash messages ============ */
+.flash-list{display:flex; flex-direction:column; gap:8px; margin-bottom:18px; max-width:760px;}
+.flash{margin:0; padding:11px 14px; border-radius:8px; font-size:.88rem; font-weight:600;}
+.flash--success{background:#e5f4ec; color:#1c7d4d;}
+.flash--error{background:#fbe6e8; color:var(--red-dark);}
+
+.settings-section-gap{margin-top:36px;}
+.settings-card{max-width:640px; background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow-card); padding:22px 24px; display:flex; flex-direction:column; gap:16px;}
+.settings-card .btn{align-self:flex-start;}
+.field-hint{font-weight:400; font-size:.76rem; color:var(--muted);}
+
+.row-actions{display:flex; gap:8px;}
+.pill{display:inline-block; padding:3px 10px; border-radius:999px; font-size:.75rem; font-weight:700; background:#eceef2; color:var(--navy);}
+.pill--administrator{background:#f0c8cd; color:#5a1017;}
+.pill--faculty{background:#e1e7f4; color:var(--navy);}
+.pill--you{background:var(--navy); color:#fff; margin-left:4px;}
+
+.modal--form{text-align:left; width:100%; max-width:440px; max-height:90vh; overflow:auto; padding:28px;}
+.modal--form h3{margin-bottom:18px; font-size:1.2rem;}
+.modal--form form{display:flex; flex-direction:column; gap:14px;}
+.modal--form .modal-actions{margin-top:6px;}
+.modal--form .field select{font-family:inherit; font-size:.95rem; padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#f7f7f8;}
+.modal-backdrop--top{z-index:60;}

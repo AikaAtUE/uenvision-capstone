@@ -1,12 +1,18 @@
 import json
 
-from django.contrib.auth import authenticate, login, logout
+from functools import wraps
+
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
-from django.shortcuts import render, redirect, HttpResponse
+from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
 from django.views.decorators.http import require_POST
 
-from .models import CustomUser, SurveyResponse
+from .models import CustomUser, SurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
 
 # Create your views here.
 
@@ -34,6 +40,9 @@ def signup_view(request):
         if password != password2:
             return render(request, "signup.html", {"error": "Passwords do not match."})
 
+        if len(password or "") < MIN_PASSWORD_LENGTH:
+            return render(request, "signup.html", {"error": f"Password must be at least {MIN_PASSWORD_LENGTH} characters."})
+
         if CustomUser.objects.filter(email=email).exists():
             return render(request, "signup.html", {"error": "An account with this email already exists."})
 
@@ -43,6 +52,7 @@ def signup_view(request):
             first_name=first_name,
             middle_name=middle_name,
             last_name=last_name,
+            role=CustomUser.Role.FACULTY,  # self-signups are always Faculty; only an admin can create admins
         )
         login(request, user)
         return redirect("dashboard")
@@ -84,7 +94,140 @@ def about_view(request):
 
 @login_required
 def settings_view(request):
-    return render(request, "settings.html", {"active_page": "settings"})
+    return render(request, "settings.html", {"active_page": "settings", "min_password_length": MIN_PASSWORD_LENGTH})
+
+
+@login_required
+@require_POST
+def change_password_view(request):
+    current = request.POST.get("current_password", "")
+    new = request.POST.get("new_password", "")
+    confirm = request.POST.get("confirm_password", "")
+
+    if not request.user.check_password(current):
+        messages.error(request, "Current password is incorrect.")
+    elif len(new) < MIN_PASSWORD_LENGTH:
+        messages.error(request, f"New password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    elif new != confirm:
+        messages.error(request, "New password and confirmation do not match.")
+    elif new == current:
+        messages.error(request, "New password must be different from your current password.")
+    else:
+        request.user.set_password(new)
+        request.user.save(update_fields=["password"])
+        update_session_auth_hash(request, request.user)  # keep this session logged in
+        messages.success(request, "Your password has been changed.")
+    return redirect("settings")
+
+
+# ---------------------------------------------------------------------------
+# Accounts management (Administrator only)
+# ---------------------------------------------------------------------------
+def administrator_required(view):
+    """Logged-in Administrators only. Everyone else gets a 403, even if they type the URL."""
+    @wraps(view)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_administrator:
+            raise PermissionDenied
+        return view(request, *args, **kwargs)
+    return wrapper
+
+
+def _clean_account_fields(post, exclude_pk=None):
+    """Validate the name/email fields shared by create + edit. Returns (data, error)."""
+    data = {
+        "last_name": post.get("last_name", "").strip(),
+        "first_name": post.get("first_name", "").strip(),
+        "middle_name": post.get("middle_name", "").strip(),
+        "email": post.get("email", "").strip(),
+    }
+    if not data["last_name"] or not data["first_name"]:
+        return data, "First name and last name are required."
+    try:
+        validate_email(data["email"])
+    except ValidationError:
+        return data, "Enter a valid email address."
+    data["email"] = CustomUser.objects.normalize_email(data["email"])
+    clash = CustomUser.objects.filter(email__iexact=data["email"])
+    if exclude_pk is not None:
+        clash = clash.exclude(pk=exclude_pk)
+    if clash.exists():
+        return data, "An account with this email already exists."
+    return data, None
+
+
+@administrator_required
+def accounts_view(request):
+    accounts = CustomUser.objects.order_by("last_name", "first_name")
+    return render(request, "accounts.html", {
+        "active_page": "accounts",
+        "accounts": accounts,
+        "roles": CustomUser.Role.choices,
+        "min_password_length": MIN_PASSWORD_LENGTH,
+        "default_password": DEFAULT_PASSWORD,
+    })
+
+
+@administrator_required
+@require_POST
+def account_create_view(request):
+    data, error = _clean_account_fields(request.POST)
+    role = request.POST.get("role", CustomUser.Role.FACULTY)
+    password = request.POST.get("password", "") or DEFAULT_PASSWORD  # blank -> default
+
+    if not error and role not in CustomUser.Role.values:
+        error = "Choose a valid role."
+    if not error and len(password) < MIN_PASSWORD_LENGTH:
+        error = f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+
+    if error:
+        messages.error(request, error)
+    else:
+        CustomUser.objects.create_user(password=password, role=role, **data)
+        note = " with the default password." if password == DEFAULT_PASSWORD else "."
+        messages.success(request, f"Account created for {data['email']}{note}")
+    return redirect("accounts")
+
+
+@administrator_required
+@require_POST
+def account_edit_view(request, pk):
+    target = get_object_or_404(CustomUser, pk=pk)
+    data, error = _clean_account_fields(request.POST, exclude_pk=target.pk)
+    if error:
+        messages.error(request, error)
+    else:
+        for field, value in data.items():
+            setattr(target, field, value)
+        target.save(update_fields=list(data))
+        messages.success(request, f"Account updated for {target.email}.")
+    return redirect("accounts")
+
+
+@administrator_required
+@require_POST
+def account_reset_password_view(request, pk):
+    target = get_object_or_404(CustomUser, pk=pk)
+    target.set_password(DEFAULT_PASSWORD)
+    target.save(update_fields=["password"])
+    if target.pk == request.user.pk:
+        update_session_auth_hash(request, target)  # `target` holds the new hash; request.user is stale
+    messages.success(request, f"Password for {target.email} was reset to the default ({DEFAULT_PASSWORD}).")
+    return redirect("accounts")
+
+
+@administrator_required
+@require_POST
+def account_delete_view(request, pk):
+    target = get_object_or_404(CustomUser, pk=pk)
+    if target.pk == request.user.pk:
+        messages.error(request, "You can't remove your own account from here.")
+    else:
+        email = target.email
+        target.delete()
+        messages.success(request, f"Account {email} was removed.")
+    return redirect("accounts")
 
 
 # ---------------------------------------------------------------------------

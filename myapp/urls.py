@@ -12,5 +12,11 @@ urlpatterns = [
     path("feedback/submit/", views.survey_submit_view, name="survey_submit"),
     path("about/", views.about_view, name="about"),
     path("settings/", views.settings_view, name="settings"),
+    path("settings/change-password/", views.change_password_view, name="change_password"),
+    path("accounts/", views.accounts_view, name="accounts"),
+    path("accounts/create/", views.account_create_view, name="account_create"),
+    path("accounts/<int:pk>/edit/", views.account_edit_view, name="account_edit"),
+    path("accounts/<int:pk>/reset-password/", views.account_reset_password_view, name="account_reset_password"),
+    path("accounts/<int:pk>/delete/", views.account_delete_view, name="account_delete"),
     path("logout/", views.logout_view, name="logout"),
 ]

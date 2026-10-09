@@ -502,7 +502,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const newName = document.querySelector('#set-name input').value.trim();
       const newEmail = document.querySelector('#set-email input').value.trim();
-      const newPassword = document.querySelector('#set-password input').value.trim();
 
       if (!newName || !newEmail){
         setMsg(settingsMsg, 'Name and email cannot be empty.', 'error');
@@ -520,7 +519,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       currentUser.name = newName;
       currentUser.email = newEmail;
-      if (newPassword) currentUser.password = newPassword;
       const idx = accounts.findIndex(a => a.id === currentUser.id);
       if (idx > -1) accounts[idx] = currentUser;
       saveAccounts(accounts);

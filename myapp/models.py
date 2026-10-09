@@ -4,6 +4,12 @@ from django.db import models
 
 from .managers import CustomUserManager
 
+# Minimum length for every password set through the app (change password,
+# signup, new accounts). Passwords are stored hashed, so this can only be
+# enforced when a password is set, never on the stored value.
+MIN_PASSWORD_LENGTH = 8
+DEFAULT_PASSWORD = "default123"  # what "Reset password" sets (Accounts page)
+
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     """
@@ -13,7 +19,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
       (never store or query the raw password anywhere).
     """
 
+    class Role(models.TextChoices):
+        ADMINISTRATOR = "administrator", "Administrator"
+        FACULTY = "faculty", "Faculty"
+
     email = models.EmailField(unique=True)
+    role = models.CharField(max_length=20, choices=Role.choices, default=Role.FACULTY)
     last_name = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     middle_name = models.CharField(max_length=100, blank=True)  # optional, per signup.html
@@ -29,6 +40,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+    @property
+    def is_administrator(self):
+        return self.role == self.Role.ADMINISTRATOR
 
     def get_full_name(self):
         parts = [self.first_name, self.middle_name, self.last_name]
