@@ -1,0 +1,33 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Console{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-console">
+  <header class="page-header"><h1>Console</h1></header>
+  <div class="page-body">
+    {% include "_messages.html" %}
+    <h2 class="section-title">Run console</h2>
+    <p class="muted data-lede">Live progress and output of the scrape, compile and skill-extraction runs started from <a href="{% url 'data_scrape' %}">Scrape Data</a> and <a href="{% url 'data_extract' %}">Extract Skills</a>. Runs keep going in the background, so you can close this page and come back.</p>
+
+    <div class="run-panel run-panel--console" id="run-panel" data-status="{{ run.status }}" data-kind="any" data-status-url="{% url 'scrape_status' %}">
+      <div class="run-head">
+        <div>
+          <span class="run-badge" id="run-badge">{{ run.status|title }}</span>
+          <span class="muted" id="run-meta"></span>
+        </div>
+        <form method="post" action="{% url 'console_stop' %}" id="stop-form"{% if run.status != 'running' %} hidden{% endif %}>
+          {% csrf_token %}
+          <button type="submit" class="btn btn-red btn-sm">Stop</button>
+        </form>
+      </div>
+      <ol class="run-steps" id="run-steps"></ol>
+      <p class="form-msg is-error" id="run-error"></p>
+      <pre class="run-log" id="run-log" tabindex="0" aria-label="Run log"></pre>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/data-scrape.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

@@ -1,8 +1,9 @@
-/* Scrape Data: live status + log for the background run. All dynamic text goes in via textContent. */
+/* Scrape Data / Extract Skills: live status + log for the background run. All dynamic text goes in via textContent. */
 (function () {
   'use strict';
   const panel = document.getElementById('run-panel');
   if (!panel) return;
+  const isConsole = panel.dataset.kind === 'any';   // the Console page shows every run and never hides
 
   const badge = document.getElementById('run-badge');
   const meta = document.getElementById('run-meta');
@@ -24,7 +25,8 @@
   }
 
   function render(d) {
-    panel.hidden = d.status === 'idle';
+    const mine = isConsole || !d.kind || d.kind === panel.dataset.kind;
+    panel.hidden = (d.status === 'idle' && !isConsole) || !mine;
     panel.dataset.status = d.status;
     badge.textContent = LABEL[d.status] || d.status;
     badge.dataset.s = d.status;
@@ -46,13 +48,14 @@
     errEl.textContent = d.error || '';
 
     const atBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
-    if (logEl.textContent !== d.log) {
-      logEl.textContent = d.log;
+    const text = d.log || 'Waiting for output…';
+    if (logEl.textContent !== text) {
+      logEl.textContent = text;
       if (atBottom) logEl.scrollTop = logEl.scrollHeight;
     }
 
     const running = d.status === 'running';
-    stopForm.hidden = !running;
+    stopForm.hidden = !(running && mine);
     if (runBtn) runBtn.disabled = running;
     if (runHint) runHint.textContent = running ? 'A run is in progress.' : 'Runs in the background — you can leave this page.';
   }
@@ -63,18 +66,18 @@
       .then(d => {
         delay = 2000;
         render(d);
-        if (prev === 'running' && d.status !== 'running') {
+        if (!isConsole && prev === 'running' && d.status !== 'running') {
           // finished while this page was open: refresh the "what's in data/" table
           setTimeout(() => window.location.reload(), 800);
           return;
         }
         prev = d.status;
-        if (d.status === 'running') setTimeout(poll, delay);
+        if (d.status === 'running' || isConsole) setTimeout(poll, d.status === 'running' ? delay : 5000);
       })
-      .catch(() => { delay = Math.min(delay * 2, 15000); if (prev === 'running') setTimeout(poll, delay); });
+      .catch(() => { delay = Math.min(delay * 2, 15000); if (prev === 'running' || isConsole) setTimeout(poll, delay); });
   }
 
-  if (prev !== 'idle') poll();
+  if (prev !== 'idle' || isConsole) poll();
 
   document.querySelectorAll('time.js-time').forEach(t => {
     const d = new Date(t.getAttribute('datetime'));

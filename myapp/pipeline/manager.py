@@ -1,5 +1,5 @@
 """
-Backend helpers for the Data pages (View / Import / Scrape).
+Backend helpers for the Data pages (View / Import / Scrape / Extract Skills).
 
 Disk layout (all under settings.DATA_DIR):
 
@@ -22,11 +22,15 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 from django.conf import settings
+
+from .skills_schema import (SKILL_CSVS, UNIVERSAL_COLUMNS, normalize_record, split_skills,
+                            write_skill_csvs)
 
 PIPELINE_DIR = Path(__file__).resolve().parent
 SOURCES = ("kalibrr", "trabajo")
@@ -37,10 +41,13 @@ TABLES = {
     "kalibrr": ("Raw Job Data — Kalibrr", "compiled_kalibrr.csv"),
     "trabajo": ("Raw Job Data — Trabajo", "compiled_trabajo.csv"),
     "extracted": ("Extracted Skills", "extracted_skills.csv"),
+    "hard_skills": ("Hard Skills", SKILL_CSVS["hard_skills"]),
+    "soft_skills": ("Soft Skills", SKILL_CSVS["soft_skills"]),
 }
 
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
-MAX_BATCH_SIZE = 20          # same cap the extraction script enforces
+DEFAULT_BATCH_SIZE = 20
+MAX_BATCH_SIZE = 100         # same cap the extraction script enforces
 HEARTBEAT_STALE_SECONDS = 60
 MAX_JSON_BYTES = 10 * 1024 * 1024
 MAX_ZIP_TOTAL_BYTES = 500 * 1024 * 1024
@@ -99,7 +106,14 @@ def _atomic_write_text(path: Path, text: str, encoding="utf-8") -> None:
     try:
         with os.fdopen(fd, "w", encoding=encoding, newline="") as f:
             f.write(text)
-        os.replace(tmp, path)
+        for attempt in range(100):     # Windows: "Access is denied" while another process has the file open
+            try:
+                os.replace(tmp, path)
+                break
+            except PermissionError:
+                if attempt == 99:
+                    raise
+                time.sleep(0.05)
     except BaseException:
         if os.path.exists(tmp):
             os.unlink(tmp)
@@ -193,6 +207,129 @@ def query_table(key: str, q: str = "", page: int = 1, page_size: int = 50) -> di
 
 
 # ---------------------------------------------------------------------------
+# Hard / soft skills CSVs and the dashboard numbers
+# ---------------------------------------------------------------------------
+def ensure_skill_csvs() -> None:
+    """(Re)build hard_skills.csv / soft_skills.csv from extracted_skills.csv when missing or stale."""
+    src = extracted_csv()
+    if not src.is_file():
+        return
+    stamp = src.stat().st_mtime
+    if all(table_path(k).is_file() and table_path(k).stat().st_mtime >= stamp for k in SKILL_CSVS):
+        return
+    loaded = load_table("extracted")
+    if loaded is None:
+        return
+    columns, rows = loaded
+    recs = [dict(zip(columns, r)) for r in rows]
+    write_skill_csvs(recs, str(data_dir()))
+    for k in SKILL_CSVS:
+        _table_cache.pop(k, None)
+
+
+_MONTH_RE = re.compile(r"^(\d{4})-(\d{2})")
+
+
+def _month_range(first: str, last: str) -> list[str]:
+    y, m = int(first[:4]), int(first[5:])
+    ly, lm = int(last[:4]), int(last[5:])
+    out = []
+    while (y, m) <= (ly, lm):
+        out.append(f"{y:04d}-{m:02d}")
+        m += 1
+        if m == 13:
+            y, m = y + 1, 1
+    return out
+
+
+def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level: str = "",
+                     months: int = 0) -> dict:
+    """Numbers behind the dashboard charts.
+
+    kind: 'hard' | 'soft'. top: how many skills. source / level: optional filters.
+    months: 0 = every month with data, otherwise only the latest N months.
+    A skill is counted once per job posting that mentions it."""
+    kind = "soft" if kind == "soft" else "hard"
+    top = max(1, min(int(top), 30))
+    loaded = load_table("extracted")
+    if loaded is None:
+        return {"exists": False}
+    columns, rows = loaded
+    idx = {c: i for i, c in enumerate(columns)}
+
+    def get(r, c):
+        i = idx.get(c)
+        return r[i].strip() if i is not None and i < len(r) else ""
+
+    sources = sorted({get(r, "source") for r in rows if get(r, "source")})
+    levels = sorted({get(r, "experience_level") for r in rows if get(r, "experience_level")})
+    chosen = [r for r in rows
+              if (not source or get(r, "source") == source)
+              and (not level or (get(r, "experience_level") or "Not specified") == level)]
+
+    col = f"{kind}_skills"
+    jobs = []        # (month or None, {key: display})
+    for r in chosen:
+        m = _MONTH_RE.match(get(r, "date"))
+        month = f"{m.group(1)}-{m.group(2)}" if m else None
+        skills = {}
+        for sk in split_skills(get(r, col)):
+            skills.setdefault(sk.lower(), sk)
+        jobs.append((month, skills))
+
+    dated = sorted({m for m, _ in jobs if m})
+    month_list = _month_range(dated[0], dated[-1]) if dated else []
+    if months and len(month_list) > months:
+        month_list = month_list[-months:]
+    window = set(month_list)
+    in_window = [(m, s) for m, s in jobs if (m in window)] if month_list else []
+
+    def tally(items):
+        counts, forms = {}, {}
+        for _, sk in items:
+            for k, disp in sk.items():
+                counts[k] = counts.get(k, 0) + 1
+                forms.setdefault(k, {}).setdefault(disp, 0)
+                forms[k][disp] += 1
+        label = {k: max(f.items(), key=lambda kv: (kv[1], kv[0]))[0] for k, f in forms.items()}
+        return counts, label
+
+    counts, label = tally(jobs)
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], label[kv[0]].lower()))
+    total_jobs = len(jobs)
+    bars = [{"skill": label[k], "count": c, "pct": round(c / total_jobs * 100, 1) if total_jobs else 0}
+            for k, c in ranked[:top]]
+
+    w_counts, w_label = tally(in_window)
+    w_ranked = sorted(w_counts.items(), key=lambda kv: (-kv[1], w_label[kv[0]].lower()))[:top]
+    per_month = {m: 0 for m in month_list}
+    series = {k: {m: 0 for m in month_list} for k, _ in w_ranked}
+    for m, sk in in_window:
+        per_month[m] += 1
+        for k in sk:
+            if k in series:
+                series[k][m] += 1
+    return {
+        "exists": True,
+        "kind": kind,
+        "updated": _file_info(extracted_csv()).get("modified"),
+        "sources": sources,
+        "levels": levels + (["Not specified"] if any(not get(r, "experience_level") for r in rows) else []),
+        "stats": {
+            "postings": total_jobs,
+            "unique_skills": len(counts),
+            "top_skill": bars[0]["skill"] if bars else None,
+            "top_skill_pct": bars[0]["pct"] if bars else 0,
+            "undated": sum(1 for m, _ in jobs if not m),
+        },
+        "bars": bars,
+        "months": month_list,
+        "postings_per_month": [per_month[m] for m in month_list],
+        "series": [{"skill": w_label[k], "counts": [series[k][m] for m in month_list]} for k, _ in w_ranked],
+    }
+
+
+# ---------------------------------------------------------------------------
 # api_keys.txt
 # ---------------------------------------------------------------------------
 def read_api_keys_text() -> str:
@@ -233,8 +370,10 @@ DEFAULT_SCRAPE_SETTINGS = {
     "max_jobs": "",
     "do_scrape": True,
     "do_compile": True,
-    "do_extract": True,
-    "batch_size": MAX_BATCH_SIZE,
+}
+DEFAULT_EXTRACT_SETTINGS = {
+    "sources": list(SOURCES),
+    "batch_size": DEFAULT_BATCH_SIZE,
     "model": DEFAULT_MODEL,
 }
 
@@ -243,15 +382,30 @@ def _settings_file() -> Path:
     return state_dir() / "scrape_settings.json"
 
 
-def get_scrape_settings() -> dict:
-    cfg = dict(DEFAULT_SCRAPE_SETTINGS)
+def _extract_settings_file() -> Path:
+    return state_dir() / "extract_settings.json"
+
+
+def _load_saved(path: Path, cfg: dict) -> dict:
     try:
-        saved = json.loads(_settings_file().read_text(encoding="utf-8"))
+        saved = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(saved, dict):
             cfg.update({k: v for k, v in saved.items() if k in cfg})
     except (OSError, ValueError):
         pass
     return cfg
+
+
+def get_scrape_settings() -> dict:
+    return _load_saved(_settings_file(), dict(DEFAULT_SCRAPE_SETTINGS))
+
+
+def get_extract_settings() -> dict:
+    cfg = dict(DEFAULT_EXTRACT_SETTINGS)
+    if not _extract_settings_file().is_file():
+        # before Extract Skills had its own page these lived in the scrape settings file
+        _load_saved(_settings_file(), cfg)
+    return _load_saved(_extract_settings_file(), cfg)
 
 
 _MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/\-]{0,80}$")
@@ -262,15 +416,13 @@ def parse_scrape_form(post) -> tuple[dict, str | None]:
     cfg = dict(DEFAULT_SCRAPE_SETTINGS)
     cfg["source"] = post.get("source", "")
     cfg["keyword"] = " ".join(post.get("keyword", "").split())
-    cfg["model"] = post.get("model", "").strip()
     cfg["do_scrape"] = post.get("do_scrape") == "on"
     cfg["do_compile"] = post.get("do_compile") == "on"
-    cfg["do_extract"] = post.get("do_extract") == "on"
     cfg["max_jobs"] = post.get("max_jobs", "").strip()
 
     if cfg["source"] not in SOURCES:
         return cfg, "Choose a data source (Trabajo or Kalibrr)."
-    if not (cfg["do_scrape"] or cfg["do_compile"] or cfg["do_extract"]):
+    if not (cfg["do_scrape"] or cfg["do_compile"]):
         return cfg, "Tick at least one step to run."
 
     try:
@@ -288,39 +440,51 @@ def parse_scrape_form(post) -> tuple[dict, str | None]:
 
     if cfg["do_scrape"] and (not cfg["keyword"] or len(cfg["keyword"]) > 100):
         return cfg, "Enter a search keyword (up to 100 characters)."
+    return cfg, None
 
+
+def parse_extract_form(post) -> tuple[dict, str | None]:
+    """Validate the Extract Skills form. Returns (settings, error)."""
+    cfg = dict(DEFAULT_EXTRACT_SETTINGS)
+    picked = post.getlist("sources") if hasattr(post, "getlist") else list(post.get("sources", []))
+    cfg["sources"] = [s for s in SOURCES if s in picked]
+    cfg["model"] = post.get("model", "").strip()
+    if not cfg["sources"]:
+        return cfg, "Tick at least one source to extract skills from (Kalibrr and/or Trabajo)."
     try:
         cfg["batch_size"] = int(post.get("batch_size", ""))
     except ValueError:
         return cfg, "Rows per prompt must be a whole number."
     if not 1 <= cfg["batch_size"] <= MAX_BATCH_SIZE:
         return cfg, f"Rows per prompt must be between 1 and {MAX_BATCH_SIZE}."
-
-    if cfg["do_extract"] and not _MODEL_RE.match(cfg["model"]):
+    if not _MODEL_RE.match(cfg["model"]):
         return cfg, "Enter a valid Gemini model name, e.g. " + DEFAULT_MODEL + "."
     return cfg, None
 
 
 def save_scrape_settings(cfg: dict) -> None:
     ensure_dirs()
-    _atomic_write_text(_settings_file(), json.dumps(cfg, indent=2))
+    keep = {k: v for k, v in cfg.items() if k in DEFAULT_SCRAPE_SETTINGS}
+    _atomic_write_text(_settings_file(), json.dumps(keep, indent=2))
+
+
+def save_extract_settings(cfg: dict) -> None:
+    ensure_dirs()
+    keep = {k: v for k, v in cfg.items() if k in DEFAULT_EXTRACT_SETTINGS}
+    _atomic_write_text(_extract_settings_file(), json.dumps(keep, indent=2))
 
 
 # ---------------------------------------------------------------------------
 # Building the command lines
 # ---------------------------------------------------------------------------
-TRABAJO_JOB_COLS = ("job_url,location_raw,city,region,country,employment_type,work_mode,"
-                    "salary_currency,salary_min,salary_max,salary_period,date_posted,"
-                    "valid_through,category")
-
 
 def build_steps(cfg: dict) -> list[dict]:
     py = sys.executable
-    src = cfg["source"]
+    src = cfg.get("source") or (cfg.get("sources") or [""])[0]   # extraction runs have "sources", not "source"
     jd, csv_path = json_dir(src), compiled_csv(src)
     steps = []
 
-    if cfg["do_scrape"]:
+    if cfg.get("do_scrape"):
         if src == "kalibrr":
             argv = [py, "-u", str(PIPELINE_DIR / "kalibrr_scraper.py"),
                     f"--text={cfg['keyword']}", f"--output-dir={jd}",
@@ -333,21 +497,21 @@ def build_steps(cfg: dict) -> list[dict]:
             argv.append(f"--max-jobs={cfg['max_jobs']}")
         steps.append({"name": "scrape", "label": f"Scrape {SOURCE_LABELS[src]}", "argv": argv})
 
-    if cfg["do_compile"]:
+    if cfg.get("do_compile"):
         steps.append({"name": "compile", "label": f"Compile {SOURCE_LABELS[src]} JSONs to CSV",
                       "argv": [py, "-u", str(PIPELINE_DIR / "compile_jobs_to_csv.py"),
                                f"--source={src}", f"--input-dir={jd}", f"--output-csv={csv_path}"]})
 
-    if cfg["do_extract"]:
-        argv = [py, "-u", str(PIPELINE_DIR / "extract_skills_gemini.py"), str(csv_path),
-                f"--keys={api_keys_path()}", "--output=extracted_skills",
-                f"--output-dir={data_dir()}", f"--json-dir={state_dir()}",
-                f"--model={cfg['model']}", f"--batch-size={cfg['batch_size']}",
-                f"--source-label={src}"]
-        if src == "trabajo":
-            argv += ["--text-columns=description", "--company-cols=company_name,company_logo_url",
-                     f"--job-cols={TRABAJO_JOB_COLS}"]
-        steps.append({"name": "extract", "label": "Extract skills with Gemini", "argv": argv})
+    if cfg.get("do_extract"):
+        # One step per ticked source; they all append to the same extracted_skills.csv / resume file.
+        for ex_src in cfg.get("sources") or [src]:
+            argv = [py, "-u", str(PIPELINE_DIR / "extract_skills_gemini.py"), str(compiled_csv(ex_src)),
+                    f"--keys={api_keys_path()}", "--output=extracted_skills",
+                    f"--output-dir={data_dir()}", f"--json-dir={state_dir()}",
+                    f"--model={cfg['model']}", f"--batch-size={cfg['batch_size']}",
+                    f"--source-label={ex_src}"]
+            steps.append({"name": f"extract_{ex_src}", "label": f"Extract skills — {SOURCE_LABELS[ex_src]}",
+                          "argv": argv})
     return steps
 
 
@@ -363,10 +527,14 @@ def _log_file() -> Path:
 
 
 def _read_state() -> dict:
-    try:
-        return json.loads(_run_file().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {"status": "idle"}
+    for attempt in range(20):    # the run process may be swapping the file in right now (Windows)
+        try:
+            return json.loads(_run_file().read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            break
+        except (OSError, ValueError):
+            time.sleep(0.05)
+    return {"status": "idle"}
 
 
 def _parse_ts(s):
@@ -378,6 +546,8 @@ def _parse_ts(s):
 
 def get_run_state() -> dict:
     st = _read_state()
+    if "kind" not in st:    # runs recorded before the Extract Skills page existed
+        st["kind"] = "extract" if all(str(x.get("name", "")).startswith("extract") for x in st.get("steps", [])) and st.get("steps") else "scrape"
     if st.get("status") == "running":
         beat = _parse_ts(st.get("heartbeat") or st.get("started_at"))
         age = (datetime.now(timezone.utc) - beat).total_seconds() if beat else 1e9
@@ -407,37 +577,41 @@ def read_log_tail(max_bytes: int = 24000) -> str:
     return "\n".join(line.rsplit("\r", 1)[-1] for line in text.split("\n")).strip("\n")
 
 
-def start_run(cfg: dict) -> str | None:
-    """Launch the pipeline in a detached process. Returns an error string or None."""
+def start_run(cfg: dict, kind: str = "scrape") -> str | None:
+    """Launch the pipeline in a detached process. kind: 'scrape' (scrape + compile) or
+    'extract' (skill extraction). Returns an error string or None."""
     ensure_dirs()
     if is_running():
         return "A run is already in progress. Wait for it to finish or stop it first."
 
     steps = build_steps(cfg)
-    src = cfg["source"]
+    src = cfg.get("source") or (cfg.get("sources") or [""])[0]
 
-    if cfg["do_extract"]:
+    if cfg.get("do_extract"):
         if count_api_keys() == 0:
             return "Skill extraction needs at least one Gemini API key — add one in api_keys.txt below."
-        if not cfg["do_compile"] and not compiled_csv(src).is_file():
-            return f"There's no compiled {SOURCE_LABELS[src]} CSV yet. Tick “Compile” (or import a CSV first)."
-    if cfg["do_compile"] and not cfg["do_scrape"] and count_json(src) == 0:
+        for ex_src in cfg.get("sources") or []:
+            if not compiled_csv(ex_src).is_file():
+                return (f"There's no compiled {SOURCE_LABELS[ex_src]} CSV yet. Scrape and compile it on the "
+                        f"Scrape Data page (or import a CSV) first — or untick {SOURCE_LABELS[ex_src]}.")
+    if cfg.get("do_compile") and not cfg.get("do_scrape") and count_json(src) == 0:
         return f"There are no {SOURCE_LABELS[src]} job JSONs to compile yet. Tick “Scrape” (or import JSONs first)."
 
     # A stale resume file with no CSV would make the extractor think everything is already done.
     state_json = state_dir() / "extracted_skills.json"
-    if cfg["do_extract"] and state_json.is_file() and not extracted_csv().is_file():
+    if cfg.get("do_extract") and state_json.is_file() and not extracted_csv().is_file():
         state_json.unlink()
 
     _log_file().write_text("", encoding="utf-8")
     state = {
-        "status": "running", "source": src, "started_at": _now(), "heartbeat": _now(),
+        "status": "running", "kind": kind,
+        "source": " + ".join(SOURCE_LABELS[x].lower() for x in cfg["sources"]) if cfg.get("do_extract") else src, "started_at": _now(), "heartbeat": _now(),
         "finished_at": None, "current": None, "pid": None, "error": None,
         "steps": [{"name": s["name"], "label": s["label"], "status": "pending"} for s in steps],
-        "summary": {"keyword": cfg["keyword"] if cfg["do_scrape"] else None,
-                    "delay_min": cfg["delay_min"], "delay_max": cfg["delay_max"],
-                    "model": cfg["model"] if cfg["do_extract"] else None,
-                    "batch_size": cfg["batch_size"] if cfg["do_extract"] else None},
+        "summary": {"keyword": cfg.get("keyword") if cfg.get("do_scrape") else None,
+                    "delay_min": cfg.get("delay_min"), "delay_max": cfg.get("delay_max"),
+                    "model": cfg.get("model") if cfg.get("do_extract") else None,
+                    "batch_size": cfg.get("batch_size") if cfg.get("do_extract") else None},
     }
     _atomic_write_text(_run_file(), json.dumps(state, indent=2))
     run_cfg = {"state_file": str(_run_file()), "log_file": str(_log_file()),
@@ -447,8 +621,10 @@ def start_run(cfg: dict) -> str | None:
 
     kwargs = {}
     if os.name == "nt":
+        # CREATE_NO_WINDOW (not DETACHED_PROCESS): a detached process has no console, so every
+        # step it started would pop open its own CMD window.
         kwargs["creationflags"] = (getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-                                   | getattr(subprocess, "DETACHED_PROCESS", 0))
+                                   | getattr(subprocess, "CREATE_NO_WINDOW", 0))
     else:
         kwargs["start_new_session"] = True
     try:
@@ -632,13 +808,23 @@ def import_csv(kind: str, upload, merge: bool) -> dict:
         to_add.append(r)
         added += 1
 
-    fieldnames = existing_cols + [c for c in columns if c not in existing_cols]
+    if kind == "extracted":      # one universal layout for every source
+        existing_rows = [normalize_record(r) for r in existing_rows]
+        to_add = [normalize_record(r) for r in to_add]
+        extra = []
+        for r in existing_rows + to_add:
+            extra += [c for c in r if c not in UNIVERSAL_COLUMNS and c not in extra]
+        fieldnames = list(UNIVERSAL_COLUMNS) + extra
+    else:
+        fieldnames = existing_cols + [c for c in columns if c not in existing_cols]
     buf = io.StringIO(newline="")
     w = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore", lineterminator="\r\n")
     w.writeheader()
     w.writerows(existing_rows + to_add)
     _atomic_write_text(path, buf.getvalue(), encoding="utf-8-sig")
     _table_cache.pop(kind, None)
+    if kind == "extracted":
+        ensure_skill_csvs()
 
     if kind == "extracted":
         _merge_extracted_state(existing_rows + to_add if merge else to_add, replace=not merge)
@@ -659,7 +845,7 @@ def _merge_extracted_state(rows: list, replace: bool) -> None:
     for r in rows:
         if str(r.get("job_id", "")).strip() in have:
             continue
-        rec = {k: (v if v != "" else None) for k, v in r.items()}
+        rec = {k: (v if v != "" else None) for k, v in normalize_record(r).items()}
         for c in _EXTRACTED_LIST_COLS:
             v = r.get(c) or ""
             rec[c] = [x.strip() for x in v.split(";") if x.strip()]
@@ -673,7 +859,8 @@ def compile_now(source: str) -> tuple[bool, str]:
         proc = subprocess.run(
             [sys.executable, "-u", str(PIPELINE_DIR / "compile_jobs_to_csv.py"),
              f"--source={source}", f"--input-dir={json_dir(source)}", f"--output-csv={compiled_csv(source)}"],
-            capture_output=True, text=True, timeout=600, cwd=str(settings.BASE_DIR))
+            capture_output=True, text=True, timeout=600, cwd=str(settings.BASE_DIR),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, str(exc)
     _table_cache.pop(source, None)

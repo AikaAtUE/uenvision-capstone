@@ -2,7 +2,7 @@
 """
 Skill Extraction from job postings using the (free) Google Gemini API
 ---------------------------------------------------------------------
-- Up to 20 jobs per prompt
+- Up to 100 jobs per prompt (default 20)
 - API keys are read from api_keys.txt (one per line); when a key hits its
   daily quota or is invalid, the script moves on to the next line
 - Output CSV/JSON include job info + company info + extracted skills
@@ -27,6 +27,8 @@ from google.genai import errors, types
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 
+from skills_schema import ALIASES, SOURCE_CONFIG, UNIVERSAL_COLUMNS, normalize_record, write_skill_csvs
+
 # ====================== DEFAULTS ======================
 # Every value can be overridden from the command line (see --help).
 CSV_PATH = "kalibrr_jobs_2.csv"
@@ -35,7 +37,8 @@ OUTPUT_PREFIX = "jobs_with_skills"            # -> <prefix>.csv and <prefix>.jso
 
 # Older models (e.g. gemini-2.5-flash) are being shut down and return "model not found".
 MODEL = "gemini-3.5-flash-lite"
-BATCH_SIZE = 20                               # max jobs per prompt
+BATCH_SIZE = 20                               # default jobs per prompt
+MAX_BATCH_SIZE = 100                          # hard cap
 MAX_CHARS_PER_JOB = 2500
 MAX_OUTPUT_TOKENS = 32000
 RPM = 5                                       # free-tier requests/minute (5 is safest)
@@ -46,16 +49,9 @@ COL_ID = "job_id"
 COL_TITLE = "job_title"
 TEXT_COLUMNS = ["description", "qualifications", "duties"]   # text sent to the model
 
-# Extra columns copied into the output (missing ones are skipped automatically)
-COMPANY_COLS = ["company_name", "company_code", "company_industry",
-                "company_url", "company_verified"]
-JOB_COLS = ["job_url", "function", "tenure", "number_of_openings",
-            "months_work_experience", "education_level_code", "open_to_fresh_grads",
-            "is_hybrid", "is_work_from_home", "city", "region", "country",
-            "formatted_address", "salary_shown", "base_salary", "maximum_salary",
-            "salary_currency", "salary_interval", "created_at", "activation_date",
-            "application_end_date", "is_active", "is_expired"]
-RENAME = {COL_TITLE: "job_name", "company_code": "company_id"}   # output column names
+# Which CSV columns are read per source, and how they are renamed, lives in skills_schema.py
+# so that Kalibrr and Trabajo rows end up in the same universal layout.
+RENAME = {COL_TITLE: "job_name", **ALIASES}
 # ======================================================
 
 OUTPUT_CSV = OUTPUT_PREFIX + ".csv"
@@ -321,7 +317,12 @@ def save_outputs(results: List[dict]):
         for c in ("hard_skills", "soft_skills", "certifications_or_licenses"):
             r[c] = "; ".join(r.get(c) or [])
         flat.append(r)
-    pd.DataFrame(flat).to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
+    cols = list(UNIVERSAL_COLUMNS) + [c for c in dict.fromkeys(k for r in flat for k in r) if c not in UNIVERSAL_COLUMNS]
+    pd.DataFrame(flat).reindex(columns=cols).to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
+    try:    # hard_skills.csv / soft_skills.csv sit next to the main CSV
+        write_skill_csvs(results, os.path.dirname(os.path.abspath(OUTPUT_CSV)))
+    except OSError as e:
+        print(f"[WARN] Couldn't write the hard/soft skills CSVs: {e}")
 
 
 def parse_list(s: str) -> List[str]:
@@ -339,17 +340,17 @@ def parse_args():
     ap.add_argument("--source-label", default=None,
                     help="if set, adds a 'source' column with this value (e.g. kalibrr / trabajo)")
     ap.add_argument("--model", default=MODEL)
-    ap.add_argument("--batch-size", type=int, default=BATCH_SIZE, help="jobs per prompt (max 20)")
+    ap.add_argument("--batch-size", type=int, default=BATCH_SIZE, help=f"jobs per prompt (max {MAX_BATCH_SIZE})")
     ap.add_argument("--rpm", type=float, default=RPM, help="requests per minute to stay under")
     ap.add_argument("--limit", type=int, default=None, help="only process the first N jobs")
     ap.add_argument("--id-col", default=COL_ID)
     ap.add_argument("--title-col", default=COL_TITLE)
-    ap.add_argument("--text-columns", default=",".join(TEXT_COLUMNS),
-                    help="comma-separated columns sent to the model")
-    ap.add_argument("--company-cols", default=",".join(COMPANY_COLS),
-                    help="comma-separated company columns to copy into the output")
-    ap.add_argument("--job-cols", default=",".join(JOB_COLS),
-                    help="comma-separated job columns to copy into the output")
+    ap.add_argument("--text-columns", default=None,
+                    help="comma-separated columns sent to the model (default: depends on --source-label)")
+    ap.add_argument("--company-cols", default=None,
+                    help="comma-separated company columns to copy into the output (default: by source)")
+    ap.add_argument("--job-cols", default=None,
+                    help="comma-separated job columns to copy into the output (default: by source)")
     ap.add_argument("--max-chars", type=int, default=MAX_CHARS_PER_JOB)
     ap.add_argument("--debug", action="store_true",
                     help="write every raw model reply to <output>_debug.log")
@@ -362,12 +363,13 @@ def main():
 
     a = parse_args()
     MODEL = a.model
-    BATCH_SIZE = max(1, min(a.batch_size, 20))
+    BATCH_SIZE = max(1, min(a.batch_size, MAX_BATCH_SIZE))
     MAX_CHARS_PER_JOB = a.max_chars
-    TEXT_COLUMNS = parse_list(a.text_columns)
+    cfg = SOURCE_CONFIG.get(a.source_label or "kalibrr", SOURCE_CONFIG["kalibrr"])
+    TEXT_COLUMNS = parse_list(a.text_columns) if a.text_columns else list(cfg["text_columns"])
     old_title = COL_TITLE
     COL_ID, COL_TITLE = a.id_col, a.title_col
-    RENAME = {COL_TITLE: "job_name", **{k: v for k, v in RENAME.items() if k != old_title}}
+    RENAME = {COL_TITLE: "job_name", **ALIASES}
     os.makedirs(a.output_dir, exist_ok=True)
     OUTPUT_CSV = os.path.join(a.output_dir, a.output + ".csv")
     json_dir = a.json_dir or a.output_dir
@@ -384,9 +386,11 @@ def main():
     missing = [c for c in [COL_ID, COL_TITLE] + TEXT_COLUMNS if c not in df.columns]
     if missing:
         raise SystemExit(f"Column(s) not found in CSV: {missing}\nAvailable: {list(df.columns)}")
-    company_cols = [c for c in parse_list(a.company_cols) if c in df.columns]
-    job_cols = [c for c in parse_list(a.job_cols) if c in df.columns and c not in (COL_ID, COL_TITLE)]
-    skipped = [c for c in parse_list(a.company_cols) + parse_list(a.job_cols) if c not in df.columns]
+    company_cols_all = parse_list(a.company_cols) if a.company_cols else cfg["company_cols"]
+    job_cols_all = parse_list(a.job_cols) if a.job_cols else cfg["job_cols"]
+    company_cols = [c for c in company_cols_all if c in df.columns]
+    job_cols = [c for c in job_cols_all if c in df.columns and c not in (COL_ID, COL_TITLE)]
+    skipped = [c for c in company_cols_all + job_cols_all if c not in df.columns]
     if skipped:
         print(f"Note: columns not in this CSV, skipped: {skipped}\n")
 
@@ -399,11 +403,12 @@ def main():
 
     results: List[dict] = []
     if Path(OUTPUT_JSON).exists():
-        results = json.loads(Path(OUTPUT_JSON).read_text(encoding="utf-8"))
+        results = [normalize_record(r) for r in json.loads(Path(OUTPUT_JSON).read_text(encoding="utf-8"))]
         done = {str(r["job_id"]) for r in results}
         df = df[~df[COL_ID].astype(str).isin(done)]
         print(f"Resuming: {len(done)} done, {len(df)} remaining")
     if df.empty:
+        save_outputs(results)      # also rewrites the CSV with the current columns
         print("Nothing to do.")
         return
 
@@ -452,7 +457,7 @@ def main():
                     rec[RENAME.get(c, c)] = to_py(row.get(c))
                 for c in SKILL_COLS:
                     rec[c] = sk[c]
-                results.append(rec)
+                results.append(normalize_record(rec))
 
             save_outputs(results)
 

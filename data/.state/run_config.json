@@ -4,8 +4,8 @@
   "cwd": "D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone",
   "steps": [
     {
-      "name": "extract",
-      "label": "Extract skills with Gemini",
+      "name": "extract_kalibrr",
+      "label": "Extract skills \u2014 Kalibrr",
       "argv": [
         "C:\\Users\\Raphael\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
         "-u",
@@ -16,7 +16,7 @@
         "--output-dir=D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\data",
         "--json-dir=D:\\School Documents\\Official UEnvision (Github)\\uenvision-capstone\\data\\.state",
         "--model=gemini-3.5-flash-lite",
-        "--batch-size=20",
+        "--batch-size=80",
         "--source-label=kalibrr"
       ]
     }

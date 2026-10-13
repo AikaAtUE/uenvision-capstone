@@ -339,43 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalEl = document.getElementById('stat-total');
     if (!totalEl) return; // not the dashboard page
 
-    const jobs = filteredJobs();
-    const totalPostings = jobs.length;
-
-    const freq = {};
-    jobs.forEach(j => j.skills.forEach(s => { freq[s] = (freq[s] || 0) + 1; }));
-    const ranked = Object.entries(freq).sort((a,b) => b[1]-a[1]);
-    const uniqueSkills = ranked.length;
-    const topSkill = ranked[0] ? ranked[0][0] : '—';
-    const topSkillPct = ranked[0] && totalPostings ? Math.round(ranked[0][1] / totalPostings * 100) : 0;
-
-    const surveySkillSet = new Set(filteredSurveys().flatMap(s => s.skills));
-    const matched = ranked.filter(([skill]) => surveySkillSet.has(skill));
-    const alignment = ranked.length ? Math.round(matched.length / ranked.length * 100) : 0;
-    const gapSkills = ranked.filter(([skill]) => !surveySkillSet.has(skill));
-    const topGap = gapSkills[0] ? gapSkills[0][0] : '—';
-
-    totalEl.textContent = totalPostings.toLocaleString();
-    document.getElementById('stat-total-note').textContent = 'Postings after filtering';
-    document.getElementById('stat-unique').textContent = uniqueSkills;
-    document.getElementById('stat-unique-note').textContent = `From ${totalPostings} postings in scope`;
-    document.getElementById('stat-topskill').textContent = topSkill;
-    document.getElementById('stat-topskill-note').textContent = `Appears in ${topSkillPct}% of postings`;
-    document.getElementById('stat-alignment').textContent = `${alignment}%`;
-    document.getElementById('stat-alignment-note').textContent = `${matched.length} of ${ranked.length} skills covered by curriculum`;
-    document.getElementById('stat-gaps').textContent = gapSkills.length;
-    document.getElementById('stat-gaps-note').textContent = `Top gap: ${topGap}`;
-
-    const barChart = document.getElementById('bar-chart');
-    const top9 = ranked.slice(0, 9);
-    const max = top9.length ? top9[0][1] : 1;
-    barChart.innerHTML = top9.length ? top9.map(([label, value]) => `
-      <div class="bar-row">
-        <span class="bar-label">${label}</span>
-        <span class="bar-track"><span class="bar-fill" style="width:${(value / max * 100).toFixed(1)}%"></span></span>
-        <span class="bar-value">${value}</span>
-      </div>
-    `).join('') : `<p class="muted">No postings match the current filters.</p>`;
+    // The real figures and charts are drawn by dashboard-skills.js from the extracted data.
   }
   renderDashboard();
 

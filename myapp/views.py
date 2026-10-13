@@ -79,6 +79,25 @@ def dashboard_view(request):
 
 
 @login_required
+def dashboard_skills_view(request):
+    """JSON for the dashboard's top-skills bar chart and skills-per-month line chart."""
+    try:
+        top = int(request.GET.get("top", 10))
+        months = int(request.GET.get("months", 0))
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Bad number."}, status=400)
+    if not 1 <= top <= 30 or not 0 <= months <= 600:
+        return JsonResponse({"ok": False, "error": "Top must be 1-30."}, status=400)
+    pipeline.ensure_skill_csvs()
+    try:
+        data = pipeline.skills_dashboard(request.GET.get("kind", "hard"), top, request.GET.get("source", ""),
+                                         request.GET.get("level", ""), months)
+    except (OSError, UnicodeDecodeError) as exc:
+        return JsonResponse({"ok": False, "error": f"Couldn't read the data: {exc}"}, status=500)
+    return JsonResponse({"ok": True, **data})
+
+
+@login_required
 def feedback_view(request):
     return render(request, "feedback.html", {"active_page": "feedback"})
 
@@ -274,8 +293,8 @@ def survey_submit_view(request):
 
 
 # ---------------------------------------------------------------------------
-# Data  (three separate pages: View Data / Import Data / Scrape Data)
-# View Data is open to every logged-in user. Import and Scrape change files on the
+# Data  (four separate pages: View Data / Import Data / Scrape Data / Extract Skills)
+# View Data is open to every logged-in user. Import, Scrape and Extract Skills change files on the
 # server (and Scrape spends API quota / makes outbound requests), so they are
 # Administrator-only.
 # ---------------------------------------------------------------------------
@@ -287,8 +306,12 @@ def _data_ctx(request, tab, **extra):
 def data_view(request):
     summary = pipeline.disk_summary()
     tables = []
+    pipeline.ensure_skill_csvs()
     for key, (label, _fn) in pipeline.TABLES.items():
-        info = summary["extracted"] if key == "extracted" else summary["sources"][key]["compiled"]
+        if key in pipeline.SOURCES:
+            info = summary["sources"][key]["compiled"]
+        else:
+            info = pipeline._file_info(pipeline.table_path(key))
         tables.append({"key": key, "label": label, "exists": info["exists"]})
     default = next((t["key"] for t in tables if t["exists"]), tables[0]["key"])
     return render(request, "data_view.html", _data_ctx(request, "view", tables=tables, default_table=default))
@@ -378,6 +401,16 @@ def _scrape_ctx(request, form=None):
         form=form or pipeline.get_scrape_settings(),
         run=pipeline.get_run_state(),
         summary=pipeline.disk_summary(),
+    )
+
+
+def _extract_ctx(request, form=None):
+    summary = pipeline.disk_summary()
+    return _data_ctx(
+        request, "extract",
+        form=form or pipeline.get_extract_settings(),
+        run=pipeline.get_run_state(),
+        summary=summary,
         keys_text=pipeline.read_api_keys_text(),
         key_count=pipeline.count_api_keys(),
         max_batch=pipeline.MAX_BATCH_SIZE,
@@ -395,23 +428,65 @@ def data_scrape_view(request):
 def scrape_run_view(request):
     cfg, error = pipeline.parse_scrape_form(request.POST)
     if not error:
-        error = pipeline.start_run(cfg)
+        error = pipeline.start_run(cfg, kind="scrape")
     if error:
         messages.error(request, error)
         return render(request, "data_scrape.html", _scrape_ctx(request, form=cfg))
     pipeline.save_scrape_settings(cfg)
-    messages.success(request, "Run started. You can leave this page — it keeps going in the background.")
-    return redirect("data_scrape")
+    messages.success(request, "Run started. Follow it here; it keeps going in the background if you leave.")
+    return redirect("console")
+
+
+@administrator_required
+def data_extract_view(request):
+    return render(request, "data_extract.html", _extract_ctx(request))
+
+
+@administrator_required
+@require_POST
+def extract_run_view(request):
+    cfg, error = pipeline.parse_extract_form(request.POST)
+    if not error:
+        cfg["do_extract"] = True
+        error = pipeline.start_run(cfg, kind="extract")
+    if error:
+        messages.error(request, error)
+        return render(request, "data_extract.html", _extract_ctx(request, form=cfg))
+    pipeline.save_extract_settings(cfg)
+    messages.success(request, "Extraction started. Follow it here; it keeps going in the background if you leave.")
+    return redirect("console")
+
+
+def _stop_and_redirect(request, target):
+    if pipeline.stop_run():
+        messages.success(request, "Run stopped. Progress so far is saved; run again to resume.")
+    else:
+        messages.error(request, "There's no run in progress.")
+    return redirect(target)
 
 
 @administrator_required
 @require_POST
 def scrape_stop_view(request):
-    if pipeline.stop_run():
-        messages.success(request, "Run stopped. Progress so far is saved; run again to resume.")
-    else:
-        messages.error(request, "There's no run in progress.")
-    return redirect("data_scrape")
+    return _stop_and_redirect(request, "data_scrape")
+
+
+@administrator_required
+@require_POST
+def extract_stop_view(request):
+    return _stop_and_redirect(request, "data_extract")
+
+
+@administrator_required
+def console_view(request):
+    """Live status and log of the scrape / extract run (Administrator only)."""
+    return render(request, "console.html", {"active_page": "console", "run": pipeline.get_run_state()})
+
+
+@administrator_required
+@require_POST
+def console_stop_view(request):
+    return _stop_and_redirect(request, "console")
 
 
 @administrator_required
@@ -419,6 +494,7 @@ def scrape_status_view(request):
     st = pipeline.get_run_state()
     return JsonResponse({
         "status": st.get("status", "idle"),
+        "kind": st.get("kind"),
         "current": st.get("current"),
         "steps": st.get("steps", []),
         "source": st.get("source"),
@@ -439,4 +515,4 @@ def api_keys_save_view(request):
     else:
         n = pipeline.count_api_keys()
         messages.success(request, f"api_keys.txt saved ({n} key{'s' if n != 1 else ''}).")
-    return redirect("data_scrape")
+    return redirect("data_extract")

@@ -1,0 +1,38 @@
+.skill-controls{display:flex; flex-wrap:wrap; gap:14px 18px; align-items:flex-end; margin-bottom:22px;}
+.skill-controls .select-field select{min-width:150px;}
+.skill-controls .select-field input{
+  width:130px; padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#f7f7f8; font:inherit;
+}
+.skill-controls .select-field input:focus{background:#fff; border-color:var(--navy); outline:none;}
+.skill-controls .select-field[hidden]{display:none;}
+
+.bars--wide .bar-row{grid-template-columns:minmax(110px,230px) 1fr 92px;}
+.bars--wide .bar-label{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.bars--wide .bar-value{white-space:nowrap;}
+.bars--wide .bar-value small{color:var(--muted-2);}
+.empty-note{padding:26px 4px; color:var(--muted);}
+
+.trend-wrap{position:relative;}
+.trend-svg{width:100%; height:auto; display:block; touch-action:pan-y;}
+.trend-svg text{font-family:inherit; font-size:11px; fill:#6b7280;}
+.trend-svg .grid{stroke:#e4e2dc; stroke-width:1;}
+.trend-svg .guide{stroke:#9aa0ad; stroke-width:1; stroke-dasharray:3 3;}
+.trend-svg .line{fill:none; stroke-width:2.4; stroke-linejoin:round; stroke-linecap:round; transition:opacity .12s;}
+.trend-svg .line.is-dim{opacity:.15;}
+.trend-tip{
+  position:absolute; pointer-events:none; background:#fff; border:1px solid var(--line); border-radius:8px;
+  box-shadow:0 6px 18px rgba(22,35,63,.14); padding:9px 11px; font-size:.78rem; min-width:150px; z-index:5;
+}
+.trend-tip strong{display:block; margin-bottom:5px; color:var(--ink);}
+.trend-tip div{display:flex; align-items:center; gap:7px; justify-content:space-between;}
+.trend-tip span.k{display:flex; align-items:center; gap:6px; min-width:0;}
+.trend-tip i{width:9px; height:9px; border-radius:50%; flex:none;}
+.trend-legend{display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:12px;}
+.trend-legend button{
+  background:none; border:none; padding:3px 2px; font:inherit; font-size:.8rem; font-weight:600; color:var(--ink);
+  display:flex; align-items:center; gap:6px; cursor:pointer;
+}
+.trend-legend button i{width:14px; height:3px; border-radius:2px; flex:none;}
+.trend-legend button.is-off{color:var(--muted-2); text-decoration:line-through;}
+#trend-note{margin-top:8px;}
+.bars--wide .bar-track,.bars--wide .bar-fill{display:block;}

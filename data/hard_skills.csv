@@ -1,0 +1,861 @@
+﻿job_name,job_level,skill
+QA Analyst,Not specified,Jira
+QA Analyst,Not specified,Agile
+QA Analyst,Not specified,Performance Testing
+QA Analyst,Not specified,Stress Testing
+QA Analyst,Not specified,Software Testing
+QA Analyst,Not specified,UX/UI Testing
+QA Analyst,Not specified,Test Automation
+Wordpress Designer Work From Home,Junior,WordPress
+Wordpress Designer Work From Home,Junior,XAMPP
+Wordpress Designer Work From Home,Junior,HTML5
+Wordpress Designer Work From Home,Junior,CSS3
+Wordpress Designer Work From Home,Junior,JavaScript
+Wordpress Designer Work From Home,Junior,jQuery
+Wordpress Designer Work From Home,Junior,PHP
+Wordpress Designer Work From Home,Junior,REST APIs
+Wordpress Designer Work From Home,Junior,JSON
+Wordpress Designer Work From Home,Junior,XML
+Wordpress Designer Work From Home,Junior,Git
+Wordpress Designer Work From Home,Junior,SourceTree
+Wordpress Designer Work From Home,Junior,Drupal
+Wordpress Designer Work From Home,Junior,Shopify
+Wordpress Designer Work From Home,Junior,Squarespace
+Wordpress Designer Work From Home,Junior,HTML
+Wordpress Designer Work From Home,Junior,CSS
+Inventory Supervisor,Not specified,Spreadsheets
+Inventory Supervisor,Not specified,Fixed Asset Tracking Software
+QA Interns,Entry,Windows
+QA Interns,Entry,Linux
+QA Interns,Entry,C#
+QA Interns,Entry,C++
+QA Interns,Entry,Python
+Senior Data Scientist,Senior,R
+Senior Data Scientist,Senior,Python
+Senior Data Scientist,Senior,SQL
+Senior Data Scientist,Senior,Machine Learning
+Senior Data Scientist,Senior,Data Mining
+ASP.Net Developer,Mid,ASP.NET
+ASP.Net Developer,Mid,VB.NET
+ASP.Net Developer,Mid,SQL Server
+ASP.Net Developer,Mid,PHP
+ASP.Net Developer,Mid,MySQL
+ASP.Net Developer,Mid,HTML
+ASP.Net Developer,Mid,CSS
+ASP.Net Developer,Mid,MVC Framework
+ASP.Net Developer,Mid,.NET Framework
+ASP.Net Developer,Mid,Azure DevOps
+ASP.Net Developer,Mid,Xamarin
+ASP.Net Developer,Mid,.NET Core
+ASP.Net Developer,Mid,ReactJS
+ASP.Net Developer,Mid,NextJS
+Business Systems Analyst Work From Home,Not specified,Business Development
+Business Systems Analyst Work From Home,Not specified,Information Technology
+Business Systems Analyst Work From Home,Not specified,Systems Analysis
+Web Developer | Junior to Mid,Junior,Ruby on Rails
+Web Developer | Junior to Mid,Junior,React
+Web Developer | Junior to Mid,Junior,HTML5
+Web Developer | Junior to Mid,Junior,CSS3
+Web Developer | Junior to Mid,Junior,JavaScript
+Web Developer | Junior to Mid,Junior,Tailwind CSS
+Web Developer | Junior to Mid,Junior,SASS
+Web Developer | Junior to Mid,Junior,React.js
+Web Developer | Junior to Mid,Junior,jQuery
+Web Developer | Junior to Mid,Junior,SQL
+Web Developer | Junior to Mid,Junior,RDBMS
+Web Developer | Junior to Mid,Junior,PostgreSQL
+Web Developer | Junior to Mid,Junior,PHP
+Web Developer | Junior to Mid,Junior,Java
+Web Developer | Junior to Mid,Junior,Python
+Web Developer | Junior to Mid,Junior,.NET
+Web Developer | Junior to Mid,Junior,RESTful APIs
+Web Developer | Junior to Mid,Junior,JSON
+Web Developer | Junior to Mid,Junior,OOP
+Web Developer | Junior to Mid,Junior,MVC
+Web Developer | Junior to Mid,Junior,Linux
+Web Developer | Junior to Mid,Junior,Git
+Web Developer | Junior to Mid,Junior,AWS
+Inventory Controller,Not specified,MS Office
+Software Architect,Senior,SQL
+Software Architect,Senior,MSSQL Server
+Software Architect,Senior,NoSQL
+Software Architect,Senior,MongoDB
+Software Architect,Senior,LevelDB
+Software Architect,Senior,Node.js
+Software Architect,Senior,TypeScript
+Software Architect,Senior,C#
+Software Architect,Senior,ASP.NET
+Software Architect,Senior,ASP.NET Core
+Software Architect,Senior,Vue.js
+Software Architect,Senior,React Native
+Software Architect,Senior,JavaScript
+Software Architect,Senior,VueJS
+Software Architect,Senior,React
+Software Architect,Senior,HTML
+Software Architect,Senior,CSS
+Technical Recruiter,Not specified,LinkedIn
+Technical Recruiter,Not specified,Applicant Tracking System (ATS)
+IT Technical Presales,Entry,MS Office
+Quality Specialist,Not specified,Microsoft Word
+Quality Specialist,Not specified,Excel
+Quality Specialist,Not specified,PPT
+Senior Android Developer,Senior,Android
+Solution Architect,Senior,Java
+Solution Architect,Senior,.NET
+Solution Architect,Senior,AWS
+Solution Architect,Senior,Azure
+Solution Architect,Senior,GCP
+Solution Architect,Senior,Git
+Solution Architect,Senior,Jira
+Solution Architect,Senior,Jenkins
+Financial & Wealth Planner,Not specified,Microsoft Office
+Database Administrator,Not specified,MS SQL
+Database Administrator,Not specified,Sybase
+Database Administrator,Not specified,Oracle
+Database Administrator,Not specified,Azure
+Database Administrator,Not specified,T-SQL
+Database Administrator,Not specified,PL/SQL
+Database Administrator,Not specified,.Net
+Database Administrator,Not specified,Python
+Database Administrator,Not specified,Java
+Database Administrator,Not specified,JavaScript
+Database Administrator,Not specified,C
+Database Administrator,Not specified,C++
+Database Administrator,Not specified,SQL
+Web Developer,Not specified,WordPress
+Web Developer,Not specified,Shopify
+Web Developer,Not specified,PHP
+Web Developer,Not specified,HTML
+Web Developer,Not specified,JavaScript
+Web Developer,Not specified,jQuery
+Web Developer,Not specified,CSS
+Web Developer,Not specified,Bootstrap
+Web Developer,Not specified,SQL
+Licensed Librarian Contract of Service,Not specified,OPAC
+QA Intern,Not specified,Windows
+QA Intern,Not specified,Linux
+QA Intern,Not specified,C#
+QA Intern,Not specified,C++
+QA Intern,Not specified,Python
+Senior UX Designer,Senior,HTML5
+Senior UX Designer,Senior,JavaScript
+Senior UX Designer,Senior,ChatGPT
+Senior UX Designer,Senior,Claude
+Junior DevOps Engineer (AWS),Junior,AWS
+Junior DevOps Engineer (AWS),Junior,Docker
+Junior DevOps Engineer (AWS),Junior,CI/CD
+Junior DevOps Engineer (AWS),Junior,Fargate
+Junior DevOps Engineer (AWS),Junior,ECS
+Junior DevOps Engineer (AWS),Junior,ECR
+Junior DevOps Engineer (AWS),Junior,EC2
+Junior DevOps Engineer (AWS),Junior,S3
+Junior DevOps Engineer (AWS),Junior,IAM
+Junior DevOps Engineer (AWS),Junior,VPC
+Junior DevOps Engineer (AWS),Junior,CloudWatch
+Junior DevOps Engineer (AWS),Junior,PostgreSQL
+Junior DevOps Engineer (AWS),Junior,CodePipeline
+Junior DevOps Engineer (AWS),Junior,CodeBuild
+Junior DevOps Engineer (AWS),Junior,CodeCommit
+Junior DevOps Engineer (AWS),Junior,Trivy
+Junior DevOps Engineer (AWS),Junior,AWS Inspector
+Graphic Designer,Not specified,Figma
+Sr. Graphic Designer,Senior,Figma
+Accounts Payable Specialist,Not specified,SAP System
+Customer Service Representative (CSR),Not specified,Microsoft Word
+Customer Service Representative (CSR),Not specified,Excel
+Senior AEM Developer,Senior,Adobe Experience Manager (AEM)
+Senior AEM Developer,Senior,Java
+Senior AEM Developer,Senior,OSGi
+Senior AEM Developer,Senior,Apache Sling
+Senior AEM Developer,Senior,JCR
+Senior AEM Developer,Senior,HTL
+Senior AEM Developer,Senior,Sightly
+Senior AEM Developer,Senior,React
+Senior AEM Developer,Senior,Angular
+Senior AEM Developer,Senior,Vue.js
+Senior AEM Developer,Senior,Git
+Senior AEM Developer,Senior,Jenkins
+Senior AEM Developer,Senior,Maven
+Senior AEM Developer,Senior,Cloud Manager
+Senior AEM Developer,Senior,GraphQL
+Senior AEM Developer,Senior,RESTful APIs
+Remote Bookkeeper Team Lead CPA or Equivalent,Senior,AppFolio
+Remote Bookkeeper Team Lead CPA or Equivalent,Senior,Yardi Voyager
+Remote Bookkeeper Team Lead CPA or Equivalent,Senior,QuickBooks
+Remote Bookkeeper Team Lead CPA or Equivalent,Senior,Xero
+Remote Bookkeeper Team Lead CPA or Equivalent,Senior,FreshBooks
+Remote Bookkeeper Team Lead CPA or Equivalent,Senior,Zoho Books
+Forklift Operator,Not specified,Microsoft Office
+Design Lead,Senior,Figma
+Software Engineer Fullstack Java Springboot,Not specified,Java
+Software Engineer Fullstack Java Springboot,Not specified,Springboot
+Software Engineer Fullstack Java Springboot,Not specified,Hibernate
+Software Engineer Fullstack Java Springboot,Not specified,HTML5
+Software Engineer Fullstack Java Springboot,Not specified,CSS3
+Software Engineer Fullstack Java Springboot,Not specified,MySQL
+Software Engineer Fullstack Java Springboot,Not specified,MongoDB
+Software Engineer Fullstack Java Springboot,Not specified,SOAP
+Software Engineer Fullstack Java Springboot,Not specified,REST
+Software Engineer Fullstack Java Springboot,Not specified,JSON
+Software Engineer Fullstack Java Springboot,Not specified,XML
+Software Engineer Fullstack Java Springboot,Not specified,SMPP
+Software Engineer Fullstack Java Springboot,Not specified,UCP
+Software Engineer Fullstack Java Springboot,Not specified,HTTP
+Software Engineer Fullstack Java Springboot,Not specified,Git
+Software Engineer Fullstack Java Springboot,Not specified,SVN
+Software Engineer Fullstack Java Springboot,Not specified,Python
+Software Engineer Fullstack Java Springboot,Not specified,AWS
+Software Engineer Fullstack Java Springboot,Not specified,.Net
+Machine Learning Operations Specialist {Data Engineer} With background on Cloud,Not specified,AWS
+Machine Learning Operations Specialist {Data Engineer} With background on Cloud,Not specified,GCP
+Machine Learning Operations Specialist {Data Engineer} With background on Cloud,Not specified,Azure
+Machine Learning Operations Specialist {Data Engineer} With background on Cloud,Not specified,Alibaba
+Machine Learning Operations Specialist {Data Engineer} With background on Cloud,Not specified,Docker
+Machine Learning Operations Specialist {Data Engineer} With background on Cloud,Not specified,Kubernetes
+Jr. Network and Computer System Associate,Not specified,Windows
+Jr. Network and Computer System Associate,Not specified,Linux
+Jr. Network and Computer System Associate,Not specified,macOS
+Data Analyst | Emerging Technologies,Not specified,SQL
+Data Analyst | Emerging Technologies,Not specified,Python
+Data Analyst | Emerging Technologies,Not specified,R
+Data Analyst | Emerging Technologies,Not specified,Tableau
+Data Analyst | Emerging Technologies,Not specified,Power BI
+Data Analyst | Emerging Technologies,Not specified,matplotlib
+Machine Learning Specialist {LLM},Not specified,AWS
+Machine Learning Specialist {LLM},Not specified,GCP
+Machine Learning Specialist {LLM},Not specified,Azure
+Machine Learning Specialist {LLM},Not specified,Alibaba
+Machine Learning Specialist {LLM},Not specified,SQL
+Machine Learning Specialist {LLM},Not specified,Docker
+Machine Learning Specialist {LLM},Not specified,Kubernetes
+IT Network Business Analyst,Not specified,Agile
+Remote Digital Marketing Operations Specialist II and HubSpot Expert,Not specified,HubSpot
+Creative Manager,Not specified,Microsoft PowerPoint
+Creative Manager,Not specified,Adobe Illustrator
+Creative Manager,Not specified,Adobe Photoshop
+Quality Engineer,Not specified,Postman
+Quality Engineer,Not specified,Jira
+Quality Engineer,Not specified,TestRail
+Quality Engineer,Not specified,Confluence
+Site Reliability Engineer,Not specified,RedHat
+Site Reliability Engineer,Not specified,CentOS
+Site Reliability Engineer,Not specified,Ubuntu
+Site Reliability Engineer,Not specified,Gitlab
+Site Reliability Engineer,Not specified,Docker
+Site Reliability Engineer,Not specified,FreeIPA
+Site Reliability Engineer,Not specified,Bind
+Site Reliability Engineer,Not specified,oVirt
+Site Reliability Engineer,Not specified,OpenStack
+Site Reliability Engineer,Not specified,Keepalived
+Site Reliability Engineer,Not specified,HAProxy
+Site Reliability Engineer,Not specified,Pacemaker
+Site Reliability Engineer,Not specified,Prometheus
+Site Reliability Engineer,Not specified,TICK Stack
+Site Reliability Engineer,Not specified,Splunk
+Site Reliability Engineer,Not specified,DRBD
+Site Reliability Engineer,Not specified,Puppet
+Site Reliability Engineer,Not specified,Nagios
+Site Reliability Engineer,Not specified,Icinga
+Site Reliability Engineer,Not specified,Ansible
+Site Reliability Engineer,Not specified,Git
+Site Reliability Engineer,Not specified,Bash
+Site Reliability Engineer,Not specified,Python
+Site Reliability Engineer,Not specified,Ruby
+Cloud Engineer,Not specified,OpenStack
+Cloud Engineer,Not specified,KVM
+Cloud Engineer,Not specified,Azure
+Cloud Engineer,Not specified,GCP
+Cloud Engineer,Not specified,AWS
+Cloud Engineer,Not specified,Cisco ACI
+Cloud Engineer,Not specified,Bash
+Cloud Engineer,Not specified,C
+Cloud Engineer,Not specified,Python
+Cloud Engineer,Not specified,GO
+Cloud Engineer,Not specified,Ceph
+Cloud Engineer,Not specified,Kubernetes
+Software Developers,Mid,JavaScript
+Software Developers,Mid,React
+Software Developers,Mid,Node.js
+Software Developers,Mid,Python
+Technical Designer,Not specified,AutoCAD
+Technical Designer,Not specified,Sketchup
+Technical Designer,Not specified,REVIT
+Technical Designer,Not specified,Lumion
+Technical Designer,Not specified,Cabinet Vision
+Digital Rights Intern,Not specified,Google Ads
+Fullstack Developer {Java and Spring Boot} [Hybrid] ®,Not specified,Java
+Fullstack Developer {Java and Spring Boot} [Hybrid] ®,Not specified,Spring Boot
+SOC Analyst,Senior,Fortinet
+SOC Analyst,Senior,Palo Alto
+SOC Analyst,Senior,Cisco
+SOC Analyst,Senior,MikroTik
+SOC Analyst,Senior,TCP/IP
+SOC Analyst,Senior,DNS
+SOC Analyst,Senior,VPN
+SOC Analyst,Senior,VLAN
+Data Architect  {Data Landscape & Lakehouse},Senior,Databricks
+Data Architect  {Data Landscape & Lakehouse},Senior,Delta Lake
+Data Architect  {Data Landscape & Lakehouse},Senior,Apache Iceberg
+Data Architect  {Data Landscape & Lakehouse},Senior,AWS
+Data Architect  {Data Landscape & Lakehouse},Senior,Azure
+Data Architect  {Data Landscape & Lakehouse},Senior,GCP
+Data Architect  {Data Landscape & Lakehouse},Senior,Apache Spark
+Data Architect  {Data Landscape & Lakehouse},Senior,Kafka
+Data Architect  {Data Landscape & Lakehouse},Senior,SQL
+Data Architect  {Data Landscape & Lakehouse},Senior,Python
+Data Architect  {Data Landscape & Lakehouse},Senior,Scala
+IT Infrastructure & Systems Manager,Senior,Sophos Firewall
+IT Infrastructure & Systems Manager,Senior,Retail Pro
+IT Infrastructure & Systems Manager,Senior,Barter POS
+IT Infrastructure & Systems Manager,Senior,Crystal Reports
+IT Infrastructure & Systems Manager,Senior,QlikView
+Digital Marketing Manager,Senior,SEO
+Digital Marketing Manager,Senior,SEM
+Cloud Backend Engineer,Not specified,Azure
+Cloud Backend Engineer,Not specified,AWS
+Cloud Backend Engineer,Not specified,GCP
+Cloud Backend Engineer,Not specified,Alibaba
+Scrum Master,Not specified,Scrum
+Scrum Master,Not specified,Extreme Programming (XP)
+Scrum Master,Not specified,Jira
+Data Center Operator,Not specified,SolarWinds
+Program Director,Senior,Agile
+Data Warehouse (DW) Developer,Not specified,AWS Glue
+Data Warehouse (DW) Developer,Not specified,Lambda
+Data Warehouse (DW) Developer,Not specified,Snowflake
+Data Warehouse (DW) Developer,Not specified,DBT
+Data Warehouse (DW) Developer,Not specified,SQL
+Data Warehouse (DW) Developer,Not specified,PostgreSQL
+Data Warehouse (DW) Developer,Not specified,Athena
+Data Warehouse (DW) Developer,Not specified,Power BI
+Data Warehouse (DW) Developer,Not specified,Tableau
+Data Warehouse (DW) Developer,Not specified,Python
+iOS Developer,Not specified,Agile Methodology
+iOS Developer,Not specified,Git
+iOS Developer,Not specified,GitLab
+iOS Developer,Not specified,Bitbucket
+iOS Developer,Not specified,GitHub
+iOS Developer,Not specified,AWS
+iOS Developer,Not specified,Objective-C
+iOS Developer,Not specified,Swift
+iOS Developer,Not specified,Cocoa Touch
+iOS Developer,Not specified,Core Data
+iOS Developer,Not specified,Core Animation
+iOS Developer,Not specified,RESTful APIs
+iOS Developer,Not specified,SVN
+iOS Developer,Not specified,Atlassian Jira
+Android Developer,Not specified,Jetpack Compose
+Android Developer,Not specified,Kotlin
+Android Developer,Not specified,Node.js
+Android Developer,Not specified,Express
+Android Developer,Not specified,Fastify
+Android Developer,Not specified,PostgreSQL
+Android Developer,Not specified,MySQL
+Android Developer,Not specified,Docker
+Android Developer,Not specified,PM2
+Android Developer,Not specified,Retrofit
+Android Developer,Not specified,OkHttp
+Android Developer,Not specified,Ktor Client
+Android Developer,Not specified,Firebase Crashlytics
+Android Developer,Not specified,Git
+Investment Banking Associate,Not specified,Excel
+Investment Banking Associate,Not specified,PowerPoint
+Investment Banking Associate,Not specified,Word
+Back End Software Engineer,Mid,PHP
+Back End Software Engineer,Mid,Laravel
+Back End Software Engineer,Mid,Java
+Back End Software Engineer,Mid,Spring Framework
+Back End Software Engineer,Mid,NodeJS
+Back End Software Engineer,Mid,Adonis
+Back End Software Engineer,Mid,OOP
+Back End Software Engineer,Mid,AWS
+Back End Software Engineer,Mid,MySQL
+Back End Software Engineer,Mid,MS SQL
+Back End Software Engineer,Mid,Oracle SQL
+Back End Software Engineer,Mid,NoSQL
+Back End Software Engineer,Mid,REST
+Back End Software Engineer,Mid,SOAP
+Back End Software Engineer,Mid,Agile
+Back End Software Engineer,Mid,Test-Driven Development
+Sales Representative,Senior,Microsoft Office
+AI Intern,Entry,Python
+Android Developer,Senior,Android SDK
+Android Developer,Senior,RESTful APIs
+iOS Developer,Senior,REST
+iOS Developer,Senior,Swift
+iOS Developer,Senior,Objective-C
+Data Architect  [Data Lakehouse],Senior,Databricks
+Data Architect  [Data Lakehouse],Senior,Delta Lake
+Data Architect  [Data Lakehouse],Senior,Apache Iceberg
+Data Architect  [Data Lakehouse],Senior,AWS
+Data Architect  [Data Lakehouse],Senior,Azure
+Data Architect  [Data Lakehouse],Senior,GCP
+Data Architect  [Data Lakehouse],Senior,Apache Spark
+Data Architect  [Data Lakehouse],Senior,Kafka
+Data Architect  [Data Lakehouse],Senior,SQL
+Data Architect  [Data Lakehouse],Senior,Python
+Data Architect  [Data Lakehouse],Senior,Scala
+Customer Service Support Head,Senior,Agile
+Customer Service Support Head,Senior,ITIL
+Customer Service Support Head,Senior,MS Project
+Customer Service Support Head,Senior,Jira
+Customer Service Support Head,Senior,ServiceNow
+Customer Service Support Head,Senior,Zendesk
+Systems Application Engineer: 1 Year Contract,Mid,Linux
+Systems Application Engineer: 1 Year Contract,Mid,SQL
+Systems Application Engineer: 1 Year Contract,Mid,VMware
+Senior WordPress Designer Work From Home,Senior,WordPress
+Senior WordPress Designer Work From Home,Senior,Gutenberg
+Senior WordPress Designer Work From Home,Senior,Git
+Senior WordPress Designer Work From Home,Senior,SourceTree
+Senior WordPress Designer Work From Home,Senior,Drupal
+Senior WordPress Designer Work From Home,Senior,Shopify
+Senior WordPress Designer Work From Home,Senior,Elementor
+Senior WordPress Designer Work From Home,Senior,HTML5
+Senior WordPress Designer Work From Home,Senior,CSS3
+Senior WordPress Designer Work From Home,Senior,JavaScript
+Senior WordPress Designer Work From Home,Senior,jQuery
+Senior WordPress Designer Work From Home,Senior,JSON
+Senior WordPress Designer Work From Home,Senior,RESTful APIs
+Operations Support Analyst,Mid,SSIS
+Operations Support Analyst,Mid,Azure Data Factory
+Operations Support Analyst,Mid,Power BI
+Operations Support Analyst,Mid,Tableau
+Operations Support Analyst,Mid,Qlik
+Operations Support Analyst,Mid,SQL
+Operations Support Analyst,Mid,Azure Synapse
+Operations Support Analyst,Mid,AWS
+Operations Support Analyst,Mid,ITIL
+Corporate Accountant,Senior,IFS
+Corporate Accountant,Senior,Excel
+Corporate Accountant,Senior,Power BI
+System Analyst,Junior,Jira
+System Analyst,Junior,Draw.io
+Senior SEO and GEO Manager,Senior,GA4
+Senior SEO and GEO Manager,Senior,Search Console
+Technical Designer for Cabinetry,Mid,AutoCAD
+Technical Designer for Cabinetry,Mid,Sketchup
+Technical Designer for Cabinetry,Mid,REVIT
+Technical Designer for Cabinetry,Mid,Lumion
+Technical Designer for Cabinetry,Mid,Cabinet Vision
+"Data Engineer {Python , SQL}",Senior,Python
+"Data Engineer {Python , SQL}",Senior,Java
+"Data Engineer {Python , SQL}",Senior,Pandas
+"Data Engineer {Python , SQL}",Senior,Dplyr
+"Data Engineer {Python , SQL}",Senior,Spark
+"Data Engineer {Python , SQL}",Senior,SQL
+"Data Engineer {Python , SQL}",Senior,NoSQL
+"Data Engineer {Python , SQL}",Senior,MongoDB
+"Data Engineer {Python , SQL}",Senior,Hive
+"Data Engineer {Python , SQL}",Senior,Snowflake
+"Data Engineer {Python , SQL}",Senior,Redshift
+"Data Engineer {Python , SQL}",Senior,AWS
+"Data Engineer {Python , SQL}",Senior,Azure
+"Data Engineer {Python , SQL}",Senior,GCP
+"Data Engineer {Python , SQL}",Senior,Apache Nifi
+"Data Engineer {Python , SQL}",Senior,Hadoop
+"Data Engineer {Python , SQL}",Senior,AWS Glue
+"Data Engineer {Python , SQL}",Senior,AWS Lake Formation
+"Data Engineer {Python , SQL}",Senior,Tableau
+"Data Engineer {Python , SQL}",Senior,Power BI
+"Data Engineer {Python , SQL}",Senior,QuickSight
+"Data Engineer {Python , SQL}",Senior,Google Data Studio
+"Data Engineer {Python , SQL}",Senior,Dash
+"Data Engineer {Python , SQL}",Senior,Plotly
+"Data Engineer {Python , SQL}",Senior,Matplotlib
+"Data Engineer {Python , SQL}",Senior,Ggplot
+"Data Engineer {Python , SQL}",Senior,Folium
+Quality Assurance Specialist,Mid,TestRail
+Quality Assurance Specialist,Mid,JIRA
+Quality Assurance Specialist,Mid,Postman
+Quality Assurance Specialist,Mid,Robot Framework
+Digital Marketing Assistant,Entry,CapCut
+Digital Marketing Assistant,Entry,Canva
+Digital Marketing Assistant,Entry,ChatGPT
+IT Project Manager,Senior,SIEM
+IT Project Manager,Senior,SOAR
+IT Project Manager,Senior,Chronicle SIEM
+IT Project Manager,Senior,Google SecOps
+Oracle EBS Developer,Senior,Oracle EBS
+Oracle EBS Developer,Senior,PL/SQL
+Oracle EBS Developer,Senior,Oracle Forms
+Oracle EBS Developer,Senior,Oracle Reports
+Oracle EBS Developer,Senior,Oracle Workflow
+Oracle EBS Developer,Senior,AME
+Oracle EBS Developer,Senior,ORDS
+Oracle EBS Developer,Senior,REST APIs
+Oracle EBS Developer,Senior,SQL
+Oracle APEX Developer,Mid,Oracle APEX
+Oracle APEX Developer,Mid,Spring Boot
+Oracle APEX Developer,Mid,REST APIs
+Oracle APEX Developer,Mid,React
+Oracle APEX Developer,Mid,PL/SQL
+Oracle APEX Developer,Mid,Java
+Oracle APEX Developer,Mid,Oracle Database
+Oracle APEX Developer,Mid,Azure DevOps
+Salesforce Developer,Senior,Salesforce
+Salesforce Developer,Senior,Visualforce
+Salesforce Developer,Senior,Apex
+Salesforce Developer,Senior,Salesforce Flows
+Salesforce Developer,Senior,SOQL
+Salesforce Developer,Senior,REST API
+Salesforce Developer,Senior,Oracle Database
+Salesforce Developer,Senior,SQL
+Salesforce Developer,Senior,PL/SQL
+Salesforce Developer,Senior,Azure DevOps
+Application Developer,Mid,React.js
+Application Developer,Mid,Node.js
+Application Developer,Mid,Express.js
+Application Developer,Mid,NestJS
+Application Developer,Mid,RESTful APIs
+Application Developer,Mid,MongoDB
+Application Developer,Mid,Redux
+Application Developer,Mid,NoSQL
+.NET Developer,Mid,.NET Core
+.NET Developer,Mid,RESTful APIs
+.NET Developer,Mid,JWT
+.NET Developer,Mid,OAuth2
+.NET Developer,Mid,React.js
+.NET Developer,Mid,Redux
+.NET Developer,Mid,MS SQL Server
+.NET Developer,Mid,T-SQL
+.NET Developer,Mid,Git
+.NET Developer,Mid,Azure DevOps
+Python Developer,Mid,Python
+Python Developer,Mid,FastAPI
+Python Developer,Mid,REST APIs
+Python Developer,Mid,React.js
+Python Developer,Mid,PostgreSQL
+Python Developer,Mid,MySQL
+Python Developer,Mid,Git
+Python Developer,Mid,Azure DevOps
+Scrum Master,Mid,Jira
+Accounting Assistant,Entry,Microsoft Great Plains
+Business Analyst,Junior,Visio
+Business Analyst,Junior,Lucidchart
+Business Analyst,Junior,Draw.io
+Business Analyst,Junior,SQL
+Business Analyst,Junior,Jira
+Business Analyst,Junior,Confluence
+Business Analyst,Junior,Azure DevOps
+UI UX,Junior,Figma
+UI UX,Junior,Adobe XD
+UI UX,Junior,Sketch
+UI UX,Junior,HTML
+UI UX,Junior,CSS
+"QA Automation Engineer, Hybrid",Mid,Next.js
+"QA Automation Engineer, Hybrid",Mid,React
+"QA Automation Engineer, Hybrid",Mid,Appium
+"QA Automation Engineer, Hybrid",Mid,Detox
+"QA Automation Engineer, Hybrid",Mid,Maestro
+"QA Automation Engineer, Hybrid",Mid,Playwright
+"QA Automation Engineer, Hybrid",Mid,Cypress
+"QA Automation Engineer, Hybrid",Mid,Selenium
+"QA Automation Engineer, Hybrid",Mid,JavaScript
+"QA Automation Engineer, Hybrid",Mid,TypeScript
+"QA Automation Engineer, Hybrid",Mid,Git
+IT Planning Professional,Mid,Microsoft 365
+IT Planning Professional,Mid,Excel
+IT Planning Professional,Mid,Power BI
+IT Planning Professional,Mid,Teams
+IT Planning Professional,Mid,SharePoint
+IT Planning Professional,Mid,Microsoft Power Apps
+IT Planning Professional,Mid,Power Automate
+Infra Operations Engineer,Entry,Cisco
+Infra Operations Engineer,Entry,Palo Alto
+Infra Operations Engineer,Entry,Cisco ASA
+Infra Operations Engineer,Entry,Windows Server
+Infra Operations Engineer,Entry,Active Directory
+Infra Operations Engineer,Entry,Microsoft 365
+Infra Operations Engineer,Entry,Entra ID
+Infra Operations Engineer,Entry,VMware
+Infra Operations Engineer,Entry,PowerShell
+Infra Operations Engineer,Entry,Bash
+AI Application Developer,Mid,Python
+AI Application Developer,Mid,pandas
+AI Application Developer,Mid,numpy
+AI Application Developer,Mid,openpyxl
+AI Application Developer,Mid,requests
+AI Application Developer,Mid,PyPDF
+AI Application Developer,Mid,Docker
+AI Application Developer,Mid,Kubernetes
+AI Application Developer,Mid,Dify
+AI Application Developer,Mid,Django
+AI Application Developer,Mid,FastAPI
+AI Application Developer,Mid,Git
+System Analyst,Junior,Jira
+System Analyst,Junior,Draw.io
+Project Support Internship,Entry,Microsoft Excel
+Project Support Internship,Entry,Google Spreadsheet
+HR Data Scientist,Mid,SuccessFactors Employee Central
+Sales Field Associate Iloilo,Junior,MS Office
+Front End Software Engineer,Senior,Git
+Front End Software Engineer,Senior,Bootstrap
+Front End Software Engineer,Senior,Tailwind
+Front End Software Engineer,Senior,JavaScript
+Front End Software Engineer,Senior,NodeJS
+Front End Software Engineer,Senior,ReactJS
+Front End Software Engineer,Senior,Redux
+Front End Software Engineer,Senior,React Router
+Front End Software Engineer,Senior,REST API
+Front End Software Engineer,Senior,Axios
+Front End Software Engineer,Senior,Fetch
+Front End Software Engineer,Senior,RXjs
+Front End Software Engineer,Senior,CSS
+Accounting & Finance OJT,Entry,NetSuite
+Accounting & Finance OJT,Entry,HTML
+Accounting & Finance OJT,Entry,Microsoft Power Apps
+Accounting & Finance OJT,Entry,Power Automate
+Accounting & Finance OJT,Entry,Excel
+Product Innovation Specialist,Junior,Azure DevOps
+Product Innovation Specialist,Junior,Jira
+Product Solutions Specialist,Junior,Cursor
+Product Solutions Specialist,Junior,ChatGPT
+Product Solutions Specialist,Junior,GitHub Copilot
+Product Solutions Specialist,Junior,HTML
+Product Solutions Specialist,Junior,CSS
+Product Solutions Specialist,Junior,JavaScript
+Product Solutions Specialist,Junior,SQL
+Product Solutions Specialist,Junior,REST APIs
+Data Analyst Intern,Entry,SQL
+Data Analyst Intern,Entry,Python
+Data Analyst Intern,Entry,R
+Client Video Production Coordinator,Mid,HeyGen's Digital Twin Studio
+Mid Business Analyst,Mid,Visio
+Mid Business Analyst,Mid,Lucidchart
+Mid Business Analyst,Mid,Draw.io
+Mid Business Analyst,Mid,SQL
+Mid Business Analyst,Mid,Jira
+Mid Business Analyst,Mid,Confluence
+Mid Business Analyst,Mid,Azure DevOps
+Full Stack Engineer with Mobile Experience,Senior,RESTful APIs
+Full Stack Engineer with Mobile Experience,Senior,Python 3.12
+Full Stack Engineer with Mobile Experience,Senior,Django 5.2
+Full Stack Engineer with Mobile Experience,Senior,Django REST Framework
+Full Stack Engineer with Mobile Experience,Senior,Celery
+Full Stack Engineer with Mobile Experience,Senior,React 18
+Full Stack Engineer with Mobile Experience,Senior,Vite
+Full Stack Engineer with Mobile Experience,Senior,PostgreSQL 16
+Full Stack Engineer with Mobile Experience,Senior,AWS
+Full Stack Engineer with Mobile Experience,Senior,Docker
+Full Stack Engineer with Mobile Experience,Senior,GitLab CI
+Full Stack Engineer with Mobile Experience,Senior,OpenTofu
+Automation Developer,Senior,UiPath
+Automation Developer,Senior,N8N
+Automation Developer,Senior,MSSQL Server
+Automation Developer,Senior,SQL
+Automation Developer,Senior,.NET
+Automation Developer,Senior,VB.NET
+Automation Developer,Senior,REST
+Automation Developer,Senior,SOAP
+Automation Developer,Senior,Git
+Automation Developer,Senior,Azure DevOps
+Senior Product Engineer | Makati,Senior,React
+Senior Product Engineer | Makati,Senior,Next.js
+Senior Product Engineer | Makati,Senior,TypeScript
+Senior Product Engineer | Makati,Senior,Tailwind CSS
+Senior Product Engineer | Makati,Senior,shadcn
+Senior Product Engineer | Makati,Senior,Figma
+Senior Product Engineer | Makati,Senior,REST APIs
+Market Research Operations Internship Program,Entry,Microsoft Office Suite
+Market Research Operations Internship Program,Entry,Google Workspace
+Demand Planning Associate Manager,Senior,Excel
+Demand Planning Associate Manager,Senior,database reporting tools
+Purchasing Buyer,Not specified,Microsoft Office
+Purchasing Buyer,Not specified,Excel
+Purchasing Buyer,Not specified,Word
+Purchasing Buyer,Not specified,PowerPoint
+Purchasing Buyer,Not specified,Power BI
+Pharmacist,Junior,Compounder
+Pharmacist,Junior,OneDrive
+Regulatory Pharmacist,Junior,ISO QMS
+Regulatory Pharmacist,Junior,Halal
+Librarian III_Photoduplication,Not specified,cataloging
+Librarian III_Photoduplication,Not specified,classification
+Mid AI Machine Learning Engineer,Mid,LangChain
+Mid AI Machine Learning Engineer,Mid,LangGraph
+Mid AI Machine Learning Engineer,Mid,APIs
+Mid AI Machine Learning Engineer,Mid,microservices
+Mid AI Machine Learning Engineer,Mid,Model Context Protocol
+Mid AI Machine Learning Engineer,Mid,CI/CD
+Software Designer,Not specified,Figma
+Software Designer,Not specified,Sketch
+Software Designer,Not specified,Adobe XD
+Software Designer,Not specified,CSS
+Software Designer,Not specified,HTML
+Tax Accountant,Not specified,SAP
+Tax Accountant,Not specified,MS Office
+Tax Accountant,Not specified,Excel
+Tax Accountant,Not specified,Word
+Tax Accountant,Not specified,PowerPoint
+AI Engineer,Mid,Azure
+AI Engineer,Mid,AWS
+AI Engineer,Mid,GCP
+AI Engineer,Mid,Python
+AI Engineer,Mid,REST APIs
+AI Engineer,Mid,Azure OpenAI
+AI Engineer,Mid,Cognitive Services
+AI Engineer,Mid,Bedrock
+AI Engineer,Mid,SageMaker
+AI Engineer,Mid,Vertex AI
+Loan Specialist,Junior,Members Benefit & Interest Rebates System
+"Data Engineer [Python , SQL] ⁿ",Not specified,Python
+"Data Engineer [Python , SQL] ⁿ",Not specified,SQL
+"Data Engineer [Python , SQL] ⁿ",Not specified,NoSQL
+"Data Engineer [Python , SQL] ⁿ",Not specified,pandas
+"Data Engineer [Python , SQL] ⁿ",Not specified,dplyr
+"Data Engineer [Python , SQL] ⁿ",Not specified,Spark
+"Data Engineer [Python , SQL] ⁿ",Not specified,ETL
+"Data Engineer [Python , SQL] ⁿ",Not specified,MongoDB
+"Data Engineer [Python , SQL] ⁿ",Not specified,Hadoop
+"Data Engineer [Python , SQL] ⁿ",Not specified,AWS
+"Data Engineer [Python , SQL] ⁿ",Not specified,Azure
+"Data Engineer [Python , SQL] ⁿ",Not specified,GCP
+"Data Engineer [Python , SQL] ⁿ",Not specified,Snowflake
+"Data Engineer [Python , SQL] ⁿ",Not specified,Redshift
+"Data Engineer [Python , SQL] ⁿ",Not specified,Tableau
+"Data Engineer [Python , SQL] ⁿ",Not specified,Power BI
+"Data Engineer [Python , SQL] ⁿ",Not specified,Apache Nifi
+Software Quality Assurance (QA) Intern,Entry,Playwright
+Software Quality Assurance (QA) Intern,Entry,JavaScript
+Software Quality Assurance (QA) Intern,Entry,TypeScript
+Software Quality Assurance (QA) Intern,Entry,JIRA
+Software Quality Assurance (QA) Intern,Entry,Zephyr
+Business Support Engineer,Junior,SAP-ERP
+Business Support Engineer,Junior,C4C
+Business Support Engineer,Junior,MS Office
+Production Supervisor,Mid,Microsoft Office Applications
+Production Supervisor,Mid,Google Applications
+Production Supervisor,Mid,GMP
+Cloud Security Project Engineer,Junior,Firewall
+Cloud Security Project Engineer,Junior,Networking
+Cloud Security Project Engineer,Junior,Network Security
+Cloud Security Project Engineer,Junior,Netskope
+Cloud Security Project Engineer,Junior,SASE
+Cloud Security Project Engineer,Junior,SSE
+Cloud Security Project Engineer,Junior,SWG
+Cloud Security Project Engineer,Junior,CASB
+Cloud Security Project Engineer,Junior,ZTNA
+Cloud Security Project Engineer,Junior,DLP
+IT Service Management Intern,Entry,Microsoft Office
+Software Developer,Senior,ReactJS
+Software Developer,Senior,C#
+Software Developer,Senior,Oracle
+Software Developer,Senior,SQL
+Software Developer,Senior,CI/CD
+DevOps Engineer,Mid,Azure DevOps
+DevOps Engineer,Mid,Kubernetes
+DevOps Engineer,Mid,AKS
+DevOps Engineer,Mid,Docker
+DevOps Engineer,Mid,PowerShell
+DevOps Engineer,Mid,Bash
+DevOps Engineer,Mid,Salesforce
+DevOps Engineer,Mid,Adobe Experience Manager
+DevOps Engineer,Mid,MS SQL
+DevOps Engineer,Mid,Oracle
+DevOps Engineer,Mid,Linux
+DevOps Engineer,Mid,Windows
+DevOps Engineer,Mid,Git
+DevOps Engineer,Mid,YAML
+Solutions Architect,Senior,TOGAF
+Solutions Architect,Senior,Zachman
+RPA Developer,Mid,UiPath
+RPA Developer,Mid,UiPath Studio
+RPA Developer,Mid,UiPath Orchestrator
+RPA Developer,Mid,C#
+RPA Developer,Mid,VB.NET
+RPA Developer,Mid,Python
+RPA Developer,Mid,Java
+RPA Developer,Mid,SQL
+RPA Developer,Mid,REST APIs
+Solutions Architecture Manager,Senior,AWS
+Solutions Architecture Manager,Senior,Azure
+Solutions Architecture Manager,Senior,GCP
+Solutions Architecture Manager,Senior,microservices
+Solutions Architecture Manager,Senior,APIs
+Sales Associate,Entry,MS Office
+Quality Assurance Engineer,Mid,Playwright
+Quality Assurance Engineer,Mid,Cypress
+Quality Assurance Engineer,Mid,Selenium
+Full Stack Developer,Senior,ReactJS
+Full Stack Developer,Senior,C#
+Full Stack Developer,Senior,Oracle
+Full Stack Developer,Senior,SQL
+Full Stack Developer,Senior,CI/CD
+AI Engineer,Mid,Python
+AI Engineer,Mid,LLMs
+AI Engineer,Mid,NLP
+AI Engineer,Mid,Machine Learning
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,Oracle SQL
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,Java
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,Spring Boot
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,Oracle Database
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,REST APIs
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,JavaScript
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,HTML
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,React
+"Software Developer with Oracle SQL, Java, Spring Boot",Senior,CI/CD
+Software Implementation Specialist,Not specified,RESTful APIs
+Software Implementation Specialist,Not specified,OAuth
+Software Implementation Specialist,Not specified,OpenID Connect
+Software Implementation Specialist,Not specified,JWT
+Software Implementation Specialist,Not specified,Python
+Software Implementation Specialist,Not specified,Java
+Software Implementation Specialist,Not specified,JavaScript
+Software Implementation Specialist,Not specified,Node.js
+Android Developer,Senior,Android SDK
+Academic Program Secretary,Junior,MS Office
+Academic Program Secretary,Junior,Google Applications
+Academic Program Secretary,Junior,Canvas
+Academic Program Secretary,Junior,Zoom
+Technical Presales Engineer,Not specified,Microsoft IT solutions
+Scrum Master,Mid,Scrum
+Scrum Master,Mid,Agile
+Scrum Master,Mid,Kanban
+Scrum Master,Mid,XP
+Scrum Master,Mid,Jira
+Scrum Master,Mid,Trello
+Back End Developer,Junior,C#
+Back End Developer,Junior,ASP.NET
+Back End Developer,Junior,NodeJS
+Back End Developer,Junior,JavaScript
+Back End Developer,Junior,AngularJS
+Back End Developer,Junior,ASP.NET MVC Framework
+Back End Developer,Junior,HTML
+Back End Developer,Junior,CSS
+Apple iOS Developer,Junior,Objective C
+Apple iOS Developer,Junior,Swift
+Project Manager,Mid,MS Office
+Senior Software Developer,Senior,REST API
+Senior Software Developer,Senior,PostgreSQL
+Senior Software Developer,Senior,AWS
+Senior Software Developer,Senior,CI/CD
+Senior Software Developer,Senior,Git
+Senior Software Developer,Senior,TypeScript
+Senior Software Developer,Senior,Next.js
+Senior Software Developer,Senior,Lambda
+Senior Software Developer,Senior,ECS
+Senior Software Developer,Senior,RDS
+Senior Software Developer,Senior,S3
+Senior Software Developer,Senior,CloudWatch
+Senior Software Developer,Senior,Terraform
+Senior Software Developer,Senior,CDK
+Import Coordinator,Junior,Microsoft Office
+Software Quality Assurance (QA) Specialist,Not specified,C
+Software Quality Assurance (QA) Specialist,Not specified,C#
+Full Stack Developer,Mid,C#
+Full Stack Developer,Mid,ASP.NET
+Full Stack Developer,Mid,NodeJS
+Full Stack Developer,Mid,JavaScript
+Full Stack Developer,Mid,VueJS
+Full Stack Developer,Mid,React
+Full Stack Developer,Mid,ASP.NET MVC Framework
+Full Stack Developer,Mid,HTML
+Full Stack Developer,Mid,CSS
+Front End Developer ,Junior,HTML5
+Front End Developer ,Junior,JavaScript
+Front End Developer ,Junior,CSS
+Front End Developer ,Junior,AngularJS
+Front End Developer ,Junior,LESS
+Front End Developer ,Junior,Adobe Suite
+Front End Developer ,Junior,Photoshop

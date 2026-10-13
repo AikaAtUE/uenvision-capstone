@@ -26,15 +26,35 @@ def now():
 
 
 def load(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    # On Windows a file can't be opened for a moment while another process swaps it in; retry.
+    for attempt in range(40):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (PermissionError, ValueError):
+            if attempt == 39:
+                raise
+            time.sleep(0.05)
 
 
 def save(path, state):
-    tmp = path + ".tmp"
+    """Write via a temp file, then swap it in. On Windows the swap fails with 'Access is denied'
+    whenever the web page is reading run.json at that instant, so retry for a while."""
+    tmp = f"{path}.{os.getpid()}.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
-    os.replace(tmp, path)
+    for attempt in range(100):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            time.sleep(0.05)
+    try:    # last resort: write in place
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
 
 
 def main():
@@ -56,9 +76,10 @@ def main():
             save(state_file, state)
 
             log.write(f"\n=== Step {i + 1}/{len(cfg['steps'])}: {step['label']} ===\n")
+            extra = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
             proc = subprocess.Popen(
                 step["argv"], cwd=cwd, env=env, stdin=subprocess.DEVNULL,
-                stdout=log, stderr=subprocess.STDOUT,
+                stdout=log, stderr=subprocess.STDOUT, **extra,
             )
             last_beat = 0.0
             while proc.poll() is None:

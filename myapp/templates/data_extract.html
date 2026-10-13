@@ -1,0 +1,68 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Extract Skills{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-data-extract">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
+    <h2 class="section-title">Extract skills</h2>
+    <p class="muted data-lede">Have Gemini read the compiled job postings from <a href="{% url 'data_scrape' %}">Scrape Data</a> (or an imported CSV) and pull out the skills for each one. Results are saved to <code>data/extracted_skills.csv</code>, and a run resumes where it left off if you stop it and run it again. Jobs already extracted are not sent again.</p>
+
+    {% if run.status != 'idle' and run.kind == 'extract' %}
+    <p class="run-note"><span class="run-badge" data-s="{{ run.status }}">{{ run.status|title }}</span>
+      <span class="muted">{% if run.status == 'running' %}A run is in progress.{% else %}Last run: {{ run.status }}.{% endif %}</span>
+      <a href="{% url 'console' %}">Open the console</a></p>
+    {% endif %}
+
+    <form class="data-card-wide" method="post" action="{% url 'extract_run' %}" id="scrape-form">
+      {% csrf_token %}
+
+      <div class="settings-card data-card">
+        <h3 class="card-title">1 · Job data</h3>
+        <fieldset class="field-group">
+          <legend>Extract skills from</legend>
+          {% for key, src in summary.sources.items %}
+          <label class="checkbox"><input type="checkbox" name="sources" value="{{ key }}"{% if key in form.sources %} checked{% endif %}>
+            <span><strong>{{ src.label }}</strong> jobs <small class="muted">— {% if src.compiled.exists %}compiled CSV ready{% else %}no compiled CSV yet{% endif %}</small></span></label>
+          {% endfor %}
+        </fieldset>
+        <small class="field-hint">Both sources are extracted into the same <code>extracted_skills.csv</code> with one set of columns (a <code>source</code> column says where each row came from, and the posting date is in <code>date</code>). Ticked sources run one after the other.</small>
+      </div>
+
+      <div class="settings-card data-card">
+        <h3 class="card-title">2 · Gemini</h3>
+
+        <label class="field"><span>Rows per prompt</span>
+          <input type="number" name="batch_size" value="{{ form.batch_size }}" min="1" max="{{ max_batch }}" step="1" required>
+          <small class="field-hint">How many job postings are sent to Gemini in one request (1–{{ max_batch }}, default 20). Smaller batches are slower but fail less often; larger ones use fewer requests.</small>
+        </label>
+
+        <label class="field"><span>Gemini model</span>
+          <input type="text" name="model" value="{{ form.model }}" placeholder="{{ default_model }}" spellcheck="false" autocomplete="off" maxlength="80">
+          <small class="field-hint">Any model name your API keys can use, e.g. <code>{{ default_model }}</code>. If Gemini answers “model not found”, change it here.</small>
+        </label>
+
+        <button type="submit" class="btn btn-navy" id="run-btn"{% if run.status == 'running' %} disabled{% endif %}>Extract skills</button>
+        <small class="field-hint" id="run-hint">{% if run.status == 'running' %}A run is in progress — see the console.{% else %}Runs in the background; progress shows in the Console.{% endif %}</small>
+      </div>
+    </form>
+
+    {# ---------- api_keys.txt ---------- #}
+    <h2 class="section-title settings-section-gap">api_keys.txt</h2>
+    <form class="settings-card data-card" method="post" action="{% url 'api_keys_save' %}">
+      {% csrf_token %}
+      <label class="field"><span>Gemini API keys — one per line</span>
+        <textarea name="keys" id="keys-text" rows="6" spellcheck="false" autocomplete="off" wrap="off" placeholder="AIza…">{{ keys_text }}</textarea>
+        <small class="field-hint">When a key runs out of daily quota or is rejected, extraction moves on to the next line. Lines starting with <code>#</code> are ignored. Currently {{ key_count }} key{{ key_count|pluralize }}. Only administrators can see and edit this.</small>
+      </label>
+      <button type="submit" class="btn btn-navy">Save api_keys.txt</button>
+    </form>
+
+    <h2 class="section-title settings-section-gap">What's in data/ right now</h2>
+    <div id="summary-wrap">{% include "_data_summary.html" %}</div>
+  </div>
+</section>
+{% endblock %}

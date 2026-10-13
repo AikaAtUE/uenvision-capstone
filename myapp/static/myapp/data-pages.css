@@ -96,3 +96,7 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 .table-wrap:has(.summary-table), #summary-wrap{max-width:680px;}
 .summary-table{max-width:none; width:100%;}
 .run-panel{max-width:680px;}
+
+.run-panel--console{max-width:none;}
+.run-panel--console .run-log{min-height:420px; max-height:68vh;}
+.run-note{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 20px; font-size:.9rem;}
