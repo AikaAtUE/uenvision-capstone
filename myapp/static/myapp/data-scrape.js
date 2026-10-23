@@ -8,7 +8,6 @@
   const badge = document.getElementById('run-badge');
   const meta = document.getElementById('run-meta');
   const stepsEl = document.getElementById('run-steps');
-  const errEl = document.getElementById('run-error');
   const logEl = document.getElementById('run-log');
   const stopForm = document.getElementById('stop-form');
   const runBtn = document.getElementById('run-btn');
@@ -22,6 +21,22 @@
   function fmt(iso) {
     const d = new Date(iso);
     return isNaN(d) ? '' : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  // Lines that look like errors are shown in red, along with the indented lines that follow
+  // them (tracebacks). Text only goes in through textContent.
+  const ERR = /\b(ERROR|CRITICAL|FATAL|FAILED|STOP)\b|Traceback|Error:|Exception|\[WARN\]/;
+  function renderLog(text) {
+    while (logEl.firstChild) logEl.removeChild(logEl.firstChild);
+    let inErr = false;
+    text.split('\n').forEach((line, i, all) => {
+      if (ERR.test(line)) inErr = true;
+      else if (!/^\s/.test(line)) inErr = false;
+      const span = document.createElement('span');
+      if (inErr) span.className = 'log-err';
+      span.textContent = line + (i < all.length - 1 ? '\n' : '');
+      logEl.appendChild(span);
+    });
   }
 
   function render(d) {
@@ -45,12 +60,14 @@
       stepsEl.appendChild(li);
     });
 
-    errEl.textContent = d.error || '';
-
+    // Everything (output, progress, warnings, errors) goes inside the dark box.
+    let text = d.log || '';
+    if (d.error && text.indexOf(d.error) === -1) text += (text ? '\n' : '') + 'ERROR: ' + d.error;
+    if (!text) text = 'Waiting for output…';
     const atBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
-    const text = d.log || 'Waiting for output…';
-    if (logEl.textContent !== text) {
-      logEl.textContent = text;
+    if (logEl.dataset.raw !== text) {
+      logEl.dataset.raw = text;
+      renderLog(text);
       if (atBottom) logEl.scrollTop = logEl.scrollHeight;
     }
 

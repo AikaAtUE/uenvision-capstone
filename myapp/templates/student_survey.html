@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Student Survey{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'myapp/uenvision-additions.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/curriculum-survey.css' %}?v={% now 'U' %}">
+{% endblock %}
+{% block content %}
+<main class="cs-page">
+  <header class="cs-header">
+    <h1>UEnvision Curriculum Survey — Students</h1>
+    <p class="muted">Help us compare what's taught in class with what the job market actually asks for. This takes about 5–10 minutes.</p>
+  </header>
+
+  {% if is_placeholder_curriculum %}
+  <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
+  {% endif %}
+
+  <div id="cs-done" class="panel cs-panel" hidden>
+    <h2>Thank you!</h2>
+    <p>Your responses were submitted. You can close this page now.</p>
+  </div>
+
+  <form id="student-survey-form" class="panel cs-panel" novalidate>
+    {% csrf_token %}
+
+    <div class="cs-privacy">
+      <h3>Data Privacy Notice</h3>
+      <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
+      <ul>
+        <li><strong>Purpose:</strong> to compare the technical skills taught in the BSIT/BSCS curricula against current IT/CS job market demand.</li>
+        <li><strong>What is collected:</strong> your name, UE email, course, student number, year level, the subjects you've taken, and the skills/proficiency you report for each.</li>
+        <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
+        <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
+        <li><strong>Questions or concerns:</strong> you may reach the UEnvision research team through your course adviser.</li>
+      </ul>
+      <label class="cs-consent"><input type="checkbox" id="student-consent"> <span>I have read the Data Privacy Notice above and voluntarily agree to participate.</span></label>
+    </div>
+
+    <div class="cs-row-2">
+      <label class="field"><span>Full name</span><input type="text" id="student-name" required></label>
+      <label class="field"><span>UE email address</span><input type="email" id="student-email" required></label>
+    </div>
+    <div class="cs-row-3">
+      <label class="field"><span>Course</span>
+        <select id="student-program" required>
+          <option value="">Select…</option>
+          <option value="BSIT">BS Information Technology</option>
+          <option value="BSCS">BS Computer Science</option>
+        </select>
+      </label>
+      <label class="field"><span>Student number</span><input type="text" id="student-number" required></label>
+      <label class="field"><span>Year level</span>
+        <select id="student-year" required>
+          <option value="">Select…</option>
+          <option value="1">1st Year</option>
+          <option value="2">2nd Year</option>
+          <option value="3">3rd Year</option>
+          <option value="4">4th Year</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="cs-section" id="student-current-subjects"></div>
+    <div class="cs-section" id="student-previous-subjects"></div>
+
+    <div class="cs-section">
+      <h3>Skills per subject</h3>
+      <p class="muted">For each subject you selected above, pick the skills you learned and your proficiency level now that you've taken it. Suggested skills come from the MIND Tech Skills Ontology — add your own if what you learned isn't listed.</p>
+      <div id="student-subject-blocks"></div>
+    </div>
+
+    <p class="form-msg form-msg--error" id="student-error" hidden></p>
+    <button type="submit" class="btn btn-navy">Submit survey</button>
+  </form>
+</main>
+
+<script type="application/json" id="cs-bootstrap">{{ bootstrap_json }}</script>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/curriculum-survey.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

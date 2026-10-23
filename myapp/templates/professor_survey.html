@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Professor Survey{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'myapp/uenvision-additions.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/curriculum-survey.css' %}?v={% now 'U' %}">
+{% endblock %}
+{% block content %}
+<main class="cs-page">
+  <header class="cs-header">
+    <h1>UEnvision Curriculum Survey — Faculty</h1>
+    <p class="muted">A digital version of the Subjects and Technical Skills Survey. For each subject you teach, tell us which skills you cover and how (Introduced / Practiced / Applied).</p>
+  </header>
+
+  {% if is_placeholder_curriculum %}
+  <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
+  {% endif %}
+
+  <div id="cs-done" class="panel cs-panel" hidden>
+    <h2>Thank you!</h2>
+    <p>Your responses were submitted. You can close this page now.</p>
+  </div>
+
+  <form id="professor-survey-form" class="panel cs-panel" novalidate>
+    {% csrf_token %}
+
+    <div class="cs-privacy">
+      <h3>Data Privacy Notice</h3>
+      <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
+      <ul>
+        <li><strong>Purpose:</strong> to document the technical competencies the BSIT/BSCS curricula expect faculty to teach, for comparison against current IT/CS job market demand.</li>
+        <li><strong>What is collected:</strong> the subjects you teach and the skills/teaching method you report for each. Your name and department are optional and used only to follow up on unclear responses, if needed.</li>
+        <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
+        <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
+        <li><strong>Questions or concerns:</strong> you may reach the UEnvision research team through the CCSS faculty coordinator.</li>
+      </ul>
+      <label class="cs-consent"><input type="checkbox" id="professor-consent"> <span>I have read the Data Privacy Notice above and voluntarily agree to participate.</span></label>
+    </div>
+
+    <div class="cs-row-2">
+      <label class="field"><span>Name (optional)</span><input type="text" id="professor-name"></label>
+      <label class="field"><span>Department / program handled (optional)</span><input type="text" id="professor-department"></label>
+    </div>
+
+    <div class="cs-section">
+      <h3>Subjects you currently teach <span class="muted">({{ current_sem_label }})</span></h3>
+      <p class="muted">Every subject across BSIT and BSCS currently in its 1st-semester slot this school year.</p>
+      <div id="professor-current-subjects"></div>
+    </div>
+
+    <div class="cs-section">
+      <h3>Subjects you taught last semester <span class="muted">({{ previous_sem_label }})</span></h3>
+      <p class="muted">Every subject across BSIT and BSCS that falls in the 2nd-semester slot of the previous school year.</p>
+      <div id="professor-previous-subjects"></div>
+    </div>
+
+    <div class="cs-section">
+      <button type="button" class="link-inline" id="professor-summer-toggle">+ Also report {{ previous_summer_label }} subjects taught</button>
+      <div id="professor-summer-subjects" hidden></div>
+    </div>
+
+    <div class="cs-section">
+      <h3>Skills per subject</h3>
+      <p class="muted">For each subject you checked above: pick the skills you cover and mark how — Introduced (first exposure), Practiced (guided exercises), or Applied (students use it independently/in a project).</p>
+      <div id="professor-subject-blocks"></div>
+    </div>
+
+    <p class="form-msg form-msg--error" id="professor-error" hidden></p>
+    <button type="submit" class="btn btn-navy">Submit survey</button>
+  </form>
+</main>
+
+<script type="application/json" id="cs-bootstrap">{{ bootstrap_json }}</script>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/curriculum-survey.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

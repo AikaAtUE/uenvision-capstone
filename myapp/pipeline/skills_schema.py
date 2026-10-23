@@ -16,7 +16,7 @@ UNIVERSAL_COLUMNS = [
     "city", "region", "country", "formatted_address",
     "salary_shown", "base_salary", "maximum_salary", "salary_currency", "salary_interval",
     "date", "is_active", "is_expired",
-    "hard_skills", "soft_skills", "certifications_or_licenses", "experience_level", "education",
+    "hard_skills", "hard_skills_raw", "soft_skills", "certifications_or_licenses", "experience_level", "education",
 ]
 
 # Source-specific / older column name -> universal name

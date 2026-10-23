@@ -6,7 +6,6 @@
 <section class="page is-active" id="page-console">
   <header class="page-header"><h1>Console</h1></header>
   <div class="page-body">
-    {% include "_messages.html" %}
     <h2 class="section-title">Run console</h2>
     <p class="muted data-lede">Live progress and output of the scrape, compile and skill-extraction runs started from <a href="{% url 'data_scrape' %}">Scrape Data</a> and <a href="{% url 'data_extract' %}">Extract Skills</a>. Runs keep going in the background, so you can close this page and come back.</p>
 
@@ -22,7 +21,6 @@
         </form>
       </div>
       <ol class="run-steps" id="run-steps"></ol>
-      <p class="form-msg is-error" id="run-error"></p>
       <pre class="run-log" id="run-log" tabindex="0" aria-label="Run log"></pre>
     </div>
   </div>

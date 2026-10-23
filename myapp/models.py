@@ -87,3 +87,36 @@ class SurveyResponse(models.Model):
 
     def __str__(self):
         return f"{self.get_survey_type_display()} #{self.pk}"
+
+
+class CurriculumSurveyResponse(models.Model):
+    """
+    One row per submitted Student / Fresh Grad Alumni / Professor curriculum-mapping
+    survey response. These are separate from SurveyResponse (above), which is for the
+    logged-in-only app-evaluation surveys (SUS/UAT/Functional) — these three surveys are
+    public (no login) curriculum-vs-skills data collection, so they get their own model.
+
+    Like SurveyResponse, the actual answers live in `data` (JSON) rather than a fixed
+    column per field, since the shape differs a lot between the three respondent types
+    (see myapp/views.py's student_survey_submit_view / alumni_survey_submit_view /
+    professor_survey_submit_view for the exact shape each one saves).
+    """
+
+    STUDENT = "student"
+    ALUMNI = "alumni"
+    PROFESSOR = "professor"
+    RESPONDENT_TYPES = [
+        (STUDENT, "Student"),
+        (ALUMNI, "Fresh Graduate / Alumni"),
+        (PROFESSOR, "Professor"),
+    ]
+
+    respondent_type = models.CharField(max_length=20, choices=RESPONDENT_TYPES, db_index=True)
+    data = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_respondent_type_display()} curriculum survey #{self.pk}"

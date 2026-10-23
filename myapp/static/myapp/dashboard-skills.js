@@ -1,5 +1,6 @@
-/* Dashboard: top-skills bar chart + top-skills-per-month line chart, drawn from /dashboard/skills/.
-   All dynamic text goes in through textContent. */
+/* Dashboard: top-skills bar chart + top-skills-per-month line chart + skill gap
+   analysis, all drawn from one /dashboard/skills/ response. All dynamic text goes
+   in through textContent. */
 (function () {
   'use strict';
   const panel = document.getElementById('skills-panel');
@@ -38,10 +39,19 @@
     $('stat-unique-note').textContent = 'Distinct ' + kindWord + ' skills';
     $('stat-topskill').textContent = st.top_skill || '—';
     $('stat-topskill-note').textContent = st.top_skill ? 'Appears in ' + st.top_skill_pct + '% of postings' : 'No skills found';
-    $('stat-alignment').textContent = '—';
-    $('stat-alignment-note').textContent = 'Available once survey data is collected';
-    $('stat-gaps').textContent = '—';
-    $('stat-gaps-note').textContent = 'Available once survey data is collected';
+
+    const gap = d.gap;
+    if (gap && gap.exists && gap.has_survey_data) {
+      $('stat-alignment').textContent = gap.alignment_score + '%';
+      $('stat-alignment-note').textContent = 'Cosine similarity: ' + gap.alignment_cosine.toFixed(2) + ' (hard skills)';
+      $('stat-gaps').textContent = String(gap.under_taught.length);
+      $('stat-gaps-note').textContent = gap.top_gap ? 'Top gap: ' + gap.top_gap : 'No high-priority gaps found';
+    } else {
+      $('stat-alignment').textContent = '—';
+      $('stat-alignment-note').textContent = 'Available once survey data is collected';
+      $('stat-gaps').textContent = '—';
+      $('stat-gaps-note').textContent = 'Available once survey data is collected';
+    }
     const up = $('last-analyzed');
     if (up) {
       const t = d.updated ? new Date(d.updated) : null;
@@ -71,6 +81,54 @@
       row.append(label, track, val);
       box.appendChild(row);
     });
+  }
+
+  /* ---------------- skill gap analysis ---------------- */
+  function gapRow(box, r) {
+    const row = document.createElement('div'); row.className = 'bar-row';
+    const label = document.createElement('span'); label.className = 'bar-label'; label.textContent = r.skill; label.title = r.skill;
+    const track = document.createElement('span'); track.className = 'bar-track';
+    const fill = document.createElement('span'); fill.className = 'bar-fill'; fill.style.width = Math.min(100, r.industry_pct) + '%';
+    track.appendChild(fill);
+    const val = document.createElement('span'); val.className = 'bar-value';
+    val.textContent = r.industry_pct + '% demand';
+    const sm = document.createElement('small'); sm.textContent = ' · ' + r.academic_pct + '% taught'; val.appendChild(sm);
+    row.append(label, track, val);
+    box.appendChild(row);
+  }
+
+  function drawGaps(d) {
+    const gap = d.gap, note = $('gap-empty-note'), content = $('gap-content');
+    if (!gap || !gap.exists) {
+      note.hidden = false; note.textContent = 'Gap analysis isn’t available yet.'; content.hidden = true;
+      return;
+    }
+    if (!gap.has_survey_data) {
+      note.hidden = false;
+      note.textContent = 'No curriculum survey submissions yet — once students, alumni, or professors fill out ' +
+        'the Student / Alumni / Professor survey, this tab will compare what they report being taught against ' +
+        'what the job market demands.';
+      content.hidden = true;
+      return;
+    }
+    note.hidden = true; content.hidden = false;
+    const ut = $('gap-under-taught'), wc = $('gap-well-covered');
+    clear(ut); clear(wc);
+    if (!gap.under_taught.length) {
+      const p = document.createElement('p'); p.className = 'empty-note';
+      p.textContent = 'No high-priority gaps among the top skills shown — good alignment.'; ut.appendChild(p);
+    } else {
+      gap.under_taught.forEach(r => gapRow(ut, r));
+    }
+    if (!gap.well_covered.length) {
+      const p = document.createElement('p'); p.className = 'empty-note';
+      p.textContent = 'None of the top in-demand skills are reported as taught yet.'; wc.appendChild(p);
+    } else {
+      gap.well_covered.forEach(r => gapRow(wc, r));
+    }
+    const byType = gap.survey_responses_by_type || {};
+    $('gap-note').textContent = gap.survey_responses + ' survey response(s) with tagged skills (' +
+      ['student', 'alumni', 'professor'].map(t => (byType[t] || 0) + ' ' + t).join(', ') + ').';
   }
 
   /* ---------------- line chart ---------------- */
@@ -185,6 +243,7 @@
     const p = document.createElement('p'); p.className = 'empty-note'; p.textContent = msg; box.appendChild(p);
     const svg = $('trend-svg'); clear(svg); svg.setAttribute('viewBox', '0 0 800 60'); svg.appendChild(el('text', { x: 4, y: 30 }, msg));
     clear($('trend-key'));
+    $('gap-empty-note').hidden = false; $('gap-empty-note').textContent = msg; $('gap-content').hidden = true;
   }
 
   function load() {
@@ -202,7 +261,7 @@
         if (!j.exists) { showEmpty('No extracted skills yet. An administrator can create them on Data → Extract Skills.'); return; }
         data = j;
         if (!filtersBuilt) buildFilters(j);
-        setStats(j); drawBars(j); drawTrend(j);
+        setStats(j); drawBars(j); drawTrend(j); drawGaps(j);
       })
       .catch(() => { if (my === reqId) errEl.textContent = 'Could not reach the server. Try again.'; });
   }

@@ -1,0 +1,90 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Recommendations{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/recommendations.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-recommendations">
+  <header class="page-header"><h1>Recommendations</h1></header>
+  <div class="page-body">
+    <p class="muted rec-intro">
+      Skills below are ranked by job-market demand{% if gap.has_survey_data %} minus how often the
+      curriculum surveys report each one being taught or learned{% endif %} — see the Dashboard's
+      Skill Gap Analysis tab for the full comparison. For any skill here, Gemini can search for real
+      training resources (courses, certifications, docs, video series) to help close that gap.
+    </p>
+
+    {% if gap.exists and not gap.has_survey_data %}
+    <p class="form-msg rec-note">
+      No curriculum survey submissions yet, so this list is ranked purely by job-market demand —
+      once students, alumni, or professors submit the survey, it will adjust to skip skills that are
+      already well-taught.
+    </p>
+    {% endif %}
+
+    {% if under_taught %}
+    <p class="form-msg rec-caveat">
+      Every resource below is AI-suggested (with live web search when the model supports it, otherwise
+      from its own training data) and marked <strong>unverified</strong> until a human checks it —
+      please review a course before sharing it with students.
+    </p>
+    {% endif %}
+
+    {% if not gap.exists %}
+      <p class="empty-note">No extracted job-market data yet. An administrator can create it on Data → Extract Skills.</p>
+    {% elif not under_taught %}
+      <p class="empty-note">No skill-demand data to rank yet.</p>
+    {% else %}
+      <form id="rec-form" method="post" action="{% url 'recommendations_generate' %}">
+        {% csrf_token %}
+        <div class="rec-toolbar">
+          <button type="submit" class="btn btn-red btn-sm" id="rec-generate-btn">Generate selected</button>
+          <span class="muted">Up to {{ max_per_run }} skills per click</span>
+          <span class="muted" id="rec-status" role="status"></span>
+        </div>
+        <p class="form-msg is-error" id="rec-error" role="alert"></p>
+
+        <div class="rec-list">
+          {% for row in under_taught %}
+          <div class="rec-skill" data-skill="{{ row.skill }}">
+            <div class="rec-skill-head">
+              <label class="rec-skill-pick">
+                <input type="checkbox" name="skills" value="{{ row.skill }}" {% if not row.cached_resources %}checked{% endif %}>
+                <span class="rec-skill-name">{{ row.skill }}</span>
+              </label>
+              <span class="rec-skill-stats muted">
+                {{ row.industry_pct }}% of postings{% if gap.has_survey_data %} · {{ row.academic_pct }}% of survey responses{% endif %}
+              </span>
+              {% if row.cached_resources %}<span class="pill rec-pill-generated">generated</span>{% endif %}
+            </div>
+            <div class="rec-resources" data-skill-slot="{{ row.skill }}">
+              {% for r in row.cached_resources %}
+              <div class="rec-card">
+                <img src="{{ r.photo }}" alt="" class="rec-card-img" onerror="this.onerror=null;this.src='{{ default_photo }}';">
+                <div class="rec-card-body">
+                  <span class="pill rec-card-type">{{ r.type }}</span>
+                  <a href="{{ r.link }}" target="_blank" rel="noopener noreferrer" class="rec-card-name">{{ r.name }}</a>
+                  {% if r.provider %}<span class="muted rec-card-provider">{{ r.provider }}</span>{% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </form>
+
+      {% if has_any_recommendations %}
+      <p class="rec-download"><a href="{% url 'recommendations_download' %}" class="btn btn-ghost btn-sm">Download CSV</a></p>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script>
+  window.__recGenerateUrl = "{% url 'recommendations_generate' %}";
+  window.__recDownloadUrl = "{% url 'recommendations_download' %}";
+  window.__recDefaultPhoto = "{{ default_photo }}";
+</script>
+<script src="{% static 'myapp/recommendations.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

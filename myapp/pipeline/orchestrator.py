@@ -64,7 +64,7 @@ def main():
     state.update(pid=os.getpid(), heartbeat=now())
     save(state_file, state)
 
-    env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", TQDM_DISABLE="1")
+    env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8")
     steps = state["steps"]
     final = "done"
 
@@ -111,9 +111,15 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as exc:  # never die silently: surface it in the UI
+    except Exception as exc:  # never die silently: surface it in the UI (and in the console log)
+        import traceback
         try:
             st = load(sys.argv[1])
+            try:
+                with open(st["log_file"], "a", encoding="utf-8", errors="replace") as lf:
+                    lf.write("\n[ERROR] The run crashed:\n" + traceback.format_exc())
+            except OSError:
+                pass
             s = load(st["state_file"])
             s.update(status="failed", current=None, finished_at=now(), error=f"{type(exc).__name__}: {exc}")
             save(st["state_file"], s)

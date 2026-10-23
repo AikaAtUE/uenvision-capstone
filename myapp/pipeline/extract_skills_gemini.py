@@ -314,7 +314,7 @@ def save_outputs(results: List[dict]):
     flat = []
     for r in results:
         r = dict(r)
-        for c in ("hard_skills", "soft_skills", "certifications_or_licenses"):
+        for c in ("hard_skills", "hard_skills_raw", "soft_skills", "certifications_or_licenses"):
             r[c] = "; ".join(r.get(c) or [])
         flat.append(r)
     cols = list(UNIVERSAL_COLUMNS) + [c for c in dict.fromkeys(k for r in flat for k in r) if c not in UNIVERSAL_COLUMNS]

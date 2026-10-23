@@ -10,10 +10,16 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
+from django.urls import reverse
+from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 
-from .models import CustomUser, SurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
+from .models import CustomUser, SurveyResponse, CurriculumSurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
 from .pipeline import manager as pipeline
+from . import curriculum_data
+from . import gap_analysis
+from . import ontology
+from . import recommendations
 
 # Create your views here.
 
@@ -80,7 +86,9 @@ def dashboard_view(request):
 
 @login_required
 def dashboard_skills_view(request):
-    """JSON for the dashboard's top-skills bar chart and skills-per-month line chart."""
+    """JSON for the dashboard's top-skills bar chart, skills-per-month line chart,
+    and (added alongside the existing two) the skill gap analysis against the
+    curriculum surveys — see gap_analysis.py for exactly what that compares."""
     try:
         top = int(request.GET.get("top", 10))
         months = int(request.GET.get("months", 0))
@@ -89,12 +97,63 @@ def dashboard_skills_view(request):
     if not 1 <= top <= 30 or not 0 <= months <= 600:
         return JsonResponse({"ok": False, "error": "Top must be 1-30."}, status=400)
     pipeline.ensure_skill_csvs()
+    source = request.GET.get("source", "")
+    level = request.GET.get("level", "")
     try:
-        data = pipeline.skills_dashboard(request.GET.get("kind", "hard"), top, request.GET.get("source", ""),
-                                         request.GET.get("level", ""), months)
+        data = pipeline.skills_dashboard(request.GET.get("kind", "hard"), top, source, level, months)
     except (OSError, UnicodeDecodeError) as exc:
         return JsonResponse({"ok": False, "error": f"Couldn't read the data: {exc}"}, status=500)
+    if data.get("exists"):
+        try:
+            data["gap"] = gap_analysis.compute(top, source, level)
+        except (OSError, UnicodeDecodeError) as exc:
+            data["gap"] = {"exists": False, "error": str(exc)}
     return JsonResponse({"ok": True, **data})
+
+
+@login_required
+def recommendations_view(request):
+    """Professor recommendations: the ranked under-taught-skills list (reusing
+    gap_analysis.py — same list the Dashboard's Skill Gap Analysis tab shows)
+    plus whatever Gemini-found training resources have already been generated
+    for them. Generating more is a separate POST (recommendations_generate_view)
+    so simply opening this page never spends API quota."""
+    gap = gap_analysis.compute(top=10)
+    cached = recommendations.load_recommendations()
+    under_taught = list(gap.get("under_taught") or []) if gap.get("exists") else []
+    for row in under_taught:
+        key = row["skill"].strip().lower()
+        row["cached_resources"] = cached.get(key, [])
+    return render(request, "recommendations.html", {
+        "active_page": "recommendations",
+        "gap": gap,
+        "under_taught": under_taught,
+        "has_any_recommendations": bool(cached),
+        "max_per_run": recommendations.MAX_SKILLS_PER_RUN,
+        "default_photo": recommendations.DEFAULT_PHOTO,
+    })
+
+
+@login_required
+@require_POST
+def recommendations_generate_view(request):
+    skills = [s.strip() for s in request.POST.getlist("skills") if s and s.strip()]
+    skills = skills[:recommendations.MAX_SKILLS_PER_RUN]
+    if not skills:
+        return JsonResponse({"ok": False, "error": "Choose at least one skill."}, status=400)
+    try:
+        out = recommendations.generate_for_skills(skills)
+    except recommendations.RecommendationError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+    return JsonResponse({"ok": True, **out})
+
+
+@login_required
+def recommendations_download_view(request):
+    path = recommendations.recs_path()
+    if not path.is_file():
+        raise Http404("No recommendations have been generated yet.")
+    return FileResponse(open(path, "rb"), as_attachment=True, filename=path.name, content_type="text/csv")
 
 
 @login_required
@@ -428,12 +487,14 @@ def data_scrape_view(request):
 def scrape_run_view(request):
     cfg, error = pipeline.parse_scrape_form(request.POST)
     if not error:
-        error = pipeline.start_run(cfg, kind="scrape")
+        start_error = pipeline.start_run(cfg, kind="scrape")
+        if start_error:      # a problem with the run itself goes in the Console, not on the form
+            pipeline.log_to_console(start_error)
+            return redirect("console")
     if error:
         messages.error(request, error)
         return render(request, "data_scrape.html", _scrape_ctx(request, form=cfg))
     pipeline.save_scrape_settings(cfg)
-    messages.success(request, "Run started. Follow it here; it keeps going in the background if you leave.")
     return redirect("console")
 
 
@@ -447,22 +508,21 @@ def data_extract_view(request):
 def extract_run_view(request):
     cfg, error = pipeline.parse_extract_form(request.POST)
     if not error:
-        cfg["do_extract"] = True
-        error = pipeline.start_run(cfg, kind="extract")
+        start_error = pipeline.start_run(cfg, kind="extract")
+        if start_error:
+            pipeline.log_to_console(start_error)
+            return redirect("console")
     if error:
         messages.error(request, error)
         return render(request, "data_extract.html", _extract_ctx(request, form=cfg))
     pipeline.save_extract_settings(cfg)
-    messages.success(request, "Extraction started. Follow it here; it keeps going in the background if you leave.")
     return redirect("console")
 
 
 def _stop_and_redirect(request, target):
-    if pipeline.stop_run():
-        messages.success(request, "Run stopped. Progress so far is saved; run again to resume.")
-    else:
-        messages.error(request, "There's no run in progress.")
-    return redirect(target)
+    # The outcome is written to the run log, so it shows in the Console either way.
+    pipeline.stop_run()
+    return redirect("console")
 
 
 @administrator_required
@@ -516,3 +576,145 @@ def api_keys_save_view(request):
         n = pipeline.count_api_keys()
         messages.success(request, f"api_keys.txt saved ({n} key{'s' if n != 1 else ''}).")
     return redirect("data_extract")
+
+
+# ---------------------------------------------------------------------------
+# Curriculum-mapping surveys (Student / Fresh Grad Alumni / Professor)
+#
+# Public (no login required) — these are filled out by outside respondents,
+# not app users. Each one is a single page: pick your program/year (or, for
+# professors, just the subjects you teach), pick the subjects that apply,
+# then tag the skills taught/learned per subject — curriculum_survey.js
+# drives all of that dynamically from the JSON blobs below; the view's job
+# is just to hand it the eligible subjects + ontology-suggested skills and
+# to save the finished JSON payload.
+#
+# NOTE on the underlying data: see the placeholder notice at the top of
+# curriculum_data.py — the exact BSIT/BSCS curricula shown here are sample
+# data standing in for the real curriculum pasted earlier in our
+# conversation, which I no longer have the literal text of. Swap in
+# curriculum_data.SUBJECTS once you re-send it; nothing else here needs to
+# change.
+# ---------------------------------------------------------------------------
+MAX_SUBJECTS_PER_SUBMISSION = 40
+MAX_SKILLS_PER_SUBJECT = 30
+MAX_JSON_BODY_BYTES = 200_000
+
+
+def _parse_curriculum_submission(request):
+    """Shared POST-body parsing/sanity-checking for all three submit views.
+    Returns (payload_dict, error_message_or_None)."""
+    if len(request.body or b"") > MAX_JSON_BODY_BYTES:
+        return None, "That submission is too large."
+    try:
+        payload = json.loads(request.body)
+    except (ValueError, TypeError):
+        return None, "Malformed request."
+    if not isinstance(payload, dict):
+        return None, "Malformed request."
+    if payload.get("consent") is not True:
+        return None, "Please confirm the Data Privacy notice before submitting."
+    personal_info = payload.get("personal_info")
+    if not isinstance(personal_info, dict):
+        return None, "Missing personal information."
+    subjects = payload.get("subjects")
+    if not isinstance(subjects, list) or not 1 <= len(subjects) <= MAX_SUBJECTS_PER_SUBMISSION:
+        return None, "Please select at least one subject."
+    for subj in subjects:
+        if not isinstance(subj, dict):
+            return None, "Malformed subject entry."
+        skills = subj.get("skills")
+        if skills is not None and (not isinstance(skills, list) or len(skills) > MAX_SKILLS_PER_SUBJECT):
+            return None, "Malformed skills entry."
+    return payload, None
+
+
+def _save_curriculum_survey(respondent_type, payload):
+    CurriculumSurveyResponse.objects.create(respondent_type=respondent_type, data=payload)
+
+
+@require_POST
+def student_survey_submit_view(request):
+    payload, error = _parse_curriculum_submission(request)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    _save_curriculum_survey(CurriculumSurveyResponse.STUDENT, payload)
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+def alumni_survey_submit_view(request):
+    payload, error = _parse_curriculum_submission(request)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    employment = payload.get("employment")
+    if not isinstance(employment, dict):
+        return JsonResponse({"ok": False, "error": "Missing employment information."}, status=400)
+    _save_curriculum_survey(CurriculumSurveyResponse.ALUMNI, payload)
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+def professor_survey_submit_view(request):
+    payload, error = _parse_curriculum_submission(request)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    _save_curriculum_survey(CurriculumSurveyResponse.PROFESSOR, payload)
+    return JsonResponse({"ok": True})
+
+
+def _safe_json(obj):
+    """mark_safe()'d JSON for embedding in a <script type="application/json">
+    tag — escapes "</" so nothing in the data can break out of the tag."""
+    return mark_safe(json.dumps(obj).replace("</", "<\\/"))
+
+
+def student_survey_view(request):
+    bootstrap = {
+        "programLabels": curriculum_data.PROGRAM_LABELS,
+        "yearLevels": curriculum_data.YEAR_LEVELS,
+        "currentSemLabel": curriculum_data.CURRENT_SEM_LABEL,
+        "eligibility": curriculum_data.build_student_eligibility(),
+        "skills": ontology.subject_skill_map(),
+        "submitUrl": reverse("student_survey_submit"),
+    }
+    return render(request, "student_survey.html", {
+        "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,
+        "bootstrap_json": _safe_json(bootstrap),
+    })
+
+
+def alumni_survey_view(request):
+    terms_by_program = {
+        program: curriculum_data.term_sequence(program)
+        for program in curriculum_data.PROGRAMS
+    }
+    bootstrap = {
+        "programLabels": curriculum_data.PROGRAM_LABELS,
+        "termsByProgram": terms_by_program,
+        "subjectsByProgramTerm": curriculum_data.SUBJECTS,
+        "skills": ontology.subject_skill_map(),
+        "submitUrl": reverse("alumni_survey_submit"),
+    }
+    return render(request, "alumni_survey.html", {
+        "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,
+        "bootstrap_json": _safe_json(bootstrap),
+    })
+
+
+def professor_survey_view(request):
+    bootstrap = {
+        "currentSemLabel": curriculum_data.CURRENT_SEM_LABEL,
+        "previousSemLabel": curriculum_data.PREVIOUS_SEM_LABEL,
+        "previousSummerLabel": curriculum_data.PREVIOUS_SUMMER_LABEL,
+        "pools": curriculum_data.professor_term_pools(),
+        "skills": ontology.subject_skill_map(),
+        "submitUrl": reverse("professor_survey_submit"),
+    }
+    return render(request, "professor_survey.html", {
+        "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,
+        "current_sem_label": curriculum_data.CURRENT_SEM_LABEL,
+        "previous_sem_label": curriculum_data.PREVIOUS_SEM_LABEL,
+        "previous_summer_label": curriculum_data.PREVIOUS_SUMMER_LABEL,
+        "bootstrap_json": _safe_json(bootstrap),
+    })

@@ -1,0 +1,78 @@
+/* UEnvision — Student / Alumni / Professor curriculum-mapping surveys.
+   Loaded only on student_survey.html / alumni_survey.html / professor_survey.html,
+   after uenvision-additions.css. Reuses .field/.btn/.panel/.checkbox from
+   styles.css + uenvision-additions.css where possible; this file only adds
+   what those don't already cover (subject pickers, skill chips, wizard steps). */
+
+.cs-page { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; }
+.cs-header h1 { margin: 0 0 6px; }
+.cs-header .muted { margin: 0 0 20px; }
+
+.cs-banner {
+  background: #fff8e1; border: 1px solid #e8d48a; color: #6b5508;
+  border-radius: 10px; padding: 10px 14px; font-size: .9rem; margin-bottom: 18px;
+}
+
+.cs-panel { padding: 24px; margin-bottom: 18px; }
+.cs-panel h2 { margin-top: 0; }
+.cs-panel[hidden] { display: none; }
+
+.cs-privacy { background: #f4f3ee; border: 1px solid #e4e2dc; border-radius: 10px; padding: 16px 18px; margin: 14px 0 18px; font-size: .92rem; }
+.cs-privacy h3 { margin: 0 0 8px; font-size: 1rem; }
+.cs-privacy ul { margin: 6px 0 0; padding-left: 20px; }
+.cs-privacy li { margin: 4px 0; }
+.cs-consent { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; font-size: .92rem; }
+.cs-consent input { margin-top: 3px; }
+
+.cs-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cs-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.cs-panel form > .field, .cs-panel form > .cs-row-2, .cs-panel form > .cs-row-3, .cs-panel form > .cs-section { margin-bottom: 16px; }
+
+.cs-section { border-top: 1px solid #e4e2dc; padding-top: 16px; }
+.cs-section h3 { margin: 0 0 4px; }
+.cs-section .muted { margin: 0 0 10px; font-size: .88rem; }
+.cs-section--empty { color: #6b6f7b; font-size: .88rem; font-style: italic; }
+
+.cs-subject-grid { display: grid; gap: 8px; }
+.cs-subject-check {
+  display: flex; align-items: flex-start; gap: 10px; border: 1px solid #d5d3cc;
+  border-radius: 8px; padding: 10px 12px; cursor: pointer; background: #fff;
+}
+.cs-subject-check:hover { border-color: var(--navy, #1b2a4a); }
+.cs-subject-check input { margin-top: 3px; }
+.cs-subject-check .cs-subject-code { font-weight: 600; color: var(--navy, #1b2a4a); margin-right: 6px; }
+.cs-subject-check .cs-subject-units { color: #6b6f7b; font-size: .82rem; }
+
+.cs-subject-block {
+  border: 1px solid #e4e2dc; border-radius: 10px; padding: 16px; margin-bottom: 14px; background: #fafaf7;
+}
+.cs-subject-block h4 { margin: 0 0 2px; }
+.cs-subject-block .cs-subject-term { color: #6b6f7b; font-size: .82rem; margin: 0 0 12px; }
+
+.cs-skill-grid { display: grid; gap: 8px; margin-bottom: 10px; }
+.cs-skill-row {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
+  border: 1px solid #e4e2dc; border-radius: 8px; padding: 8px 10px; background: #fff;
+}
+.cs-skill-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.cs-skill-row select { font: inherit; font-size: .86rem; padding: 5px 8px; border: 1px solid #d5d3cc; border-radius: 6px; background: #fff; }
+.cs-skill-row select[disabled] { opacity: .45; }
+.cs-skill-row.is-custom input[type=text] { font: inherit; font-size: .9rem; padding: 6px 8px; border: 1px solid #d5d3cc; border-radius: 6px; width: 100%; }
+
+.cs-add-skill { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.cs-add-skill input[type=text] { flex: 1; font: inherit; padding: 7px 10px; border: 1px solid #d5d3cc; border-radius: 8px; }
+
+.cs-ia-group { display: flex; gap: 4px; }
+.cs-ia-group label { cursor: pointer; }
+.cs-ia-group input { position: absolute; opacity: 0; pointer-events: none; }
+.cs-ia-group span { display: block; padding: 5px 9px; border: 1px solid #d5d3cc; border-radius: 999px; font-size: .78rem; background: #fff; }
+.cs-ia-group input:checked + span { background: var(--navy, #1b2a4a); border-color: var(--navy, #1b2a4a); color: #fff; }
+
+.cs-employment-branch[hidden] { display: none; }
+
+.cs-skip-note { font-size: .86rem; color: #6b6f7b; margin: 6px 0 0; }
+
+@media (max-width: 680px) {
+  .cs-row-2, .cs-row-3 { grid-template-columns: 1fr; }
+  .cs-skill-row { grid-template-columns: 1fr; }
+}

@@ -36,3 +36,15 @@
 .trend-legend button.is-off{color:var(--muted-2); text-decoration:line-through;}
 #trend-note{margin-top:8px;}
 .bars--wide .bar-track,.bars--wide .bar-fill{display:block;}
+
+.gap-scope-note{margin-bottom:16px; font-size:.85rem;}
+.gap-cols{display:grid; grid-template-columns:1fr 1fr; gap:28px;}
+.gap-col h3{font-size:.95rem; margin:0 0 12px;}
+.gap-col h3 small{font-weight:400; color:var(--muted-2); font-size:.82em;}
+#gap-note{margin-top:16px;}
+.gap-rec-link{margin-top:10px; font-size:.85rem;}
+.gap-rec-link a{color:var(--red); font-weight:600; text-decoration:none;}
+.gap-rec-link a:hover{text-decoration:underline;}
+@media (max-width: 860px){
+  .gap-cols{grid-template-columns:1fr;}
+}

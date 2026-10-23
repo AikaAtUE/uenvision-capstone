@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Alumni Survey{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'myapp/uenvision-additions.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/curriculum-survey.css' %}?v={% now 'U' %}">
+{% endblock %}
+{% block content %}
+<main class="cs-page">
+  <header class="cs-header">
+    <h1>UEnvision Curriculum Survey — Fresh Graduates &amp; Alumni</h1>
+    <p class="muted">Help us compare what UE taught you with what the job market actually asked for once you graduated. This takes about 10 minutes.</p>
+  </header>
+
+  {% if is_placeholder_curriculum %}
+  <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
+  {% endif %}
+
+  <div id="cs-done" class="panel cs-panel" hidden>
+    <h2>Thank you!</h2>
+    <p>Your responses were submitted. You can close this page now.</p>
+  </div>
+
+  <form id="alumni-survey-form" class="panel cs-panel" novalidate>
+    {% csrf_token %}
+
+    <div class="cs-privacy">
+      <h3>Data Privacy Notice</h3>
+      <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
+      <ul>
+        <li><strong>Purpose:</strong> to compare the technical skills taught in the BSIT/BSCS curricula against current IT/CS job market demand, including how well they carried over into your career.</li>
+        <li><strong>What is collected:</strong> your name, UE email, course, student number, year graduated, your subjects/skills, and your employment situation as you describe it.</li>
+        <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
+        <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
+        <li><strong>Questions or concerns:</strong> you may reach the UEnvision research team through your course adviser.</li>
+      </ul>
+      <label class="cs-consent"><input type="checkbox" id="alumni-consent"> <span>I have read the Data Privacy Notice above and voluntarily agree to participate.</span></label>
+    </div>
+
+    <div class="cs-row-2">
+      <label class="field"><span>Full name</span><input type="text" id="alumni-name" required></label>
+      <label class="field"><span>UE email address</span><input type="email" id="alumni-email" required></label>
+    </div>
+    <div class="cs-row-3">
+      <label class="field"><span>Course</span>
+        <select id="alumni-program" required>
+          <option value="">Select…</option>
+          <option value="BSIT">BS Information Technology</option>
+          <option value="BSCS">BS Computer Science</option>
+        </select>
+      </label>
+      <label class="field"><span>Student number</span><input type="text" id="alumni-number" required></label>
+      <label class="field"><span>Year graduated</span><input type="number" id="alumni-year-graduated" min="2000" max="2026" required></label>
+    </div>
+
+    <div class="cs-section">
+      <h3>Your last semester at UE</h3>
+      <p class="muted">Which term was your last one? (Most students: 4th Year – 2nd Semester.)</p>
+      <label class="field"><span>Last semester</span><select id="alumni-term"></select></label>
+      <div id="alumni-subjects"></div>
+    </div>
+
+    <div class="cs-section">
+      <h3>Skills per subject</h3>
+      <div id="alumni-subject-blocks"></div>
+    </div>
+
+    <div class="cs-section" id="alumni-overall-skills"></div>
+
+    <div class="cs-section">
+      <h3>Employment status</h3>
+      <div class="cs-row-2">
+        <label class="checkbox"><input type="radio" name="alumni-employed" value="yes"> Currently employed</label>
+        <label class="checkbox"><input type="radio" name="alumni-employed" value="no"> Not currently employed</label>
+      </div>
+
+      <div id="alumni-employed-branch" class="cs-employment-branch" hidden>
+        <label class="field"><span>Current role / job title</span><input type="text" id="alumni-role"></label>
+        <div class="field">
+          <span>Was this your first job applied to after graduating?</span>
+          <div class="cs-row-2">
+            <label class="checkbox"><input type="radio" name="alumni-first-job" value="yes"> Yes</label>
+            <label class="checkbox"><input type="radio" name="alumni-first-job" value="no"> No</label>
+          </div>
+        </div>
+        <div class="field">
+          <span>Which technical skills were you able to apply in this job?</span>
+          <div id="alumni-skills-applied-picker"></div>
+        </div>
+        <div class="field">
+          <span>Which technical skills do you feel you still need to learn? (press Enter to add)</span>
+          <input type="text" id="alumni-skills-to-learn-input" placeholder="Type a skill, then press Enter">
+          <div id="alumni-skills-to-learn-list"></div>
+        </div>
+      </div>
+
+      <div id="alumni-unemployed-branch" class="cs-employment-branch" hidden>
+        <label class="field"><span>How many jobs have you applied to so far? (optional)</span><input type="number" id="alumni-jobs-applied" min="0"></label>
+        <label class="field"><span>If a job rejected you, what reason was given, if any? (optional)</span><textarea id="alumni-rejection-reason" rows="2"></textarea></label>
+        <div class="field">
+          <span>Are you currently upskilling / studying to improve your skills?</span>
+          <div class="cs-row-2">
+            <label class="checkbox"><input type="radio" name="alumni-upskilling" value="yes"> Yes</label>
+            <label class="checkbox"><input type="radio" name="alumni-upskilling" value="no"> No</label>
+          </div>
+        </div>
+        <div id="alumni-upskilling-branch" class="cs-employment-branch" hidden>
+          <span class="field"><span>What skills are you currently improving? (press Enter to add)</span>
+            <input type="text" id="alumni-upskilling-input" placeholder="Type a skill, then press Enter">
+            <div id="alumni-upskilling-list"></div>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <p class="form-msg form-msg--error" id="alumni-error" hidden></p>
+    <button type="submit" class="btn btn-navy">Submit survey</button>
+  </form>
+</main>
+
+<script type="application/json" id="cs-bootstrap">{{ bootstrap_json }}</script>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/curriculum-survey.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

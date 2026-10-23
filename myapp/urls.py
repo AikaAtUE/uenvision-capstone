@@ -8,6 +8,9 @@ urlpatterns = [
     path("reset-password/", views.reset_password_view, name="reset_password"),
     path("dashboard/", views.dashboard_view, name="dashboard"),
     path("dashboard/skills/", views.dashboard_skills_view, name="dashboard_skills"),
+    path("recommendations/", views.recommendations_view, name="recommendations"),
+    path("recommendations/generate/", views.recommendations_generate_view, name="recommendations_generate"),
+    path("recommendations/download/", views.recommendations_download_view, name="recommendations_download"),
     path("data/", views.data_view, name="data"),
     path("data/table/", views.data_table_view, name="data_table"),
     path("data/download/<str:key>/", views.data_download_view, name="data_download"),
@@ -33,4 +36,12 @@ urlpatterns = [
     path("accounts/<int:pk>/reset-password/", views.account_reset_password_view, name="account_reset_password"),
     path("accounts/<int:pk>/delete/", views.account_delete_view, name="account_delete"),
     path("logout/", views.logout_view, name="logout"),
+
+    # Curriculum-mapping surveys (public, no login — Student / Alumni / Professor)
+    path("survey/student/", views.student_survey_view, name="student_survey"),
+    path("survey/student/submit/", views.student_survey_submit_view, name="student_survey_submit"),
+    path("survey/alumni/", views.alumni_survey_view, name="alumni_survey"),
+    path("survey/alumni/submit/", views.alumni_survey_submit_view, name="alumni_survey_submit"),
+    path("survey/professor/", views.professor_survey_view, name="professor_survey"),
+    path("survey/professor/submit/", views.professor_survey_submit_view, name="professor_survey_submit"),
 ]

@@ -100,3 +100,5 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 .run-panel--console{max-width:none;}
 .run-panel--console .run-log{min-height:420px; max-height:68vh;}
 .run-note{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 20px; font-size:.9rem;}
+.run-log .log-err{color:#ff8a94;}
+.form-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;}

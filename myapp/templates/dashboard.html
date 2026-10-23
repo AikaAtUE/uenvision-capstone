@@ -62,6 +62,7 @@
       <div class="tabs" role="tablist">
         <button class="tab is-active" data-tab="top-skills">Top in-demand skills</button>
         <button class="tab" data-tab="skill-trends">Skill trends over time</button>
+        <button class="tab" data-tab="skill-gaps">Skill gap analysis</button>
       </div>
 
       <p class="form-msg is-error" id="skills-error" role="alert"></p>
@@ -79,6 +80,30 @@
         </div>
         <div class="trend-legend" id="trend-key"></div>
         <p class="muted" id="trend-note"></p>
+      </div>
+
+      <div class="tab-panel" id="tab-skill-gaps">
+        <p class="muted gap-scope-note">
+          Compares the <strong>hard skills</strong> most in-demand in job postings against what the
+          Student / Fresh Grad Alumni / Professor curriculum surveys report as actually taught or
+          learned. Skill names are matched to the MIND Tech Skills Ontology by exact wording only,
+          so a differently-worded mention of the same skill may not be recognized as a match yet.
+        </p>
+        <p class="form-msg" id="gap-empty-note" hidden></p>
+        <div id="gap-content" hidden>
+          <div class="gap-cols">
+            <div class="gap-col">
+              <h3>Under-taught <small>— high industry demand, little or no survey coverage</small></h3>
+              <div class="bars bars--wide" id="gap-under-taught"></div>
+              <p class="gap-rec-link"><a href="{% url 'recommendations' %}">Find training recommendations for these skills →</a></p>
+            </div>
+            <div class="gap-col">
+              <h3>Well-covered <small>— in demand and reported as taught</small></h3>
+              <div class="bars bars--wide" id="gap-well-covered"></div>
+            </div>
+          </div>
+          <p class="muted" id="gap-note"></p>
+        </div>
       </div>
     </div>
   </div>

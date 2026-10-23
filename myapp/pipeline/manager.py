@@ -41,6 +41,7 @@ TABLES = {
     "kalibrr": ("Raw Job Data — Kalibrr", "compiled_kalibrr.csv"),
     "trabajo": ("Raw Job Data — Trabajo", "compiled_trabajo.csv"),
     "extracted": ("Extracted Skills", "extracted_skills.csv"),
+    "custom_skills": ("Custom Skills (not in the ontology)", "ontology/custom_skills.csv"),
     "hard_skills": ("Hard Skills", SKILL_CSVS["hard_skills"]),
     "soft_skills": ("Soft Skills", SKILL_CSVS["soft_skills"]),
 }
@@ -76,6 +77,10 @@ def compiled_csv(source: str) -> Path:
 
 def extracted_csv() -> Path:
     return data_dir() / "extracted_skills.csv"
+
+
+def ontology_dir() -> Path:
+    return data_dir() / "ontology"
 
 
 def state_dir() -> Path:
@@ -373,6 +378,7 @@ DEFAULT_SCRAPE_SETTINGS = {
 }
 DEFAULT_EXTRACT_SETTINGS = {
     "sources": list(SOURCES),
+    "standardize": True,
     "batch_size": DEFAULT_BATCH_SIZE,
     "model": DEFAULT_MODEL,
 }
@@ -444,12 +450,17 @@ def parse_scrape_form(post) -> tuple[dict, str | None]:
 
 
 def parse_extract_form(post) -> tuple[dict, str | None]:
-    """Validate the Extract Skills form. Returns (settings, error)."""
+    """Validate the Extract Skills form. Returns (settings, error).
+    The "Standardize only" button (action=standardize) skips extraction."""
     cfg = dict(DEFAULT_EXTRACT_SETTINGS)
+    standardize_only = post.get("action") == "standardize"
     picked = post.getlist("sources") if hasattr(post, "getlist") else list(post.get("sources", []))
     cfg["sources"] = [s for s in SOURCES if s in picked]
     cfg["model"] = post.get("model", "").strip()
-    if not cfg["sources"]:
+    cfg["standardize"] = standardize_only or post.get("standardize") == "on"
+    cfg["do_extract"] = not standardize_only
+    cfg["do_standardize"] = cfg["standardize"]
+    if cfg["do_extract"] and not cfg["sources"]:
         return cfg, "Tick at least one source to extract skills from (Kalibrr and/or Trabajo)."
     try:
         cfg["batch_size"] = int(post.get("batch_size", ""))
@@ -512,6 +523,14 @@ def build_steps(cfg: dict) -> list[dict]:
                     f"--source-label={ex_src}"]
             steps.append({"name": f"extract_{ex_src}", "label": f"Extract skills — {SOURCE_LABELS[ex_src]}",
                           "argv": argv})
+
+    if cfg.get("do_standardize"):
+        # After extraction: map the hard skills onto the ontology (exact -> fuzzy candidates -> Gemini).
+        steps.append({"name": "standardize", "label": "Standardize hard skills", "argv": [
+            py, "-u", str(PIPELINE_DIR / "standardize_skills_gemini.py"),
+            f"--json={state_dir() / 'extracted_skills.json'}", f"--output-dir={data_dir()}",
+            f"--ontology-dir={ontology_dir()}", f"--temp-csv={state_dir() / 'standardize_pending.csv'}",
+            f"--keys={api_keys_path()}", f"--model={cfg['model']}", f"--batch-size={cfg['batch_size']}"]})
     return steps
 
 
@@ -594,6 +613,11 @@ def start_run(cfg: dict, kind: str = "scrape") -> str | None:
             if not compiled_csv(ex_src).is_file():
                 return (f"There's no compiled {SOURCE_LABELS[ex_src]} CSV yet. Scrape and compile it on the "
                         f"Scrape Data page (or import a CSV) first — or untick {SOURCE_LABELS[ex_src]}.")
+    if cfg.get("do_standardize"):
+        if not (ontology_dir() / "mind_tech_ontology.csv").is_file():
+            return "The ontology file is missing: put mind_tech_ontology.csv in data/ontology/."
+        if not cfg.get("do_extract") and not (state_dir() / "extracted_skills.json").is_file():
+            return "There are no extracted skills to standardize yet. Run Extract Skills first."
     if cfg.get("do_compile") and not cfg.get("do_scrape") and count_json(src) == 0:
         return f"There are no {SOURCE_LABELS[src]} job JSONs to compile yet. Tick “Scrape” (or import JSONs first)."
 
@@ -603,9 +627,12 @@ def start_run(cfg: dict, kind: str = "scrape") -> str | None:
         state_json.unlink()
 
     _log_file().write_text("", encoding="utf-8")
+    log_to_console(f"Run started: {', '.join(x['label'] for x in steps)}. "
+                   "It keeps going in the background, so you can leave this page.", "INFO")
     state = {
         "status": "running", "kind": kind,
-        "source": " + ".join(SOURCE_LABELS[x].lower() for x in cfg["sources"]) if cfg.get("do_extract") else src, "started_at": _now(), "heartbeat": _now(),
+        "source": (" + ".join(SOURCE_LABELS[x].lower() for x in cfg["sources"]) if cfg.get("do_extract")
+                   else "standardize" if cfg.get("do_standardize") else src), "started_at": _now(), "heartbeat": _now(),
         "finished_at": None, "current": None, "pid": None, "error": None,
         "steps": [{"name": s["name"], "label": s["label"], "status": "pending"} for s in steps],
         "summary": {"keyword": cfg.get("keyword") if cfg.get("do_scrape") else None,
@@ -644,9 +671,21 @@ def start_run(cfg: dict, kind: str = "scrape") -> str | None:
     return None
 
 
+def log_to_console(text: str, level: str = "ERROR") -> None:
+    """Append a line to the run log so it shows up inside the Console's dark box."""
+    try:
+        ensure_dirs()
+        stamp = datetime.now().strftime("%H:%M:%S")
+        with open(_log_file(), "a", encoding="utf-8") as f:
+            f.write(f"[{stamp}] {level}: {text}\n")
+    except OSError:
+        pass
+
+
 def stop_run() -> bool:
     st = _read_state()
     if st.get("status") != "running" or not st.get("pid"):
+        log_to_console("There's no run in progress to stop.", "INFO")
         return False
     pid = int(st["pid"])
     try:
@@ -758,7 +797,7 @@ CSV_REQUIRED = {
     "trabajo": {"job_id", "job_title", "description"},
     "extracted": {"job_id", "hard_skills"},
 }
-_EXTRACTED_LIST_COLS = ("hard_skills", "soft_skills", "certifications_or_licenses")
+_EXTRACTED_LIST_COLS = ("hard_skills", "hard_skills_raw", "soft_skills", "certifications_or_licenses")
 
 
 def _read_csv_upload(upload):

@@ -45,7 +45,14 @@
           <small class="field-hint">Any model name your API keys can use, e.g. <code>{{ default_model }}</code>. If Gemini answers “model not found”, change it here.</small>
         </label>
 
-        <button type="submit" class="btn btn-navy" id="run-btn"{% if run.status == 'running' %} disabled{% endif %}>Extract skills</button>
+        <label class="checkbox"><input type="checkbox" name="standardize"{% if form.standardize %} checked{% endif %}>
+          <span><strong>Standardize hard skills</strong> after extracting, using the skills ontology<br>
+          <small class="muted">Skills are matched to one standard name each. Close matches are listed in a temporary CSV (top 5 candidates per skill) and Gemini picks the right one — the same rows-per-prompt setting applies. A skill that isn't in the ontology is added to <code>data/ontology/custom_skills.csv</code>, so later ones follow it. Your original wording is kept in the <code>hard_skills_raw</code> column.</small></span></label>
+
+        <div class="form-actions">
+          <button type="submit" name="action" value="extract" class="btn btn-navy" id="run-btn"{% if run.status == 'running' %} disabled{% endif %}>Extract skills</button>
+          <button type="submit" name="action" value="standardize" class="btn btn-ghost"{% if run.status == 'running' %} disabled{% endif %} title="Skip extraction and only standardize what has already been extracted">Standardize only</button>
+        </div>
         <small class="field-hint" id="run-hint">{% if run.status == 'running' %}A run is in progress — see the console.{% else %}Runs in the background; progress shows in the Console.{% endif %}</small>
       </div>
     </form>
