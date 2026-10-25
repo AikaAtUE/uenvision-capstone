@@ -11,12 +11,13 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from .models import CustomUser, Notification, SurveyResponse, CurriculumSurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
 from .pipeline import manager as pipeline
@@ -577,6 +578,18 @@ def notifications_read_view(request):
     """Opening the bell's dropdown marks everything as read (clears the red count)."""
     Notification.objects.filter(recipient=request.user, read_at__isnull=True).update(read_at=timezone.now())
     return JsonResponse({"ok": True})
+
+
+@administrator_required
+@require_GET
+def notifications_poll_view(request):
+    """The bell asks for this every few seconds so new notifications show up without a refresh.
+    `page` is the page the bell is on, so the dropdown's Approve button returns there."""
+    page = request.GET.get("page", "")
+    if not url_has_allowed_host_and_scheme(page, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        page = reverse("dashboard")
+    html = render_to_string("_notif_panel_body.html", {"notif_next": page}, request=request)
+    return JsonResponse({"unread": notifications.unread_count(request.user), "html": html})
 
 
 @administrator_required

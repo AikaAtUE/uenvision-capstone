@@ -57,6 +57,7 @@ urlpatterns = [
     path("accounts/<int:pk>/approve/", views.account_approve_view, name="account_approve"),
     path("notifications/", views.notifications_view, name="notifications"),
     path("notifications/read/", views.notifications_read_view, name="notifications_read"),
+    path("notifications/poll/", views.notifications_poll_view, name="notifications_poll"),
     path("settings/notifications/", views.notification_settings_view, name="notification_settings"),
     path("pending-approval/", views.pending_approval_view, name="pending_approval"),
     path("accounts/<int:pk>/reset-password/", views.account_reset_password_view, name="account_reset_password"),

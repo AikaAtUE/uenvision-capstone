@@ -1232,6 +1232,28 @@ class FacultyApprovalTests(TestCase):
         return self.client.post(reverse("signup"), {"last_name": "Santos", "first_name": "Prof", "email": "prof@ue.edu.ph",
                                                     "password": "longenough1", "password2": "longenough1"})
 
+    def test_bell_poll_returns_live_count_and_dropdown(self):
+        self.client.force_login(self.admin)
+        url = reverse("notifications_poll")
+        first = self.client.get(url, {"page": "/accounts/"}, HTTP_X_BACKGROUND_REQUEST="1").json()
+        self.assertEqual(first["unread"], 0)
+        self.assertIn("No notifications yet", first["html"])
+        self.client.logout()
+        self.signup()                                   # a professor signs up while the admin's page is open
+        self.client.force_login(self.admin)
+        data = self.client.get(url, {"page": "/accounts/?q=x"}, HTTP_X_BACKGROUND_REQUEST="1").json()
+        self.assertEqual(data["unread"], 1)
+        self.assertIn("Prof Santos (prof@ue.edu.ph) signed up", data["html"])
+        self.assertIn('name="next" value="/accounts/?q=x"', data["html"])   # Approve comes back to the same page
+        evil = self.client.get(url, {"page": "https://evil.example/"}).json()
+        self.assertNotIn("evil.example", evil["html"])
+        # admins only
+        prof = CustomUser.objects.get(email="prof@ue.edu.ph")
+        prof.is_approved = True
+        prof.save()
+        self.client.force_login(prof)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
     def test_signup_waits_for_approval_and_admins_are_notified(self):
         from django.core import mail
         from .models import Notification

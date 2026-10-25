@@ -1,0 +1,33 @@
+{# Inside of the bell dropdown. Also re-rendered by notifications_poll_view so the bell updates live. #}
+    <div class="notif-panel-head">
+      <h2>Notifications</h2>
+      <a class="link-inline" href="{% url 'settings' %}#notification-settings">Email alerts: {% if user.notify_by_email %}on{% else %}off{% endif %}</a>
+    </div>
+    {% if recent_notifications %}
+    <ul class="notif-panel-list">
+      {% for n in recent_notifications %}
+      <li class="notif-panel-item{% if not n.read_at %} is-unread{% endif %}">
+        <a class="notif-panel-link" href="{{ n.link|default:'#' }}">
+          <span class="notif-panel-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor"/></svg>
+          </span>
+          <span class="notif-panel-text">
+            <span class="notif-panel-msg">{{ n.message }}</span>
+            <span class="notif-panel-time">{{ n.when }}</span>
+          </span>
+          {% if not n.read_at %}<span class="notif-panel-dot" aria-label="Unread"></span>{% endif %}
+        </a>
+        {% if n.subject_user and not n.subject_user.is_approved %}
+        <form class="notif-panel-actions" method="post" action="{% url 'account_approve' n.subject_user.pk %}">
+          {% csrf_token %}<input type="hidden" name="next" value="{{ notif_next|default:request.get_full_path }}">
+          <button type="submit" class="btn btn-navy btn-sm">Approve</button>
+          <a class="btn btn-ghost btn-sm" href="{{ n.link }}">Review</a>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="notif-panel-empty">No notifications yet. Faculty sign-ups that need approval will show up here.</p>
+    {% endif %}
+    <a class="notif-panel-all" href="{% url 'notifications' %}">See all notifications</a>
