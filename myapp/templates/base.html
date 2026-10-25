@@ -34,6 +34,10 @@
 <div class="toast" id="toast"></div>
 
 <script src="{% static 'myapp/script.js' %}?v={% now 'U' %}"></script>
+{% if user.is_authenticated %}
+<script src="{% static 'myapp/idle-timeout.js' %}?v={% now 'U' %}" data-timeout="{{ request.idle_timeout_seconds|default:1800 }}"
+        data-ping-url="{% url 'session_ping' %}" data-csrf="{{ csrf_token }}" data-login-url="{% url 'login' %}?timeout=1"></script>
+{% endif %}
 {% block extra_js %}{% endblock %}
 </body>
 </html>

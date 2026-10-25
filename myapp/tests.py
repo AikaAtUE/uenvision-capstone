@@ -1,6 +1,6 @@
 import json
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import CustomUser, SurveyResponse, DEFAULT_PASSWORD
@@ -829,3 +829,163 @@ class EnvApiKeyTests(TestCase):
                     self.assertEqual(pipeline.count_api_keys(), 3)
                     # The editable file on the Data page is left as it is.
                     self.assertNotIn("key-c", pipeline.read_api_keys_text())
+
+
+class IdleTimeoutTests(TestCase):
+    """Every role is logged out after IDLE_TIMEOUT_SECONDS without activity."""
+
+    def login_as(self, role, email):
+        user = CustomUser.objects.create_user(email=email, password="secret123",
+                                              first_name="I", last_name="T", role=role)
+        self.client.force_login(user)
+        return user
+
+    def age_session(self, seconds):
+        import time
+        session = self.client.session
+        session["last_activity"] = int(time.time()) - seconds
+        session.save()
+
+    def test_idle_users_of_every_role_are_logged_out(self):
+        pages = {CustomUser.Role.ADMINISTRATOR: "dashboard", CustomUser.Role.FACULTY: "dashboard",
+                 CustomUser.Role.STUDENT: "student_dashboard", CustomUser.Role.ALUMNI: "student_dashboard"}
+        for i, (role, page) in enumerate(pages.items()):
+            with self.subTest(role=role):
+                self.client.logout()
+                self.login_as(role, f"idle{i}@ue.edu.ph")
+                self.assertEqual(self.client.get(reverse(page)).status_code, 200)
+                self.age_session(31 * 60)
+                r = self.client.get(reverse(page))
+                self.assertEqual(r.status_code, 302)
+                self.assertTrue(r["Location"].startswith(reverse("login") + "?timeout=1"))
+                self.assertNotIn("_auth_user_id", self.client.session)
+                login = self.client.get(r["Location"])
+                self.assertContains(login, "logged out after 30 minutes of inactivity")
+
+    def test_activity_within_the_limit_keeps_the_session(self):
+        self.login_as(CustomUser.Role.FACULTY, "active@ue.edu.ph")
+        self.client.get(reverse("dashboard"))
+        self.age_session(29 * 60)
+        self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+        self.age_session(29 * 60)  # the request above refreshed the clock
+        self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+
+    def test_ping_counts_as_activity(self):
+        self.login_as(CustomUser.Role.STUDENT, "ping@ue.edu.ph")
+        self.client.get(reverse("student_dashboard"))
+        self.age_session(20 * 60)
+        self.assertEqual(self.client.post(reverse("session_ping")).json(), {"ok": True})
+        self.age_session(0)
+        self.assertGreater(self.client.session["last_activity"], 0)
+
+    def test_background_requests_do_not_keep_session_alive(self):
+        self.login_as(CustomUser.Role.ADMINISTRATOR, "poll@ue.edu.ph")
+        self.client.get(reverse("dashboard"))
+        self.age_session(20 * 60)
+        before = self.client.session["last_activity"]
+        self.client.get(reverse("dashboard"), HTTP_X_BACKGROUND_REQUEST="1")
+        self.assertEqual(self.client.session["last_activity"], before)
+        self.age_session(31 * 60)
+        r = self.client.get(reverse("dashboard"), HTTP_X_BACKGROUND_REQUEST="1")
+        self.assertEqual(r.status_code, 401)
+        self.assertTrue(r.json()["session_expired"])
+
+    def test_expired_json_request_gets_401_not_redirect(self):
+        self.login_as(CustomUser.Role.STUDENT, "json@ue.edu.ph")
+        self.client.get(reverse("student_dashboard"))
+        self.age_session(31 * 60)
+        r = self.client.post(reverse("session_ping"), HTTP_ACCEPT="application/json")
+        self.assertEqual(r.status_code, 401)
+
+
+@override_settings(REQUIRE_EMAIL_VERIFICATION=True)
+class EmailVerificationTests(TestCase):
+    """Self sign-ups must click the emailed link before they can log in."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+
+    def signup(self, email="new@ue.edu.ph"):
+        return self.client.post(reverse("signup"), {"last_name": "Cruz", "first_name": "Ana", "email": email,
+                                                    "password": "longenough1", "password2": "longenough1"})
+
+    def link_from_outbox(self):
+        import re
+        from django.core import mail
+        return re.search(r"http://testserver(/verify-email/\S+/)", mail.outbox[-1].body).group(1)
+
+    def test_signup_sends_link_and_blocks_login_until_confirmed(self):
+        from django.core import mail
+        r = self.signup()
+        self.assertContains(r, "Check your email")
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["new@ue.edu.ph"])
+        self.assertIn("noreply@uenvision.tech", mail.outbox[0].from_email)
+        self.assertFalse(CustomUser.objects.get(email="new@ue.edu.ph").email_verified)
+
+        r = self.client.post(reverse("login"), {"email": "new@ue.edu.ph", "password": "longenough1"})
+        self.assertContains(r, "Confirm your email first")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+        link = self.link_from_outbox()
+        self.assertContains(self.client.get(link), "Email confirmed")
+        self.assertTrue(CustomUser.objects.get(email="new@ue.edu.ph").email_verified)
+        # the link only works once
+        self.assertContains(self.client.get(link), "This link doesn't work")
+
+        r = self.client.post(reverse("login"), {"email": "new@ue.edu.ph", "password": "longenough1"})
+        self.assertRedirects(r, reverse("dashboard"), fetch_redirect_response=False)
+
+    def test_bad_link_is_rejected(self):
+        self.signup()
+        link = self.link_from_outbox()
+        self.assertContains(self.client.get(link[:-3] + "xx/"), "This link doesn't work")
+        self.assertFalse(CustomUser.objects.get(email="new@ue.edu.ph").email_verified)
+
+    def test_resend_is_rate_limited_and_does_not_reveal_accounts(self):
+        from django.core import mail
+        from django.core.cache import cache
+        self.signup()
+        r = self.client.post(reverse("resend_verification"), {"email": "new@ue.edu.ph"})
+        self.assertContains(r, "wait a minute")
+        self.assertEqual(len(mail.outbox), 1)
+        cache.clear()
+        self.client.post(reverse("resend_verification"), {"email": "new@ue.edu.ph"})
+        self.assertEqual(len(mail.outbox), 2)
+        r = self.client.post(reverse("resend_verification"), {"email": "nobody@ue.edu.ph"})
+        self.assertContains(r, "If <strong>nobody@ue.edu.ph</strong> has an account")
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_existing_and_admin_made_accounts_need_no_confirmation(self):
+        user = CustomUser.objects.create_user(email="old@ue.edu.ph", password="secret123",
+                                              first_name="O", last_name="L")
+        self.assertTrue(user.email_verified)
+        r = self.client.post(reverse("login"), {"email": "old@ue.edu.ph", "password": "secret123"})
+        self.assertEqual(r.status_code, 302)
+
+    @override_settings(REQUIRE_EMAIL_VERIFICATION=False)
+    def test_without_email_settings_signup_logs_in_directly(self):
+        r = self.signup("direct@ue.edu.ph")
+        self.assertRedirects(r, reverse("dashboard"), fetch_redirect_response=False)
+        self.assertTrue(CustomUser.objects.get(email="direct@ue.edu.ph").email_verified)
+
+
+@override_settings(REQUIRE_EMAIL_VERIFICATION=True)
+class StudentRegisterVerificationTests(StudentFlowTests):
+    """Students/alumni registering after the survey also confirm their email first."""
+
+    def test_survey_register_dashboard(self):
+        from django.core import mail
+        reg = self.submit().json()["register_url"]
+        token = reg.split("t=", 1)[1]
+        r = self.client.post(reverse("register"), {"t": token, "email": "juan@ue.edu.ph",
+                                                   "password": "secret123", "password2": "secret123"})
+        self.assertContains(r, "Check your email")
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(mail.outbox[-1].to, ["juan@ue.edu.ph"])
+        link = mail.outbox[-1].body.split("http://testserver", 1)[1].split()[0]
+        self.assertContains(self.client.get(link), "Email confirmed")
+        r = self.client.post(reverse("login"), {"email": "juan@ue.edu.ph", "password": "secret123"})
+        self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)

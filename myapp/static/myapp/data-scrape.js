@@ -78,7 +78,7 @@
   }
 
   function poll() {
-    fetch(statusUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+    fetch(statusUrl, { headers: { 'Accept': 'application/json', 'X-Background-Request': '1' }, credentials: 'same-origin' })
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(d => {
         delay = 2000;

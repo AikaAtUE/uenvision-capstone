@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Confirm your email{% endblock %}
+{% block content %}
+<section class="auth-screen is-active">
+  {% include "_auth_side.html" %}
+  <div class="auth-card">
+    <div class="auth-brand auth-brand--compact">
+      {% include "_logo.html" with logo_class="auth-logo auth-logo--sm" %}
+    </div>
+    <div class="auth-form">
+      {% if state == "sent" %}
+        <h1 class="verify-title">Check your email</h1>
+        {% if send_failed %}
+          <p class="flash flash--error">We couldn't send the confirmation email just now. Please try "Send the email again" in a minute.</p>
+        {% else %}
+          <p>We sent a confirmation link to <strong>{{ email }}</strong>. Open it to finish creating your account, then log in.</p>
+          <p class="muted verify-note">It can take a few minutes to arrive. Check your spam or junk folder too.</p>
+        {% endif %}
+      {% elif state == "unconfirmed" %}
+        <h1 class="verify-title">Confirm your email first</h1>
+        <p>Your account for <strong>{{ email }}</strong> isn't confirmed yet. Open the link we emailed you when you signed up, or send a new one below.</p>
+        <p class="muted verify-note">Check your spam or junk folder too.</p>
+      {% elif state == "confirmed" %}
+        <h1 class="verify-title">Email confirmed</h1>
+        <p>Your account is ready. You can log in now.</p>
+        <a class="btn btn-navy btn-block" href="{% url 'login' %}">Log in</a>
+      {% elif state == "invalid" %}
+        <h1 class="verify-title">This link doesn't work</h1>
+        <p>The confirmation link has expired or was already used. If you haven't confirmed your account yet, we can send you a new link.</p>
+      {% elif state == "resent" %}
+        <h1 class="verify-title">Check your email</h1>
+        <p>If <strong>{{ email }}</strong> has an account that still needs confirming, we've sent it a new link.</p>
+        <p class="muted verify-note">Check your spam or junk folder too.</p>
+      {% endif %}
+
+      {% if state != "confirmed" %}
+      <form method="post" action="{% url 'resend_verification' %}" class="verify-resend">
+        {% csrf_token %}
+        {% if email %}
+          <input type="hidden" name="email" value="{{ email }}">
+        {% else %}
+          <label class="field"><span>Your email</span><input type="email" name="email" autocomplete="email" required></label>
+        {% endif %}
+        {% if wait %}<p class="form-msg">Please wait a minute before asking for another email.</p>{% endif %}
+        <button type="submit" class="btn btn-navy btn-block">Send the email again</button>
+      </form>
+      <p class="auth-foot"><a class="link-inline" href="{% url 'login' %}">Back to log in</a></p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

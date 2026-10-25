@@ -21,6 +21,7 @@ from django.views.decorators.http import require_POST
 from .models import CustomUser, SurveyResponse, CurriculumSurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
 from .pipeline import manager as pipeline
 from . import curriculum_data
+from . import email_verification
 from . import gap_analysis
 from . import ontology
 from . import recommendations
@@ -37,6 +38,8 @@ def login_view(request):
         email = request.POST.get("email")
         password = request.POST.get("password")
         user = authenticate(request, username=email, password=password)
+        if user is not None and not user.email_verified and email_verification.verification_required():
+            return render(request, "verify_email.html", {"state": "unconfirmed", "email": user.email})
         if user is not None:
             login(request, user)
             next_url = request.POST.get("next") or request.GET.get("next")
@@ -47,7 +50,8 @@ def login_view(request):
     if request.user.is_authenticated:
         return redirect(home_url_for(request.user))
     # the demo-account hint is for local testing only, never on a deployed site
-    return render(request, "login.html", {"show_demo": settings.DEBUG})
+    return render(request, "login.html", {"show_demo": settings.DEBUG,
+                                          "timed_out": request.GET.get("timeout") == "1"})
 
 
 def signup_view(request):
@@ -75,7 +79,11 @@ def signup_view(request):
             middle_name=middle_name,
             last_name=last_name,
             role=CustomUser.Role.FACULTY,  # self-signups are always Faculty; only an admin can create admins
+            email_verified=not email_verification.verification_required(),
         )
+        if not user.email_verified:
+            sent = email_verification.send_verification_email(request, user)
+            return render(request, "verify_email.html", {"state": "sent", "email": user.email, "send_failed": not sent})
         login(request, user)
         return redirect("dashboard")
     return render(request, "signup.html")
@@ -84,6 +92,39 @@ def signup_view(request):
 def logout_view(request):
     logout(request)
     return redirect("home")
+
+
+@require_POST
+def session_ping_view(request):
+    """Called by idle-timeout.js every few minutes while a UEnvision tab is visible,
+    so a user looking at the page counts as active. IdleTimeoutMiddleware does the rest."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"ok": False, "session_expired": True}, status=401)
+    return JsonResponse({"ok": True})
+
+
+def verify_email_view(request, uidb64, token):
+    user = email_verification.user_from_link(uidb64, token)
+    if user is None:
+        return render(request, "verify_email.html", {"state": "invalid"})
+    user.email_verified = True
+    user.save(update_fields=["email_verified"])
+    return render(request, "verify_email.html", {"state": "confirmed"})
+
+
+@require_POST
+def resend_verification_view(request):
+    email = (request.POST.get("email") or "").strip()
+    ctx = {"state": "resent", "email": email}
+    if not email:
+        return render(request, "verify_email.html", {"state": "invalid"})
+    if not email_verification.can_resend(email):
+        return render(request, "verify_email.html", {**ctx, "wait": True})
+    user = CustomUser.objects.filter(email__iexact=email, email_verified=False, is_active=True).first()
+    if user is not None:
+        email_verification.send_verification_email(request, user)
+    # Same answer whether or not the account exists, so this can't be used to look up emails.
+    return render(request, "verify_email.html", ctx)
 
 
 def forgot_password_view(request):

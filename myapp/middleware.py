@@ -1,5 +1,11 @@
+import time
+from urllib.parse import urlencode
+
+from django.conf import settings
+from django.contrib.auth import logout
+from django.http import JsonResponse
 from django.shortcuts import redirect
-from django.urls import Resolver404, resolve
+from django.urls import Resolver404, resolve, reverse
 
 # Pages a logged-in student/alumni may open. Everything else in the app (the
 # faculty/administrator Dashboard, Data, Recommendations, Accounts, Console, ...)
@@ -8,7 +14,8 @@ LEARNER_URL_NAMES = {
     "home", "role_skills", "check_gap", "skill_search", "skill_add", "register", "login", "logout",
     "student_dashboard", "student_role", "student_generate", "my_skills", "my_skills_save",
     "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
-    "feedback", "survey_submit", "about", "settings", "change_password",
+    "feedback", "survey_submit", "about", "settings", "change_password", "session_ping",
+    "verify_email", "resend_verification",
 }
 
 
@@ -25,4 +32,48 @@ class LearnerAccessMiddleware:
                 match = None
             if match is not None and match.url_name not in LEARNER_URL_NAMES:
                 return redirect("student_dashboard")
+        return self.get_response(request)
+
+
+# Session key holding the time (epoch seconds) of the user's last real request.
+LAST_ACTIVITY_KEY = "last_activity"
+# Background requests (e.g. the Data > Scrape status poll) send this header so an
+# open tab doesn't keep an idle user signed in forever.
+BACKGROUND_HEADER = "HTTP_X_BACKGROUND_REQUEST"
+
+
+def _wants_json(request):
+    return (request.headers.get("x-requested-with") == "XMLHttpRequest"
+            or "application/json" in request.headers.get("accept", "")
+            or request.content_type == "application/json"
+            or BACKGROUND_HEADER in request.META)
+
+
+class IdleTimeoutMiddleware:
+    """Log out any signed-in user (all roles) after IDLE_TIMEOUT_SECONDS without activity."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        timeout = getattr(settings, "IDLE_TIMEOUT_SECONDS", 1800)
+        request.idle_timeout_seconds = timeout  # read by idle-timeout.js via base.html
+        if timeout and user is not None and user.is_authenticated:
+            now = int(time.time())
+            last = request.session.get(LAST_ACTIVITY_KEY)
+            if last is not None and now - last > timeout:
+                logout(request)
+                if _wants_json(request):
+                    return JsonResponse({"ok": False, "error": "You were logged out after 30 minutes of inactivity. Please log in again.",
+                                         "session_expired": True}, status=401)
+                login_url = reverse("login")
+                params = {"timeout": "1"}
+                if request.method == "GET":
+                    params["next"] = request.get_full_path()
+                return redirect(f"{login_url}?{urlencode(params)}")
+            # Only write the session when the stamp is missing or a little stale,
+            # so normal browsing doesn't save the session on every request.
+            if BACKGROUND_HEADER not in request.META and (last is None or now - last >= min(15, timeout // 10)):
+                request.session[LAST_ACTIVITY_KEY] = now
         return self.get_response(request)

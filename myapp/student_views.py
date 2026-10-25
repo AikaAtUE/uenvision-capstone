@@ -24,7 +24,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from . import curriculum_data, gap_analysis, job_roles, ontology, recommendations, skills_catalog
+from . import curriculum_data, email_verification, gap_analysis, job_roles, ontology, recommendations, skills_catalog
 from .models import MIN_PASSWORD_LENGTH, CurriculumSurveyResponse, CustomUser
 
 REGISTER_SALT = "uenvision-register"
@@ -149,9 +149,13 @@ def register_view(request):
     user = CustomUser.objects.create_user(
         email=survey_email, password=password, first_name=first or survey_email.split("@")[0],
         last_name=last, role=role, target_role=response.data.get("target_role") or "",
+        email_verified=not email_verification.verification_required(),
     )
     response.user = user
     response.save(update_fields=["user"])
+    if not user.email_verified:
+        sent = email_verification.send_verification_email(request, user)
+        return render(request, "verify_email.html", {"state": "sent", "email": user.email, "send_failed": not sent})
     login(request, user)
     return redirect("student_dashboard")
 

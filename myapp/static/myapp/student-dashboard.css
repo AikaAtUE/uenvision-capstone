@@ -16,3 +16,41 @@
 @media (max-width: 860px){
   .sd-cols, .sd-stats{grid-template-columns:1fr;}
 }
+
+/* ---------- Phones: keep everything inside the screen width, bigger tap targets ---------- */
+@media (max-width: 640px){
+  #page-student-dashboard .page-body{padding:16px 14px 28px;}
+  .sd-cols{grid-template-columns:minmax(0,1fr); gap:16px;}
+  .sd-cols > .panel{min-width:0; padding:16px 14px 18px;}
+  .sd-cols .section-title{margin-bottom:14px;}
+  .sd-sub{margin:-8px 0 12px;}
+  .sd-callout{padding:16px 14px;}
+  .sd-callout .btn{width:100%; text-align:center; padding:12px 14px;}
+  .sd-role-form .select-field{font-size:.82rem;}
+  .sd-role-form .select-field select{min-width:0; width:100%; min-height:44px; font-size:16px;}
+  .sd-stats{gap:10px; margin-bottom:16px;}
+  .sd-stats .stat-note{font-size:.78rem;}
+
+  .sd-table{font-size:.86rem; table-layout:fixed;}
+  .sd-table th, .sd-table td{padding:8px 6px;}
+  .sd-table th:nth-child(2), .sd-table td:nth-child(2){width:28%;}
+  .sd-table th:nth-child(3), .sd-table td:nth-child(3){width:30%; text-align:right;}
+  .sd-table td:first-child{white-space:normal; overflow-wrap:anywhere;}
+  /* "vs 21.4%" goes under the main percentage instead of widening the column */
+  .sd-table td small{display:block; font-size:.74rem;}
+  .sd-pill{white-space:nowrap;}
+  .sd-table .sd-pill{padding:3px 8px;}
+
+  /* learning resources */
+  #page-student-dashboard .rec-toolbar{gap:8px 12px;}
+  #page-student-dashboard #rec-generate-btn{width:100%; padding:12px 14px;}
+  #page-student-dashboard .rec-clear{padding:10px 0;}
+  #page-student-dashboard .rec-skill{padding:14px;}
+  #page-student-dashboard .rec-skill-pick{min-height:40px;}
+  #page-student-dashboard .rec-skill-pick input{width:22px; height:22px;}
+  #page-student-dashboard .rec-resources{grid-template-columns:minmax(0,1fr);}
+  #page-student-dashboard .rec-card-name{display:inline-block; padding:2px 0;}
+
+  .sd-skill-cloud .sd-pill{white-space:normal; padding:6px 12px;}
+  .sd-section .link-inline{display:inline-block; padding:6px 0;}
+}

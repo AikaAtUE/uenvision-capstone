@@ -342,7 +342,7 @@ tbody tr:hover{background:#fafafa;}
     background:#fff; border-bottom:1px solid var(--line); padding:8px 14px;
   }
   .mobile-menu-btn{
-    width:40px; height:40px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--navy);
+    width:44px; height:44px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--navy);
     display:inline-flex; align-items:center; justify-content:center;
   }
   .mobile-menu-btn svg{width:22px; height:22px;}
@@ -467,3 +467,9 @@ img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }
 .modal--form .modal-actions{margin-top:6px;}
 .modal--form .field select{font-family:inherit; font-size:.95rem; padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#f7f7f8;}
 .modal-backdrop--top{z-index:60;}
+
+/* ============ Email confirmation pages ============ */
+.verify-title{font-size:1.3rem; margin:0 0 4px;}
+.verify-note{font-size:.85rem;}
+.verify-resend{display:flex; flex-direction:column; gap:12px; margin-top:8px;}
+.auth-form a.btn{text-decoration:none;}

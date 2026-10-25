@@ -71,6 +71,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'myapp.middleware.IdleTimeoutMiddleware',
     'myapp.middleware.LearnerAccessMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -162,6 +163,39 @@ if not DEBUG:
     SESSION_COOKIE_HTTPONLY = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = 'same-origin'
+
+# ---------------------------------------------------------------------------
+# Sessions: every role (administrator, faculty, student, alumni) is logged out
+# after 30 minutes without activity (myapp.middleware.IdleTimeoutMiddleware),
+# and the login cookie is dropped when the browser is closed.
+# ---------------------------------------------------------------------------
+IDLE_TIMEOUT_SECONDS = 30 * 60
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# ---------------------------------------------------------------------------
+# Email (account confirmation links). Set EMAIL_HOST and friends in .env to
+# send real emails, e.g. the Hostinger mailbox noreply@uenvision.tech:
+#   EMAIL_HOST=smtp.hostinger.com  EMAIL_PORT=465
+#   EMAIL_HOST_USER=noreply@uenvision.tech  EMAIL_HOST_PASSWORD=...
+# Without EMAIL_HOST, emails are printed to the console (local development) and
+# new accounts don't need confirming, so sign-up keeps working.
+# ---------------------------------------------------------------------------
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+if EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '465'))
+    EMAIL_USE_SSL = EMAIL_PORT == 465
+    EMAIL_USE_TLS = EMAIL_PORT == 587
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    EMAIL_TIMEOUT = 20
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = f"UEnvision <{os.environ.get('EMAIL_HOST_USER') or 'noreply@uenvision.tech'}>"
+# New sign-ups must click the link in their email before they can log in.
+REQUIRE_EMAIL_VERIFICATION = _env_bool('REQUIRE_EMAIL_VERIFICATION', bool(EMAIL_HOST))
+# How long a confirmation link works (Django uses this for its token links).
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24  # 1 day
 
 LOGGING = {
     'version': 1,

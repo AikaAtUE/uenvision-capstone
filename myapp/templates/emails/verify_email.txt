@@ -1,0 +1,9 @@
+Hi {{ user.first_name }},
+
+Please confirm your UEnvision account by opening this link:
+
+{{ url }}
+
+The link works for {{ hours }} hours. If you didn't create a UEnvision account, you can ignore this email.
+
+This is an automated message from UEnvision. Please don't reply to it.

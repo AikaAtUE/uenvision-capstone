@@ -20,7 +20,10 @@ urlpatterns = [
     path("me/recommendations/generate/", student_views.student_generate_view, name="student_generate"),
 
     path("login/", views.login_view, name="login"),
+    path("session/ping/", views.session_ping_view, name="session_ping"),
     path("signup/", views.signup_view, name="signup"),
+    path("verify-email/resend/", views.resend_verification_view, name="resend_verification"),
+    path("verify-email/<uidb64>/<token>/", views.verify_email_view, name="verify_email"),
     path("forgot-password/", views.forgot_password_view, name="forgot_password"),
     path("reset-password/", views.reset_password_view, name="reset_password"),
     path("dashboard/", views.dashboard_view, name="dashboard"),

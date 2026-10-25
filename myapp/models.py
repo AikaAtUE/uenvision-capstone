@@ -33,6 +33,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # Students/alumni only: the job role picked on their dashboard (job_roles.ROLES key).
     target_role = models.CharField(max_length=60, blank=True)
 
+    # False only for self sign-ups that haven't clicked the link in their
+    # confirmation email yet (see email_verification.py). Accounts made by an
+    # administrator, createsuperuser, and accounts from before this existed count as confirmed.
+    email_verified = models.BooleanField(default=True)
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
