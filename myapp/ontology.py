@@ -172,13 +172,15 @@ def suggest_skills_for_subject(subject_name, limit=12):
 
 @lru_cache(maxsize=1)
 def subject_skill_map():
-    """{(program, code): [suggested skill names]} for every subject in the
-    curriculum catalog — computed once per process and reused on every
-    survey page load."""
-    from . import curriculum_data
+    """{"CODE": [suggested skill names]} for every subject in the
+    curriculum catalog. Uses the hand-curated lists in subject_skills.py; the
+    keyword heuristic above (suggest_skills_for_subject) gave suggestions that
+    were too far from the subjects, so it's no longer used for the surveys.
+    Subjects without a curated list (Professional Electives) get none."""
+    from . import curriculum_data, skills_catalog
 
+    skills_catalog.ensure_curated()
     out = {}
-    for subj in curriculum_data.all_subjects_flat():
-        key = f"{subj['program']}:{subj['code']}"
-        out[key] = suggest_skills_for_subject(subj["name"])
+    for code, info in curriculum_data.subject_by_code().items():
+        out[code] = skills_catalog.suggestions_for(info["name"])
     return out

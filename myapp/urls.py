@@ -1,8 +1,25 @@
 from django.urls import path
-from . import views
+from django.views.generic import RedirectView
+
+from . import student_views, views
 
 urlpatterns = [
-    path("", views.login_view, name="login"),
+    # Public site
+    path("", student_views.home_view, name="home"),
+    path("roles/skills/", student_views.role_skills_view, name="role_skills"),
+    path("check-skill-gap/", student_views.check_gap_view, name="check_gap"),
+    path("skills/search/", student_views.skill_search_view, name="skill_search"),
+    path("skills/add/", student_views.skill_add_view, name="skill_add"),
+    path("register/", student_views.register_view, name="register"),
+
+    # Students / alumni
+    path("me/", student_views.student_dashboard_view, name="student_dashboard"),
+    path("me/skills/", student_views.my_skills_view, name="my_skills"),
+    path("me/skills/save/", student_views.my_skills_save_view, name="my_skills_save"),
+    path("me/role/", student_views.student_role_view, name="student_role"),
+    path("me/recommendations/generate/", student_views.student_generate_view, name="student_generate"),
+
+    path("login/", views.login_view, name="login"),
     path("signup/", views.signup_view, name="signup"),
     path("forgot-password/", views.forgot_password_view, name="forgot_password"),
     path("reset-password/", views.reset_password_view, name="reset_password"),
@@ -37,11 +54,13 @@ urlpatterns = [
     path("accounts/<int:pk>/delete/", views.account_delete_view, name="account_delete"),
     path("logout/", views.logout_view, name="logout"),
 
-    # Curriculum-mapping surveys (public, no login — Student / Alumni / Professor)
+    # Curriculum-mapping surveys: Student / Alumni are public; the Professor survey
+    # lives under Data and needs a faculty/administrator login.
     path("survey/student/", views.student_survey_view, name="student_survey"),
     path("survey/student/submit/", views.student_survey_submit_view, name="student_survey_submit"),
     path("survey/alumni/", views.alumni_survey_view, name="alumni_survey"),
     path("survey/alumni/submit/", views.alumni_survey_submit_view, name="alumni_survey_submit"),
-    path("survey/professor/", views.professor_survey_view, name="professor_survey"),
-    path("survey/professor/submit/", views.professor_survey_submit_view, name="professor_survey_submit"),
+    path("data/professor-survey/", views.professor_survey_view, name="professor_survey"),
+    path("data/professor-survey/submit/", views.professor_survey_submit_view, name="professor_survey_submit"),
+    path("survey/professor/", RedirectView.as_view(pattern_name="professor_survey", permanent=False)),
 ]

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Page not found{% endblock %}
+{% block extra_head %}{% load static %}<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">{% endblock %}
+{% block content %}
+{% include "_public_header.html" %}
+<main class="pub-main pub-main--narrow err-page">
+  <p class="err-code">404</p>
+  <h1>We couldn't find that page</h1>
+  <p class="muted">The link may be old or mistyped.</p>
+  <p><a class="btn btn-navy" href="{% url 'home' %}">Back to the homepage</a></p>
+</main>
+{% endblock %}

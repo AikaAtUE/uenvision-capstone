@@ -48,3 +48,28 @@
 @media (max-width: 860px){
   .gap-cols{grid-template-columns:1fr;}
 }
+
+.gap-subj-title{font-size:.95rem; margin:28px 0 12px;}
+.gap-subj-title small{font-weight:400; color:var(--muted-2); font-size:.82em;}
+.gap-subj-wrap{overflow-x:auto;}
+.gap-subj-table{width:100%; min-width:720px; border-collapse:collapse; font-size:.85rem; table-layout:fixed;}
+.gap-subj-table th:nth-child(1){width:26%;} .gap-subj-table th:nth-child(2){width:10%;}
+.gap-subj-table th:nth-child(3){width:10%;} .gap-subj-table th:nth-child(4){width:24%;}
+.gap-subj-table td{overflow-wrap:anywhere;}
+.gap-subj-table th{text-align:left; font-weight:600; padding:8px 10px; border-bottom:2px solid var(--line);}
+.gap-subj-table td{vertical-align:top; padding:10px; border-bottom:1px solid var(--line);}
+.gap-subj-table td small{color:var(--muted-2);}
+.gap-subj-list{margin:0; padding-left:16px;}
+.gap-subj-list li.muted{list-style:none; margin-left:-16px;}
+.gap-col .bars--wide .bar-row{grid-template-columns:minmax(80px,150px) 1fr 160px;}
+.gap-subj-table th{white-space:normal;}
+
+/* Phones: the bar gets its own line under the skill name, so it never shrinks to nothing */
+@media (max-width: 560px){
+  .bars--wide .bar-row{grid-template-columns:1fr auto; grid-template-areas:"label value" "track track"; row-gap:5px;}
+  .bars--wide .bar-label{grid-area:label;}
+  .bars--wide .bar-value{grid-area:value;}
+  .bars--wide .bar-track{grid-area:track; height:12px;}
+  .gap-cols{grid-template-columns:1fr;}
+  .gap-col .bars--wide .bar-row{grid-template-columns:1fr auto;}
+}

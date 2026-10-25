@@ -24,11 +24,31 @@
       </a>
 
       <nav class="nav" aria-label="Main">
+        {% if user.is_learner %}
+        <a class="nav-item {% if active_page == 'student_dashboard' %}is-active{% endif %}" href="{% url 'student_dashboard' %}">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor"/><rect x="13" y="3" width="8" height="5" rx="1.5" fill="currentColor"/><rect x="13" y="10" width="8" height="11" rx="1.5" fill="currentColor"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="currentColor"/></svg>
+          </span>
+          <span>My skill gap</span>
+        </a>
+        <a class="nav-item {% if active_page == 'my_skills' %}is-active{% endif %}" href="{% url 'my_skills' %}">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </span>
+          <span>My subjects &amp; skills</span>
+        </a>
+        {% else %}
         <a class="nav-item {% if active_page == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor"/><rect x="13" y="3" width="8" height="5" rx="1.5" fill="currentColor"/><rect x="13" y="10" width="8" height="11" rx="1.5" fill="currentColor"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="currentColor"/></svg>
           </span>
           <span>Dashboard</span>
+        </a>
+        <a class="nav-item {% if active_page == 'recommendations' %}is-active{% endif %}" href="{% url 'recommendations' %}">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </span>
+          <span>Recommendations</span>
         </a>
         <a class="nav-item {% if active_page == 'data' %}is-active{% endif %}" href="{% url 'data' %}">
           <span class="nav-icon" aria-hidden="true">
@@ -36,6 +56,7 @@
           </span>
           <span>Data</span>
         </a>
+        {% endif %}
         <a class="nav-item {% if active_page == 'feedback' %}is-active{% endif %}" href="{% url 'feedback' %}">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 4h16v12H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
@@ -79,8 +100,18 @@
         <span>Log out</span>
       </a>
     </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
 
     <main class="content">
+      {# Phone-width only: the sidebar becomes a slide-in menu opened from this bar. #}
+      <div class="mobile-bar">
+        <button type="button" class="mobile-menu-btn" id="nav-open" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <a href="{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" class="mobile-bar-logo">
+          {% include "_logo.html" with logo_class="sidebar-logo sidebar-logo--full" %}
+        </a>
+      </div>
       {% block page_content %}{% endblock %}
     </main>
   </div>

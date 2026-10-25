@@ -7,7 +7,7 @@
   if (!panel) return;
 
   const $ = id => document.getElementById(id);
-  const ctl = { kind: $('ctl-kind'), top: $('ctl-top'), source: $('ctl-source'), level: $('ctl-level'), months: $('ctl-months') };
+  const ctl = { kind: $('ctl-kind'), top: $('ctl-top'), source: $('ctl-source'), level: $('ctl-level'), months: $('ctl-months'), program: $('ctl-program') };
   const errEl = $('skills-error');
   const SVGNS = 'http://www.w3.org/2000/svg';
   const COLORS = ['#c8202f', '#16233f', '#2a9d8f', '#e9a23b', '#6a4c93', '#3d85c6', '#b5651d', '#7a8b2e', '#d6609a', '#5b6b7d'];
@@ -92,9 +92,52 @@
     track.appendChild(fill);
     const val = document.createElement('span'); val.className = 'bar-value';
     val.textContent = r.industry_pct + '% demand';
-    const sm = document.createElement('small'); sm.textContent = ' · ' + r.academic_pct + '% taught'; val.appendChild(sm);
+    const sm = document.createElement('small'); sm.textContent = ' · ' + r.academic_pct + '% covered'; val.appendChild(sm);
+    const parts = [r.industry_pct + '% of postings', r.academic_pct + '% depth-weighted coverage'];
+    if (r.taught_depth_pct != null) parts.push('taught depth ' + r.taught_depth_pct + '%');
+    if (r.learned_proficiency_pct != null) parts.push('learned proficiency ' + r.learned_proficiency_pct + '%');
+    row.title = r.skill + ': ' + parts.join(', ');
     row.append(label, track, val);
     box.appendChild(row);
+  }
+
+  function skillList(items, fmt) {
+    const ul = document.createElement('ul'); ul.className = 'gap-subj-list';
+    if (!items.length) { const li = document.createElement('li'); li.className = 'muted'; li.textContent = '—'; ul.appendChild(li); }
+    items.forEach(i => { const li = document.createElement('li'); li.textContent = fmt(i); ul.appendChild(li); });
+    return ul;
+  }
+
+  function drawSubjects(gap) {
+    const box = $('gap-by-subject'); clear(box);
+    const rows = gap.by_subject || [];
+    if (!rows.length) {
+      const p = document.createElement('p'); p.className = 'empty-note';
+      p.textContent = 'No subject has survey answers that match in-demand skills yet.'; box.appendChild(p);
+      return;
+    }
+    const table = document.createElement('table'); table.className = 'gap-subj-table';
+    const head = document.createElement('tr');
+    ['Subject', 'Respondents', 'Alignment', 'In-demand skills covered (depth)', 'Under-taught skills that fit (share of postings)'].forEach(h => {
+      const th = document.createElement('th'); th.textContent = h; head.appendChild(th);
+    });
+    const thead = document.createElement('thead'); thead.appendChild(head); table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      const c1 = document.createElement('td');
+      const strong = document.createElement('strong'); strong.textContent = r.code;
+      const sm = document.createElement('small'); sm.textContent = r.name;
+      c1.append(strong, document.createElement('br'), sm);
+      const c2 = document.createElement('td'); c2.textContent = String(r.respondents);
+      const c3 = document.createElement('td'); c3.textContent = r.alignment_pct == null ? '—' : r.alignment_pct + '%';
+      const c4 = document.createElement('td');
+      c4.appendChild(skillList(r.covered, i => i.skill + ' (' + i.depth_pct + '%)'));
+      const c5 = document.createElement('td');
+      c5.appendChild(skillList(r.could_add, i => i.skill + ' (' + i.industry_pct + '%)'));
+      tr.append(c1, c2, c3, c4, c5); tbody.appendChild(tr);
+    });
+    table.appendChild(tbody); box.appendChild(table);
   }
 
   function drawGaps(d) {
@@ -127,6 +170,7 @@
       gap.well_covered.forEach(r => gapRow(wc, r));
     }
     const byType = gap.survey_responses_by_type || {};
+    drawSubjects(gap);
     $('gap-note').textContent = gap.survey_responses + ' survey response(s) with tagged skills (' +
       ['student', 'alumni', 'professor'].map(t => (byType[t] || 0) + ' ' + t).join(', ') + ').';
   }
@@ -250,7 +294,7 @@
     let top = parseInt(ctl.top.value, 10);
     if (!(top >= 1)) return;               // user is mid-typing
     top = Math.min(top, 30);
-    const q = new URLSearchParams({ kind: ctl.kind.value, top: top, source: ctl.source.value, level: ctl.level.value, months: ctl.months.value });
+    const q = new URLSearchParams({ kind: ctl.kind.value, top: top, source: ctl.source.value, level: ctl.level.value, months: ctl.months.value, program: ctl.program.value });
     const my = ++reqId;
     fetch(panel.dataset.url + '?' + q, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
       .then(r => r.json().then(j => ({ ok: r.ok, j })))
@@ -273,11 +317,15 @@
     if (!(v >= 1)) v = 10;
     ctl.top.value = Math.min(v, 30); load();
   });
-  [ctl.kind, ctl.source, ctl.level, ctl.months].forEach(c => c.addEventListener('change', () => { hidden.clear(); load(); }));
+  [ctl.kind, ctl.source, ctl.level, ctl.months, ctl.program].forEach(c => c.addEventListener('change', () => { hidden.clear(); load(); }));
 
   // The period picker only matters for the trend chart.
-  const monthsWrap = $('ctl-months-wrap');
-  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { monthsWrap.hidden = t.dataset.tab !== 'skill-trends'; }));
+  // ...and the program picker only for the gap analysis.
+  const monthsWrap = $('ctl-months-wrap'), programWrap = $('ctl-program-wrap');
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    monthsWrap.hidden = t.dataset.tab !== 'skill-trends';
+    programWrap.hidden = t.dataset.tab !== 'skill-gaps';
+  }));
 
   load();
 })();

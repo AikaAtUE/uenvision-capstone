@@ -13,7 +13,38 @@
       training resources (courses, certifications, docs, video series) to help close that gap.
     </p>
 
-    {% if gap.exists and not gap.has_survey_data %}
+    <form class="rec-subject-form" method="get" action="{% url 'recommendations' %}">
+      <label class="select-field select-field--grow"><span>Show recommendations for</span>
+        <select name="subject" onchange="this.form.submit()">
+          <option value="">All subjects — overall under-taught skills</option>
+          {% if my_subjects %}
+          <optgroup label="Subjects you teach (from your Professor Survey)">
+            {% for value, label in my_subjects %}<option value="{{ value }}"{% if value == subject_value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </optgroup>
+          {% endif %}
+          <optgroup label="All subjects">
+            {% for value, label in subject_choices %}<option value="{{ value }}"{% if value == subject_value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </optgroup>
+        </select>
+      </label>
+      <noscript><button class="btn btn-navy btn-sm" type="submit">Show</button></noscript>
+    </form>
+    {% if not my_subjects %}
+    <p class="muted rec-intro">Answer the <a class="link-inline" href="{% url 'professor_survey' %}">Professor Survey</a> (under Data) and your own subjects will be listed first here.</p>
+    {% endif %}
+
+    {% if subject %}
+      {% if subject.exists %}
+      <p class="form-msg rec-note">
+        <strong>{{ subject.code }} — {{ subject.name }}</strong>.
+        In-demand skills that fit this subject, ranked by job-market demand minus how deeply the Professor Survey
+        says they're already taught here ({{ subject.respondents }} survey response{{ subject.respondents|pluralize }} for this subject).
+        Skills nobody reported yet are the ones you could add.
+      </p>
+      {% else %}
+      <p class="form-msg rec-note">{{ subject.error }}</p>
+      {% endif %}
+    {% elif gap.exists and not gap.has_survey_data %}
     <p class="form-msg rec-note">
       No curriculum survey submissions yet, so this list is ranked purely by job-market demand —
       once students, alumni, or professors submit the survey, it will adjust to skip skills that are
@@ -32,13 +63,15 @@
     {% if not gap.exists %}
       <p class="empty-note">No extracted job-market data yet. An administrator can create it on Data → Extract Skills.</p>
     {% elif not under_taught %}
-      <p class="empty-note">No skill-demand data to rank yet.</p>
+      <p class="empty-note">{% if subject %}None of this subject's suggested skills appear in the job postings collected so far.{% else %}No skill-demand data to rank yet.{% endif %}</p>
     {% else %}
-      <form id="rec-form" method="post" action="{% url 'recommendations_generate' %}">
+      <form id="rec-form" method="post" action="{% url 'recommendations_generate' %}" data-max="{{ max_per_run }}" data-verb="Generate">
         {% csrf_token %}
+        <input type="hidden" name="subject" value="{{ subject_value }}">
         <div class="rec-toolbar">
           <button type="submit" class="btn btn-red btn-sm" id="rec-generate-btn">Generate selected</button>
-          <span class="muted">Up to {{ max_per_run }} skills per click</span>
+          <span class="muted rec-limit">Up to {{ max_per_run }} skills per click</span>
+          <button type="button" class="link-inline rec-clear" id="rec-clear">Clear selection</button>
           <span class="muted" id="rec-status" role="status"></span>
         </div>
         <p class="form-msg is-error" id="rec-error" role="alert"></p>
@@ -52,21 +85,12 @@
                 <span class="rec-skill-name">{{ row.skill }}</span>
               </label>
               <span class="rec-skill-stats muted">
-                {{ row.industry_pct }}% of postings{% if gap.has_survey_data %} · {{ row.academic_pct }}% of survey responses{% endif %}
+                {{ row.industry_pct }}% of postings{% if subject %} · {% if row.subject_depth_pct is not None %}taught here at {{ row.subject_depth_pct }}% depth{% else %}not reported for this subject yet{% endif %}{% elif gap.has_survey_data %} · {{ row.academic_pct }}% depth-weighted coverage{% endif %}
               </span>
               {% if row.cached_resources %}<span class="pill rec-pill-generated">generated</span>{% endif %}
             </div>
             <div class="rec-resources" data-skill-slot="{{ row.skill }}">
-              {% for r in row.cached_resources %}
-              <div class="rec-card">
-                <img src="{{ r.photo }}" alt="" class="rec-card-img" onerror="this.onerror=null;this.src='{{ default_photo }}';">
-                <div class="rec-card-body">
-                  <span class="pill rec-card-type">{{ r.type }}</span>
-                  <a href="{{ r.link }}" target="_blank" rel="noopener noreferrer" class="rec-card-name">{{ r.name }}</a>
-                  {% if r.provider %}<span class="muted rec-card-provider">{{ r.provider }}</span>{% endif %}
-                </div>
-              </div>
-              {% endfor %}
+              {% include "_rec_cards.html" with resources=row.cached_resources %}
             </div>
           </div>
           {% endfor %}

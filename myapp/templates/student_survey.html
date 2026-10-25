@@ -4,8 +4,10 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'myapp/uenvision-additions.css' %}?v={% now 'U' %}">
 <link rel="stylesheet" href="{% static 'myapp/curriculum-survey.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">
 {% endblock %}
 {% block content %}
+{% include "_public_header.html" %}
 <main class="cs-page">
   <header class="cs-header">
     <h1>UEnvision Curriculum Survey — Students</h1>
@@ -61,8 +63,16 @@
       </label>
     </div>
 
+    <p class="cs-hint" id="student-hint">Choose your course and year level above to see your subjects.</p>
+    <div class="cs-subject-tools" id="student-subject-tools" hidden>
+      <label class="field cs-subject-filter-wrap"><span>Find a subject</span>
+        <input type="search" id="student-subject-filter" placeholder="Type a code or name, e.g. CCP or Database" autocomplete="off">
+      </label>
+      <span class="cs-picked-count" id="student-picked-count" aria-live="polite">No subjects selected yet</span>
+    </div>
     <div class="cs-section" id="student-current-subjects"></div>
     <div class="cs-section" id="student-previous-subjects"></div>
+    <div class="cs-section" id="student-earlier-subjects"></div>
 
     <div class="cs-section">
       <h3>Skills per subject</h3>

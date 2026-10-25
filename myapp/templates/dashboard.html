@@ -57,6 +57,10 @@
             <option value="0">All months</option><option value="12">Last 12 months</option>
             <option value="24" selected>Last 24 months</option><option value="36">Last 36 months</option>
           </select></label>
+        <label class="select-field" id="ctl-program-wrap" hidden><span>Program</span>
+          <select id="ctl-program">
+            <option value="">BSIT and BSCS</option><option value="BSIT">BSIT</option><option value="BSCS">BSCS</option>
+          </select></label>
       </div>
 
       <div class="tabs" role="tablist">
@@ -88,6 +92,8 @@
           Student / Fresh Grad Alumni / Professor curriculum surveys report as actually taught or
           learned. Skill names are matched to the MIND Tech Skills Ontology by exact wording only,
           so a differently-worded mention of the same skill may not be recognized as a match yet.
+          Coverage is depth-weighted: professors' Introduced / Practiced / Applied and students' and
+          alumni's proficiency levels count for part or all of a mention.
         </p>
         <p class="form-msg" id="gap-empty-note" hidden></p>
         <div id="gap-content" hidden>
@@ -102,6 +108,8 @@
               <div class="bars bars--wide" id="gap-well-covered"></div>
             </div>
           </div>
+          <h3 class="gap-subj-title">By subject <small>— where each in-demand skill is covered, and which under-taught skills fit the subject</small></h3>
+          <div class="gap-subj-wrap" id="gap-by-subject"></div>
           <p class="muted" id="gap-note"></p>
         </div>
       </div>

@@ -29,6 +29,25 @@
 .cs-panel form > .field, .cs-panel form > .cs-row-2, .cs-panel form > .cs-row-3, .cs-panel form > .cs-section { margin-bottom: 16px; }
 
 .cs-section { border-top: 1px solid #e4e2dc; padding-top: 16px; }
+.cs-section:empty { display: none; }
+.cs-hint { margin: 4px 0 16px; padding: 12px 14px; border-radius: 8px; background: #f3f5f9; color: #4b5263; font-size: .9rem; }
+.cs-panel:has(#student-current-subjects:not(:empty)) #student-hint { display: none; }
+/* until a subject is picked, say what will appear here instead of showing nothing */
+[id$="-subject-blocks"]:empty::before {
+  content: "Pick a subject above and a skill box for it will appear here.";
+  display: block; padding: 14px; border: 1px dashed #d5d3cc; border-radius: 8px; color: #6b6f7b; font-size: .88rem;
+}
+/* professor survey: long subject lists get a filter, a running count and two columns */
+.cs-subject-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; margin: 0 0 16px;
+  position: sticky; top: 0; z-index: 6; background: #fff; padding: 10px 0; border-bottom: 1px solid #eee; }
+.cs-subject-filter-wrap { flex: 1 1 280px; }
+.cs-subject-filter-wrap input { width: 100%; }
+.cs-picked-count { font-size: .86rem; font-weight: 600; color: var(--navy, #16233f); padding-bottom: 12px; }
+#professor-survey-form .cs-subject-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.cs-subject-check.is-filtered-out { display: none; }
+.cs-subject-check:has(input:checked) { border-color: var(--navy, #1b2a4a); background: #eef1f7; }
+.cs-no-match { color: #6b6f7b; font-size: .88rem; font-style: italic; }
+@media (max-width: 720px) { .cs-subject-tools { top: 57px; } }
 .cs-section h3 { margin: 0 0 4px; }
 .cs-section .muted { margin: 0 0 10px; font-size: .88rem; }
 .cs-section--empty { color: #6b6f7b; font-size: .88rem; font-style: italic; }
@@ -49,19 +68,6 @@
 .cs-subject-block h4 { margin: 0 0 2px; }
 .cs-subject-block .cs-subject-term { color: #6b6f7b; font-size: .82rem; margin: 0 0 12px; }
 
-.cs-skill-grid { display: grid; gap: 8px; margin-bottom: 10px; }
-.cs-skill-row {
-  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
-  border: 1px solid #e4e2dc; border-radius: 8px; padding: 8px 10px; background: #fff;
-}
-.cs-skill-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.cs-skill-row select { font: inherit; font-size: .86rem; padding: 5px 8px; border: 1px solid #d5d3cc; border-radius: 6px; background: #fff; }
-.cs-skill-row select[disabled] { opacity: .45; }
-.cs-skill-row.is-custom input[type=text] { font: inherit; font-size: .9rem; padding: 6px 8px; border: 1px solid #d5d3cc; border-radius: 6px; width: 100%; }
-
-.cs-add-skill { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
-.cs-add-skill input[type=text] { flex: 1; font: inherit; padding: 7px 10px; border: 1px solid #d5d3cc; border-radius: 8px; }
-
 .cs-ia-group { display: flex; gap: 4px; }
 .cs-ia-group label { cursor: pointer; }
 .cs-ia-group input { position: absolute; opacity: 0; pointer-events: none; }
@@ -74,5 +80,132 @@
 
 @media (max-width: 680px) {
   .cs-row-2, .cs-row-3 { grid-template-columns: 1fr; }
-  .cs-skill-row { grid-template-columns: 1fr; }
 }
+
+/* Optional earlier-semester subjects on the student survey */
+.cs-earlier summary { cursor: pointer; font-weight: 600; color: var(--navy, #16233f); padding: 4px 0; }
+.cs-earlier h4 { margin: 14px 0 8px; font-size: .9rem; }
+.cs-page--embedded { max-width: none; margin: 0; padding: 8px 0 32px; }
+
+/* Skill tag input (one per subject) */
+.cs-skill-picker { position: relative; }
+.cs-tagbox {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 44px;
+  padding: 6px 8px; border: 1px solid #d5d3cc; border-radius: 8px; background: #fff; cursor: text;
+}
+.cs-tagbox:focus-within { border-color: var(--navy, #1b2a4a); box-shadow: 0 0 0 3px rgba(27,42,74,.12); }
+.cs-chips { display: contents; }
+.cs-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 3px 4px 3px 10px; border-radius: 999px; background: #eef1f7; border: 1px solid #d3d9e6;
+  font-size: .86rem; color: #16233f; cursor: default; user-select: none;
+}
+.cs-chip-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-chip-level {
+  font: inherit; font-size: .78rem; padding: 2px 4px; border: 1px solid #cfd5e2; border-radius: 6px; background: #fff; cursor: pointer;
+}
+.cs-chip-level.is-missing { border-color: #c8202f; box-shadow: 0 0 0 2px rgba(200,32,47,.18); }
+.cs-chip-remove {
+  width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: #6b6f7b;
+  font-size: 1rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.cs-chip-remove:hover, .cs-chip-remove:focus-visible { background: #d3d9e6; color: #c8202f; outline: none; }
+.cs-tag-input { flex: 1 1 180px; min-width: 140px; border: 0; outline: none; font: inherit; font-size: .92rem; padding: 6px 4px; background: transparent; }
+.cs-skill-results {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+  display: flex; flex-direction: column; border: 1px solid #d5d3cc; border-radius: 8px; background: #fff;
+  box-shadow: 0 6px 18px rgba(22,35,63,.12); max-height: 280px; overflow-y: auto;
+}
+.cs-skill-results[hidden] { display: none; }
+.cs-skill-results-head { padding: 7px 12px 4px; font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #6b6f7b; }
+.cs-skill-result { text-align: left; background: none; border: 0; border-bottom: 1px solid #eee; padding: 8px 12px; font: inherit; font-size: .9rem; cursor: pointer; }
+.cs-skill-result:hover, .cs-skill-result.is-active { background: #f3f4f7; }
+.cs-skill-result--new { color: #c8202f; font-weight: 600; }
+/* Level colors: one blue scale, lighter = shallower, darker = deeper. Levels are
+   ordered (not good/bad), so no red/green; the name and the select's text still
+   say the level for anyone who can't tell the shades apart. Student proficiency
+   and professor teaching method share the scale by depth weight
+   (Introduced ~ Intermediate, Practiced ~ Advanced, Applied = Expert). */
+.cs-chip { --chip-bg: #f3f4f7; --chip-border: #c9ccd4; --chip-fg: #16233f; }
+.cs-chip[data-level=""] { border-style: dashed; }
+.cs-chip[data-level="beginner"] { --chip-bg: #e6eefa; --chip-border: #c3d4f0; --chip-fg: #16233f; }
+.cs-chip[data-level="intermediate"], .cs-chip[data-level="introduced"] { --chip-bg: #b9cdee; --chip-border: #9db8e4; --chip-fg: #16233f; }
+.cs-chip[data-level="advanced"], .cs-chip[data-level="practiced"] { --chip-bg: #3f66ad; --chip-border: #34589a; --chip-fg: #fff; }
+.cs-chip[data-level="expert"], .cs-chip[data-level="applied"] { --chip-bg: #1b2a4a; --chip-border: #1b2a4a; --chip-fg: #fff; }
+.cs-chip { background: var(--chip-bg); border-color: var(--chip-border); color: var(--chip-fg); transition: background-color .15s, color .15s; }
+.cs-chip .cs-chip-remove { color: inherit; opacity: .75; }
+.cs-chip .cs-chip-remove:hover, .cs-chip .cs-chip-remove:focus-visible { opacity: 1; background: rgba(255,255,255,.25); color: inherit; }
+.cs-chip .cs-chip-level { color: #16233f; }
+
+@media (max-width: 680px) {
+  .cs-chip { flex-wrap: wrap; border-radius: 12px; }
+}
+#cs-done .btn { display: inline-block; margin-top: 12px; text-decoration: none; }
+
+/* My subjects & skills (students / alumni) */
+.ms-lede { max-width: 760px; line-height: 1.55; margin-bottom: 16px; }
+.ms-empty { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ms-empty .btn { text-decoration: none; }
+.ps-has-record { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.ps-has-record .btn { text-decoration: none; }
+.ms-toolbar {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px;
+  position: sticky; top: 0; z-index: 6; background: var(--bg, #f2f3f5); padding: 10px 0 12px; margin-bottom: 6px;
+}
+.ms-add { flex: 1 1 320px; max-width: 560px; }
+.ms-add select { width: 100%; }
+.ms-actions { display: flex; align-items: center; gap: 14px; }
+.ms-status { font-size: .85rem; }
+.ms-status.is-dirty { color: #8a5a00; font-weight: 600; }
+.ms-subjects { display: flex; flex-direction: column; }
+.ms-subject { background: #fff; }
+.ms-subject.is-new { border-color: var(--navy, #1b2a4a); box-shadow: 0 0 0 3px rgba(27,42,74,.08); }
+.ms-subject-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.ms-remove-subject { background: none; border: 0; color: #6b6f7b; font: inherit; font-size: .82rem; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+.ms-remove-subject:hover, .ms-remove-subject:focus-visible { color: #c8202f; text-decoration: underline; }
+.ms-overall { margin-top: 24px; }
+.ms-overall .muted { margin: 2px 0 10px; font-size: .88rem; }
+@media (max-width: 720px) { .ms-toolbar { top: 57px; } .ms-actions { width: 100%; justify-content: space-between; } }
+
+/* "Add a subject that isn't listed" (professors) */
+.cs-other-form { border: 1px dashed #c9cfdb; border-radius: 10px; padding: 14px 16px; background: #fafbfd; }
+.cs-other-form > .muted { margin: 0 0 10px; }
+.cs-other-fields { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+.cs-other-fields .field { flex: 0 1 180px; }
+.cs-other-fields .cs-other-name-wrap { flex: 1 1 260px; }
+.cs-other-fields input { width: 100%; }
+.cs-other-programs { border: 0; padding: 0; margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.cs-other-programs legend { font-weight: 600; font-size: .9rem; margin-bottom: 6px; padding: 0; }
+.cs-other-programs label { display: inline-flex; align-items: center; gap: 6px; font-size: .9rem; cursor: pointer; }
+.cs-other-skip { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: #fff4e5; color: #7a4b00; font-size: .88rem; }
+.cs-other-error { margin: 10px 0 0; }
+.cs-other-actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+.cs-other-add:disabled { opacity: .5; cursor: not-allowed; }
+.cs-added-tag { display: inline-block; vertical-align: middle; margin-left: 6px; padding: 2px 8px; border-radius: 999px;
+  background: #eef1f7; color: #3f4a63; font-size: .72rem; font-weight: 600; line-height: 1.5; }
+.ms-other { margin: 0 0 14px; }
+
+/* Curriculum tags on subject cards ("Y1S1IT"): BSIT blue, BSCS green, darker each year */
+.cs-subject-check { align-items: stretch; }
+.cs-subject-check input { align-self: flex-start; }
+.cs-subject-text { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.cs-term-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; }
+.cs-term-tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: .7rem; font-weight: 700;
+  letter-spacing: .04em; font-variant-numeric: tabular-nums; line-height: 1.6; }
+.cs-term-tag--bsit.cs-term-tag--y1 { background: #dbeafe; color: #1e3a8a; }
+.cs-term-tag--bsit.cs-term-tag--y2 { background: #93c5fd; color: #1e3a8a; }
+.cs-term-tag--bsit.cs-term-tag--y3 { background: #2563eb; color: #fff; }
+.cs-term-tag--bsit.cs-term-tag--y4 { background: #1e3a8a; color: #fff; }
+.cs-term-tag--bscs.cs-term-tag--y1 { background: #dcfce7; color: #14532d; }
+.cs-term-tag--bscs.cs-term-tag--y2 { background: #86efac; color: #14532d; }
+.cs-term-tag--bscs.cs-term-tag--y3 { background: #16a34a; color: #fff; }
+.cs-term-tag--bscs.cs-term-tag--y4 { background: #14532d; color: #fff; }
+.cs-other [hidden] { display: none !important; }
+.cs-skill-alias { color: #6b6f7b; font-size: .8rem; margin-left: 6px; }
+/* Professor Survey as an editable record: privacy notice accepted once, save bar */
+.cs-privacy--accepted { padding: 12px 18px; }
+.cs-privacy--accepted summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.cs-privacy--accepted summary .muted { font-size: .85rem; }
+.cs-privacy--accepted[open] summary { margin-bottom: 8px; }
+.ps-save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 14px;
+  background: #fff; padding: 12px 0; border-top: 1px solid #eee; margin-top: 8px; }

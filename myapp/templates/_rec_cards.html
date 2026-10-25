@@ -1,0 +1,11 @@
+{# Resource cards for one skill. Needs `resources` and `default_photo`. #}
+{% for r in resources %}
+<div class="rec-card">
+  <img src="{{ r.photo }}" alt="" class="rec-card-img" onerror="this.onerror=null;this.src='{{ default_photo }}';">
+  <div class="rec-card-body">
+    <span class="pill rec-card-type">{{ r.type }}</span>
+    <a href="{{ r.link }}" target="_blank" rel="noopener noreferrer" class="rec-card-name">{{ r.name }}</a>
+    {% if r.provider %}<span class="muted rec-card-provider">{{ r.provider }}</span>{% endif %}
+  </div>
+</div>
+{% endfor %}

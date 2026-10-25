@@ -15,14 +15,18 @@
           <span>System Usability Scale (SUS) evaluation</span>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
+        {% if not user.is_learner %}
         <a class="feedback-item" href="#" data-survey="uat">
           <span>User Acceptance Testing survey</span>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
+        {% endif %}
+        {% if not user.is_learner %}
         <a class="feedback-item" href="#" data-survey="functional">
           <span>Functional test case sheet</span>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
+        {% endif %}
       </div>
     </div>
 
@@ -37,7 +41,7 @@
           <div class="survey-row-2">
             <label class="field"><span>Your role</span>
               <select id="sus-role">
-                <option>Student</option><option>Faculty</option><option>Industry partner</option><option>Other</option>
+                {% if user.role == "alumni" %}<option>Alumni</option>{% endif %}<option>Student</option><option>Faculty</option><option>Industry partner</option><option>Other</option>
               </select>
             </label>
             <label class="field"><span>Program</span>
@@ -68,7 +72,7 @@
             <label class="field"><span>Your name</span><input type="text" id="uat-name" required></label>
             <label class="field"><span>Role</span>
               <select id="uat-role">
-                <option>Student</option><option>Faculty</option><option>Industry partner</option><option>Other</option>
+                {% if user.role == "alumni" %}<option>Alumni</option>{% endif %}<option>Student</option><option>Faculty</option><option>Industry partner</option><option>Other</option>
               </select>
             </label>
           </div>

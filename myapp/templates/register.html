@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Create your account{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">{% endblock %}
+{% block content %}
+{% include "_public_header.html" %}
+<main class="pub-main pub-main--narrow">
+  <div class="panel pub-register">
+  {% if invalid %}
+    <h1 class="pub-h2">This link has expired</h1>
+    <p>Account links from the survey work for 3 days. Please <a class="link-inline" href="{% url 'check_gap' %}">take the survey again</a>, or <a class="link-inline" href="{% url 'login' %}">log in</a> if you already have an account.</p>
+  {% elif already %}
+    <h1 class="pub-h2">You already have an account</h1>
+    <p>These survey answers are already linked to an account. <a class="link-inline" href="{% url 'login' %}">Log in</a> to see your results.</p>
+  {% else %}
+    <h1 class="pub-h2">Create your account</h1>
+    <p class="muted">Thanks{% if name %}, {{ name }}{% endif %}! Confirm your UE email and choose a password to see your skill gap and learning recommendations.</p>
+    <form method="post" action="{% url 'register' %}" class="auth-form">
+      {% csrf_token %}
+      <input type="hidden" name="t" value="{{ token }}">
+      <label class="field"><span>Confirm your UE email</span>
+        <input type="email" name="email" autocomplete="username" placeholder="{{ email }}" required>
+        <span class="field-hint">Type the email you used in the survey: {{ email }}</span></label>
+      <label class="field"><span>Password</span>
+        <input type="password" name="password" autocomplete="new-password" minlength="{{ min_password_length }}" required>
+        <span class="field-hint">At least {{ min_password_length }} characters.</span></label>
+      <label class="field"><span>Confirm password</span>
+        <input type="password" name="password2" autocomplete="new-password" required></label>
+      {% if error %}<p class="form-msg is-error" role="alert">{{ error }}</p>{% endif %}
+      <button type="submit" class="btn btn-red btn-block">Create account and see my results</button>
+    </form>
+  {% endif %}
+  </div>
+</main>
+{% endblock %}

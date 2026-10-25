@@ -16,7 +16,12 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 /* ---- View Data ---- */
 .data-toolbar .btn{text-decoration:none; display:inline-flex; align-items:center; gap:6px;}
 #view-table td{max-width:360px; overflow:hidden; text-overflow:ellipsis;}
+#view-table td{vertical-align:top;}
 #view-table td.is-long{white-space:normal; min-width:260px; max-width:420px; line-height:1.4;}
+#view-table .cell-clamp{display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer; border-radius:4px;}
+#view-table .cell-clamp.is-open{display:block; -webkit-line-clamp:unset; max-height:320px; overflow:auto;}
+#view-table .cell-clamp:hover{background:#f3f4f7;}
+#view-table .cell-clamp:focus-visible{outline:2px solid var(--red); outline-offset:2px;}
 .pager{display:flex; align-items:center; justify-content:center; gap:16px; margin-top:16px;}
 .pager[hidden]{display:none;}
 .pager .btn[disabled]{opacity:.45; cursor:default;}

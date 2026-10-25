@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Check your skill gap{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">{% endblock %}
+{% block content %}
+{% include "_public_header.html" %}
+<main class="pub-main pub-main--narrow">
+  <section class="pub-hero">
+    <h1>Check your skill gap</h1>
+    <p>Tell us which subjects you took and which skills you learned in them. We'll compare that with what employers ask for{% if role_label %} in <strong>{{ role_label }}</strong> job postings{% endif %} and suggest resources to close the gaps. It takes about 5 minutes.</p>
+  </section>
+  <h2 class="pub-h2">Which one are you?</h2>
+  <div class="pub-choice">
+    <a class="panel pub-choice-card" href="{% url 'student_survey' %}{% if role %}?role={{ role }}{% endif %}">
+      <strong>I'm a current student</strong>
+      <span class="muted">BSIT or BSCS student at UE</span>
+    </a>
+    <a class="panel pub-choice-card" href="{% url 'alumni_survey' %}{% if role %}?role={{ role }}{% endif %}">
+      <strong>I'm a fresh graduate</strong>
+      <span class="muted">UE BSIT or BSCS alumni</span>
+    </a>
+  </div>
+  <p class="muted pub-foot">After the survey you can create an account with your UE email to see your results.</p>
+</main>
+{% endblock %}

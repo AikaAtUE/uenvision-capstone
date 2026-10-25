@@ -1,0 +1,45 @@
+/* Public pages: homepage, "check your skill gap", registration */
+.pub-header{display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:#fff; border-bottom:1px solid var(--line);}
+.pub-brand{display:flex; align-items:center;}
+.pub-logo{height:40px; width:auto;}
+.pub-nav{display:flex; gap:10px;}
+.pub-nav .btn{text-decoration:none;}
+.pub-main{max-width:1100px; margin:0 auto; padding:32px 20px 56px;}
+.pub-main--narrow{max-width:720px;}
+.pub-hero{margin-bottom:24px;}
+.pub-hero h1{font-size:1.9rem; line-height:1.2; margin-bottom:10px;}
+.pub-hero p{color:var(--muted); max-width:720px; line-height:1.55;}
+.pub-role-form{display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 20px; margin-bottom:22px;}
+.pub-cta{text-decoration:none;}
+.pub-cols{display:grid; grid-template-columns:1fr; gap:20px;}
+.pub-cols--two{grid-template-columns:1fr 1fr;}
+.pub-h2{font-size:1.1rem; margin-bottom:6px;}
+.pub-sub{font-size:.82rem; margin-bottom:16px;}
+.pub-bars{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px;}
+.pub-bars li{display:grid; grid-template-columns:minmax(90px,170px) 1fr 140px; align-items:center; gap:10px; font-size:.88rem;}
+.pub-skill{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.pub-track{background:#f0f0ef; border-radius:5px; height:16px; overflow:hidden;}
+.pub-fill{display:block; height:100%; background:var(--red); border-radius:5px;}
+.pub-fill--navy{background:var(--navy);}
+.pub-val{text-align:right; color:var(--ink); font-weight:600; white-space:nowrap;}
+.pub-val small{color:var(--muted-2); font-weight:400;}
+.pub-foot{font-size:.78rem; margin-top:20px;}
+.pub-choice{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px;}
+.pub-choice-card{display:flex; flex-direction:column; gap:6px; text-decoration:none; border:2px solid transparent; transition:border-color .12s;}
+.pub-choice-card:hover{border-color:var(--red);}
+.pub-choice-card strong{font-family:var(--font-head); font-size:1.05rem;}
+.pub-register .auth-form{margin-top:18px; display:flex; flex-direction:column; gap:14px;}
+.pub-register p{line-height:1.5;}
+@media (max-width: 760px){
+  .pub-cols--two, .pub-choice{grid-template-columns:1fr;}
+  .pub-bars li{grid-template-columns:minmax(80px,120px) 1fr 110px;}
+  .pub-hero h1{font-size:1.5rem;}
+  .pub-header{padding:12px 16px;}
+}
+
+/* 403 / 404 pages */
+.err-page{padding-top:72px;}
+.err-page .err-code{font-family:var(--font-head); font-size:.9rem; font-weight:700; letter-spacing:.1em; color:var(--red); margin-bottom:8px;}
+.err-page h1{font-size:1.7rem; margin-bottom:10px;}
+.err-page .muted{line-height:1.55; margin-bottom:22px; max-width:560px;}
+.err-page .btn{text-decoration:none; display:inline-block;}

@@ -2,6 +2,7 @@ import json
 
 from functools import wraps
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -11,6 +12,9 @@ from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 
@@ -23,6 +27,11 @@ from . import recommendations
 
 # Create your views here.
 
+def home_url_for(user):
+    """Where a logged-in user lands: students/alumni get their own dashboard."""
+    return reverse("student_dashboard") if getattr(user, "is_learner", False) else reverse("dashboard")
+
+
 def login_view(request):
     if request.method == "POST":
         email = request.POST.get("email")
@@ -30,9 +39,15 @@ def login_view(request):
         user = authenticate(request, username=email, password=password)
         if user is not None:
             login(request, user)
-            return redirect("dashboard")
-        return render(request, "login.html", {"error": "Invalid email or password."})
-    return render(request, "login.html")
+            next_url = request.POST.get("next") or request.GET.get("next")
+            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
+            return redirect(home_url_for(user))
+        return render(request, "login.html", {"error": "Invalid email or password.", "show_demo": settings.DEBUG})
+    if request.user.is_authenticated:
+        return redirect(home_url_for(request.user))
+    # the demo-account hint is for local testing only, never on a deployed site
+    return render(request, "login.html", {"show_demo": settings.DEBUG})
 
 
 def signup_view(request):
@@ -68,7 +83,7 @@ def signup_view(request):
 
 def logout_view(request):
     logout(request)
-    return redirect("login")
+    return redirect("home")
 
 
 def forgot_password_view(request):
@@ -99,35 +114,102 @@ def dashboard_skills_view(request):
     pipeline.ensure_skill_csvs()
     source = request.GET.get("source", "")
     level = request.GET.get("level", "")
+    program = request.GET.get("program", "")
+    if program and program not in curriculum_data.PROGRAMS:
+        return JsonResponse({"ok": False, "error": "Unknown program."}, status=400)
     try:
         data = pipeline.skills_dashboard(request.GET.get("kind", "hard"), top, source, level, months)
     except (OSError, UnicodeDecodeError) as exc:
         return JsonResponse({"ok": False, "error": f"Couldn't read the data: {exc}"}, status=500)
     if data.get("exists"):
         try:
-            data["gap"] = gap_analysis.compute(top, source, level)
+            data["gap"] = gap_analysis.compute(top, source, level, program)
         except (OSError, UnicodeDecodeError) as exc:
             data["gap"] = {"exists": False, "error": str(exc)}
     return JsonResponse({"ok": True, **data})
 
 
+def _subject_choices():
+    """[(code, label)] for every subject professors teach, once per code (subjects
+    that BSIT and BSCS share are listed once; practicum/research/capstone and the
+    placeholder Professional Electives are left out)."""
+    tags = curriculum_data.subject_term_tags()
+    subjects = sorted(curriculum_data.subject_by_code().items(),
+                      key=lambda item: curriculum_data.subject_sort_key(item[0], tags))
+    return [(code, f"{code} — {info['name']}") for code, info in subjects
+            if code not in curriculum_data.HIDDEN_FROM_PROFESSORS]
+
+
+def _subject_code(value):
+    """Subject code from a ?subject= value; also accepts the older "PROGRAM|CODE" form."""
+    return str(value or "").split("|")[-1]
+
+
+def _my_custom_subjects(user):
+    """{code: {"name", "programs", "term_label"}} for the subjects this professor added
+    themselves because they aren't in the curriculum list (e.g. an elective)."""
+    from .student_views import latest_response
+
+    latest = latest_response(user)
+    out = {}
+    for subj in ((latest.data or {}).get("subjects") or []) if latest else []:
+        if isinstance(subj, dict) and subj.get("custom") and subj.get("code"):
+            out[str(subj["code"])] = {"name": str(subj.get("name") or ""), "programs": subj.get("programs") or [],
+                                      "term_label": "Added by you"}
+    return out
+
+
+def _my_subjects(user):
+    """Subjects in this professor's current record (latest Professor Survey response,
+    possibly edited on Data -> My subjects & skills), including ones they added."""
+    from .student_views import latest_response
+
+    seen, out = set(), []
+    labels = dict(_subject_choices())
+    labels.update({code: f"{code} — {info['name']}" for code, info in _my_custom_subjects(user).items()})
+    latest = latest_response(user)
+    for data in ([latest.data] if latest else []):
+        for subj in (data or {}).get("subjects") or []:
+            value = str(subj.get("code") or "")
+            if value in labels and value not in seen:
+                seen.add(value)
+                out.append((value, labels[value]))
+    return out
+
+
 @login_required
 def recommendations_view(request):
-    """Professor recommendations: the ranked under-taught-skills list (reusing
-    gap_analysis.py — same list the Dashboard's Skill Gap Analysis tab shows)
-    plus whatever Gemini-found training resources have already been generated
-    for them. Generating more is a separate POST (recommendations_generate_view)
-    so simply opening this page never spends API quota."""
-    gap = gap_analysis.compute(top=10)
+    """Professor recommendations. Two views of the same page:
+    * no subject chosen: the ranked under-taught-skills list (reusing
+      gap_analysis.py — same list the Dashboard's Skill Gap Analysis tab shows);
+    * ?subject=CODE: in-demand skills that fit that subject, ranked by
+      demand minus how deeply the Professor Survey says they're already taught
+      there (gap_analysis.subject_targets).
+    Either way, already generated Gemini resources are shown. Generating more is a
+    separate POST (recommendations_generate_view) so simply opening this page never
+    spends API quota."""
     cached = recommendations.load_recommendations()
-    under_taught = list(gap.get("under_taught") or []) if gap.get("exists") else []
-    for row in under_taught:
-        key = row["skill"].strip().lower()
-        row["cached_resources"] = cached.get(key, [])
+    subject_value = _subject_code(request.GET.get("subject", ""))
+    choices = _subject_choices()
+    custom = _my_custom_subjects(request.user)
+    subject = None
+    gap = gap_analysis.compute(top=10)
+    if subject_value in dict(choices) or subject_value in custom:
+        subject = gap_analysis.subject_targets(subject_value, info=custom.get(subject_value))
+        rows = list(subject.get("targets") or []) if subject.get("exists") else []
+    else:
+        subject_value = ""
+        rows = list(gap.get("under_taught") or []) if gap.get("exists") else []
+    for row in rows:
+        row["cached_resources"] = cached.get(row["skill"].strip().lower(), [])
     return render(request, "recommendations.html", {
         "active_page": "recommendations",
         "gap": gap,
-        "under_taught": under_taught,
+        "under_taught": rows,
+        "subject": subject,
+        "subject_value": subject_value,
+        "subject_choices": choices,
+        "my_subjects": _my_subjects(request.user),
         "has_any_recommendations": bool(cached),
         "max_per_run": recommendations.MAX_SKILLS_PER_RUN,
         "default_photo": recommendations.DEFAULT_PHOTO,
@@ -141,8 +223,14 @@ def recommendations_generate_view(request):
     skills = skills[:recommendations.MAX_SKILLS_PER_RUN]
     if not skills:
         return JsonResponse({"ok": False, "error": "Choose at least one skill."}, status=400)
+    context = ""
+    subject_value = _subject_code(request.POST.get("subject", ""))
+    labels = dict(_subject_choices())
+    labels.update(_my_subjects(request.user))
+    if subject_value in labels:
+        context = f"to teach within the university subject {labels[subject_value]}"
     try:
-        out = recommendations.generate_for_skills(skills)
+        out = recommendations.generate_for_skills(skills, "professor", context)
     except recommendations.RecommendationError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
     return JsonResponse({"ok": True, **out})
@@ -337,6 +425,8 @@ def survey_submit_view(request):
         or not all(isinstance(r, dict) for r in rows)
     ):
         return JsonResponse({"ok": False, "error": "Invalid survey data."}, status=400)
+    if request.user.is_learner and kind != SurveyResponse.SUS:
+        return JsonResponse({"ok": False, "error": "Students and alumni can only answer the SUS survey."}, status=403)
 
     if kind == SurveyResponse.SUS:
         for row in rows:
@@ -589,19 +679,25 @@ def api_keys_save_view(request):
 # is just to hand it the eligible subjects + ontology-suggested skills and
 # to save the finished JSON payload.
 #
-# NOTE on the underlying data: see the placeholder notice at the top of
-# curriculum_data.py — the exact BSIT/BSCS curricula shown here are sample
-# data standing in for the real curriculum pasted earlier in our
-# conversation, which I no longer have the literal text of. Swap in
-# curriculum_data.SUBJECTS once you re-send it; nothing else here needs to
-# change.
+# Which semester is "current" comes from curriculum_data.current_period(),
+# worked out from today's date against the school calendar.
 # ---------------------------------------------------------------------------
 MAX_SUBJECTS_PER_SUBMISSION = 40
 MAX_SKILLS_PER_SUBJECT = 30
 MAX_JSON_BODY_BYTES = 200_000
+UE_EMAIL_DOMAIN = "ue.edu.ph"  # students/alumni must use their UE email (subdomains allowed)
 
 
-def _parse_curriculum_submission(request):
+def _is_ue_email(value):
+    try:
+        validate_email(value)
+    except ValidationError:
+        return False
+    domain = value.rsplit("@", 1)[1].lower()
+    return domain == UE_EMAIL_DOMAIN or domain.endswith("." + UE_EMAIL_DOMAIN)
+
+
+def _parse_curriculum_submission(request, needs_personal_info=True):
     """Shared POST-body parsing/sanity-checking for all three submit views.
     Returns (payload_dict, error_message_or_None)."""
     if len(request.body or b"") > MAX_JSON_BODY_BYTES:
@@ -615,7 +711,7 @@ def _parse_curriculum_submission(request):
     if payload.get("consent") is not True:
         return None, "Please confirm the Data Privacy notice before submitting."
     personal_info = payload.get("personal_info")
-    if not isinstance(personal_info, dict):
+    if needs_personal_info and not isinstance(personal_info, dict):
         return None, "Missing personal information."
     subjects = payload.get("subjects")
     if not isinstance(subjects, list) or not 1 <= len(subjects) <= MAX_SUBJECTS_PER_SUBMISSION:
@@ -629,8 +725,34 @@ def _parse_curriculum_submission(request):
     return payload, None
 
 
-def _save_curriculum_survey(respondent_type, payload):
-    CurriculumSurveyResponse.objects.create(respondent_type=respondent_type, data=payload)
+def _save_curriculum_survey(respondent_type, payload, user=None):
+    return CurriculumSurveyResponse.objects.create(respondent_type=respondent_type, data=payload, user=user)
+
+
+def _learner_survey_saved(request, response):
+    """After a student/alumni survey: a logged-in student/alumni is linked right
+    away; anyone else gets a signed link to register and see their results."""
+    from . import student_views
+
+    user = request.user
+    if user.is_authenticated and user.is_learner:
+        response.user = user
+        response.save(update_fields=["user"])
+        return JsonResponse({"ok": True, "next_url": reverse("student_dashboard")})
+    return JsonResponse({"ok": True, "register_url": student_views.register_url_for(response)})
+
+
+def _clean_target_role(payload):
+    from . import job_roles
+
+    role = payload.get("target_role")
+    payload["target_role"] = role if role in job_roles.ROLE_LABELS else ""
+
+
+def _ue_email_error(payload):
+    if not _is_ue_email(str(payload["personal_info"].get("ue_email") or "").strip()):
+        return f"Please use your UE email address (ending in @{UE_EMAIL_DOMAIN})."
+    return None
 
 
 @require_POST
@@ -638,8 +760,17 @@ def student_survey_submit_view(request):
     payload, error = _parse_curriculum_submission(request)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
-    _save_curriculum_survey(CurriculumSurveyResponse.STUDENT, payload)
-    return JsonResponse({"ok": True})
+    error = _ue_email_error(payload)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    terms = {s.get("term") for s in payload["subjects"] if isinstance(s, dict)}
+    if "current" not in terms:
+        return JsonResponse({"ok": False, "error": "Please select at least one current-semester subject."}, status=400)
+    if payload.get("has_previous") and "previous" not in terms:
+        return JsonResponse({"ok": False, "error": "Please select at least one previous-semester subject."}, status=400)
+    _clean_target_role(payload)
+    response = _save_curriculum_survey(CurriculumSurveyResponse.STUDENT, payload)
+    return _learner_survey_saved(request, response)
 
 
 @require_POST
@@ -647,20 +778,58 @@ def alumni_survey_submit_view(request):
     payload, error = _parse_curriculum_submission(request)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
+    error = _ue_email_error(payload)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
     employment = payload.get("employment")
     if not isinstance(employment, dict):
         return JsonResponse({"ok": False, "error": "Missing employment information."}, status=400)
-    _save_curriculum_survey(CurriculumSurveyResponse.ALUMNI, payload)
-    return JsonResponse({"ok": True})
+    _clean_target_role(payload)
+    response = _save_curriculum_survey(CurriculumSurveyResponse.ALUMNI, payload)
+    return _learner_survey_saved(request, response)
 
 
+@login_required
 @require_POST
 def professor_survey_submit_view(request):
-    payload, error = _parse_curriculum_submission(request)
+    """Saves the professor's record. The Professor Survey page is also where they
+    edit it later, so a professor who already has a record gets it updated in
+    place (one record per professor) instead of a second response."""
+    from .student_views import latest_response
+
+    payload, error = _parse_curriculum_submission(request, needs_personal_info=False)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
-    _save_curriculum_survey(CurriculumSurveyResponse.PROFESSOR, payload)
-    return JsonResponse({"ok": True})
+    payload.pop("personal_info", None)  # the response is linked to the account instead
+    current = latest_response(request.user)
+    earlier = {s.get("code") for s in ((current.data or {}).get("subjects") or []) if isinstance(s, dict)} if current else set()
+    by_code = curriculum_data.subject_by_code()
+    subjects, seen = [], set()
+    for subj in payload["subjects"]:
+        if subj.get("custom"):
+            info, error = curriculum_data.clean_custom_subject(subj)
+            if error:
+                return JsonResponse({"ok": False, "error": error}, status=400)
+            subj = {**subj, **info}
+        elif str(subj.get("code") or "") not in by_code or (
+                subj["code"] in curriculum_data.HIDDEN_FROM_PROFESSORS and subj["code"] not in earlier):
+            return JsonResponse({"ok": False, "error": "Unknown subject."}, status=400)
+        if subj["code"] not in seen:
+            seen.add(subj["code"])
+            subjects.append(subj)
+    payload["subjects"] = subjects
+    now = timezone.now().isoformat(timespec="seconds")
+    if current is None:
+        payload["consent_at"] = now
+        _save_curriculum_survey(CurriculumSurveyResponse.PROFESSOR, payload, user=request.user)
+        return JsonResponse({"ok": True, "created": True})
+    data = dict(current.data or {})
+    data.update(payload)
+    data.setdefault("consent_at", current.created_at.isoformat(timespec="seconds"))
+    data["edited_at"] = now
+    current.data = data
+    current.save(update_fields=["data"])
+    return JsonResponse({"ok": True, "created": False, "edited_at": now})
 
 
 def _safe_json(obj):
@@ -670,13 +839,19 @@ def _safe_json(obj):
 
 
 def student_survey_view(request):
+    period = curriculum_data.current_period()
     bootstrap = {
         "programLabels": curriculum_data.PROGRAM_LABELS,
         "yearLevels": curriculum_data.YEAR_LEVELS,
-        "currentSemLabel": curriculum_data.CURRENT_SEM_LABEL,
-        "eligibility": curriculum_data.build_student_eligibility(),
+        "currentSemLabel": period["current_label"],
+        "ueEmailDomain": UE_EMAIL_DOMAIN,
+        "eligibility": curriculum_data.build_student_eligibility(period["slot"]),
+        "targetRole": request.GET.get("role", ""),
         "skills": ontology.subject_skill_map(),
+        "termTags": curriculum_data.subject_term_tags(),
         "submitUrl": reverse("student_survey_submit"),
+        "skillSearchUrl": reverse("skill_search"),
+        "skillAddUrl": reverse("skill_add"),
     }
     return render(request, "student_survey.html", {
         "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,
@@ -693,8 +868,13 @@ def alumni_survey_view(request):
         "programLabels": curriculum_data.PROGRAM_LABELS,
         "termsByProgram": terms_by_program,
         "subjectsByProgramTerm": curriculum_data.SUBJECTS,
+        "targetRole": request.GET.get("role", ""),
+        "ueEmailDomain": UE_EMAIL_DOMAIN,
         "skills": ontology.subject_skill_map(),
+        "termTags": curriculum_data.subject_term_tags(),
         "submitUrl": reverse("alumni_survey_submit"),
+        "skillSearchUrl": reverse("skill_search"),
+        "skillAddUrl": reverse("skill_add"),
     }
     return render(request, "alumni_survey.html", {
         "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,
@@ -702,19 +882,47 @@ def alumni_survey_view(request):
     })
 
 
+@login_required
 def professor_survey_view(request):
+    """The Professor Survey, which is also the professor's editable record: once
+    answered, the page opens with their saved subjects and skills filled in."""
+    from .student_views import latest_response
+
+    period = curriculum_data.current_period()
+    current = latest_response(request.user)
+    data = (current.data or {}) if current else {}
+    by_code = curriculum_data.subject_by_code()
+    record = None
+    if current:
+        record = [{"code": subj["code"],
+                   "name": subj.get("name") or by_code.get(subj["code"], {}).get("name", ""),
+                   "custom": bool(subj.get("custom")), "programs": subj.get("programs") or [],
+                   "skills": [s for s in (subj.get("skills") or []) if isinstance(s, dict)]}
+                  for subj in data.get("subjects") or [] if isinstance(subj, dict) and subj.get("code")]
+    consent_at = data.get("consent_at") or (current.created_at.isoformat() if current and data.get("consent") else None)
     bootstrap = {
-        "currentSemLabel": curriculum_data.CURRENT_SEM_LABEL,
-        "previousSemLabel": curriculum_data.PREVIOUS_SEM_LABEL,
-        "previousSummerLabel": curriculum_data.PREVIOUS_SUMMER_LABEL,
-        "pools": curriculum_data.professor_term_pools(),
+        "currentSemLabel": period["current_label"],
+        "previousSemLabel": period["previous_sem_label"],
+        "previousSummerLabel": period["previous_summer_label"],
+        "pools": curriculum_data.professor_term_pools(period["slot"]),
+        "knownCodes": sorted(by_code),
+        "record": record,
+        "consented": bool(consent_at),
         "skills": ontology.subject_skill_map(),
+        "termTags": curriculum_data.subject_term_tags(),
         "submitUrl": reverse("professor_survey_submit"),
+        "skillSearchUrl": reverse("skill_search"),
+        "skillAddUrl": reverse("skill_add"),
     }
     return render(request, "professor_survey.html", {
+        "active_page": "data",
+        "data_tab": "professor_survey",
+        "has_record": current is not None,
+        "consent_at": parse_datetime(consent_at) if consent_at else None,
+        "edited_at": parse_datetime(data["edited_at"]) if data.get("edited_at") else (current.created_at if current else None),
         "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,
-        "current_sem_label": curriculum_data.CURRENT_SEM_LABEL,
-        "previous_sem_label": curriculum_data.PREVIOUS_SEM_LABEL,
-        "previous_summer_label": curriculum_data.PREVIOUS_SUMMER_LABEL,
+        "current_sem_label": period["current_label"],
+        "previous_sem_label": period["previous_sem_label"],
+        "previous_summer_label": period["previous_summer_label"],
         "bootstrap_json": _safe_json(bootstrap),
     })

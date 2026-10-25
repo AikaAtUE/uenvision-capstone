@@ -1,0 +1,61 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}My subjects & skills{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'myapp/curriculum-survey.css' %}?v={% now 'U' %}">
+{% if professor %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endif %}
+{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-my-skills">
+  <header class="page-header"><h1>{% if professor %}Data{% else %}My subjects &amp; skills{% endif %}</h1></header>
+  <div class="page-body">
+    {% if professor %}{% include "_data_tabs.html" %}{% endif %}
+    {% if not has_record %}
+      <div class="panel ms-empty">
+        <p><strong>You haven't answered the {% if professor %}Professor Survey{% else %}curriculum survey{% endif %} yet.</strong> Answer it once and your subjects and skills will show up here, ready to edit any time.</p>
+        <a class="btn btn-red btn-sm" href="{{ survey_url }}">Take the survey</a>
+      </div>
+    {% else %}
+      <p class="muted ms-lede">
+        {% if professor %}
+        The subjects you teach and, for each skill, how you cover it: Introduced, Practiced or Applied.
+        Update it whenever your subjects or lessons change. The gap analysis and your subject recommendations use what's saved here.
+        {% else %}
+        The subjects you've taken{% if program_label %} in {{ program_label }}{% endif %} and the skills you learned in each.
+        Keep it up to date as you finish subjects or get better at a skill. Your skill gap and recommendations use what's saved here.
+        {% endif %}
+      </p>
+
+      <form id="my-skills-form" class="ms-form" novalidate>
+        {% csrf_token %}
+        <div class="ms-toolbar">
+          <label class="field ms-add"><span>Add a subject</span>
+            <select id="ms-add-subject"><option value="">Choose a subject to add…</option></select>
+          </label>
+          <div class="ms-actions">
+            <span class="muted ms-status" id="ms-status" role="status">
+              {% if edited_at %}Last edited {{ edited_at|slice:":10" }}{% else %}From your survey on {{ submitted_at|date:"M j, Y" }}{% endif %}
+            </span>
+            <button type="submit" class="btn btn-red" id="ms-save">Save changes</button>
+          </div>
+        </div>
+        {% if professor %}<div id="ms-other-subject" class="ms-other"></div>{% endif %}
+        <p class="form-msg form-msg--error" id="ms-error" hidden></p>
+
+        <div id="ms-subjects" class="ms-subjects"></div>
+        <p class="cs-hint" id="ms-no-subjects" hidden>No subjects yet. Add the subjects you've taken with the box above.</p>
+
+        <div id="ms-overall" class="ms-overall" hidden>
+          <h2 class="section-title">Overall skills from your time at UE</h2>
+          <p class="muted">Skills you came away with that aren't tied to one subject.</p>
+          <div class="cs-skill-picker" id="ms-overall-picker"></div>
+        </div>
+      </form>
+      <script type="application/json" id="cs-bootstrap">{{ bootstrap_json }}</script>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/curriculum-survey.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

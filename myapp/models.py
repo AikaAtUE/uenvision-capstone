@@ -22,12 +22,16 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         ADMINISTRATOR = "administrator", "Administrator"
         FACULTY = "faculty", "Faculty"
+        STUDENT = "student", "Student"
+        ALUMNI = "alumni", "Alumni"
 
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.FACULTY)
     last_name = models.CharField(max_length=100)
     first_name = models.CharField(max_length=100)
     middle_name = models.CharField(max_length=100, blank=True)  # optional, per signup.html
+    # Students/alumni only: the job role picked on their dashboard (job_roles.ROLES key).
+    target_role = models.CharField(max_length=60, blank=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -44,6 +48,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     @property
     def is_administrator(self):
         return self.role == self.Role.ADMINISTRATOR
+
+    @property
+    def is_learner(self):
+        """Students and alumni: they only get their own dashboard, SUS and settings."""
+        return self.role in (self.Role.STUDENT, self.Role.ALUMNI)
 
     def get_full_name(self):
         parts = [self.first_name, self.middle_name, self.last_name]
@@ -112,6 +121,14 @@ class CurriculumSurveyResponse(models.Model):
     ]
 
     respondent_type = models.CharField(max_length=20, choices=RESPONDENT_TYPES, db_index=True)
+    # Professors answer while logged in; students/alumni are linked when they register after the survey.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="curriculum_survey_responses",
+    )
     data = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 

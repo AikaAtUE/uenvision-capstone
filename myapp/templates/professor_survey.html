@@ -1,74 +1,108 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
 {% load static %}
 {% block title %}Professor Survey{% endblock %}
 {% block extra_head %}
+<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">
 <link rel="stylesheet" href="{% static 'myapp/uenvision-additions.css' %}?v={% now 'U' %}">
 <link rel="stylesheet" href="{% static 'myapp/curriculum-survey.css' %}?v={% now 'U' %}">
 {% endblock %}
-{% block content %}
-<main class="cs-page">
+{% block page_content %}
+<section class="page is-active" id="page-data">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+  {% include "_data_tabs.html" %}
+<div class="cs-page cs-page--embedded">
   <header class="cs-header">
-    <h1>UEnvision Curriculum Survey — Faculty</h1>
-    <p class="muted">A digital version of the Subjects and Technical Skills Survey. For each subject you teach, tell us which skills you cover and how (Introduced / Practiced / Applied).</p>
+    <h2 class="section-title">Curriculum Survey — Faculty</h2>
+    {% if has_record %}
+    <p class="muted">Your subjects and the skills you cover in each. This is your saved record: change anything below whenever your subjects or lessons change, then press <strong>Save changes</strong>. The gap analysis and your subject recommendations use what's saved here.</p>
+    {% else %}
+    <p class="muted">A digital version of the Subjects and Technical Skills Survey. For each subject you teach, tell us which skills you cover and how (Introduced / Practiced / Applied). Your answers are linked to your account, so no personal details are asked. You can come back and edit them any time.</p>
+    {% endif %}
   </header>
 
   {% if is_placeholder_curriculum %}
   <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
   {% endif %}
 
-  <div id="cs-done" class="panel cs-panel" hidden>
-    <h2>Thank you!</h2>
-    <p>Your responses were submitted. You can close this page now.</p>
-  </div>
-
   <form id="professor-survey-form" class="panel cs-panel" novalidate>
     {% csrf_token %}
 
+    {% if consent_at %}
+    <details class="cs-privacy cs-privacy--accepted">
+      <summary><strong>Data Privacy Notice</strong> <span class="muted">You accepted this on {{ consent_at|date:"M j, Y" }}. Click to view it again.</span></summary>
+      <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
+      <ul>
+        <li><strong>Purpose:</strong> to document the technical competencies the BSIT/BSCS curricula expect faculty to teach, for comparison against current IT/CS job market demand.</li>
+        <li><strong>What is collected:</strong> the subjects you teach and the skills/teaching method you report for each, linked to your UEnvision faculty account. No other personal information is asked.</li>
+        <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
+        <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
+        <li><strong>Questions or concerns:</strong> you may reach the UEnvision research team through the CCSS faculty coordinator.</li>
+      </ul>
+    </details>
+    {% else %}
     <div class="cs-privacy">
       <h3>Data Privacy Notice</h3>
       <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
       <ul>
         <li><strong>Purpose:</strong> to document the technical competencies the BSIT/BSCS curricula expect faculty to teach, for comparison against current IT/CS job market demand.</li>
-        <li><strong>What is collected:</strong> the subjects you teach and the skills/teaching method you report for each. Your name and department are optional and used only to follow up on unclear responses, if needed.</li>
+        <li><strong>What is collected:</strong> the subjects you teach and the skills/teaching method you report for each, linked to your UEnvision faculty account. No other personal information is asked.</li>
         <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
         <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
         <li><strong>Questions or concerns:</strong> you may reach the UEnvision research team through the CCSS faculty coordinator.</li>
       </ul>
-      <label class="cs-consent"><input type="checkbox" id="professor-consent"> <span>I have read the Data Privacy Notice above and voluntarily agree to participate.</span></label>
+      <label class="cs-consent"><input type="checkbox" id="professor-consent"> <span>I have read the Data Privacy Notice above and voluntarily agree to participate. (You only need to do this once.)</span></label>
     </div>
+    {% endif %}
 
-    <div class="cs-row-2">
-      <label class="field"><span>Name (optional)</span><input type="text" id="professor-name"></label>
-      <label class="field"><span>Department / program handled (optional)</span><input type="text" id="professor-department"></label>
+    <div class="cs-subject-tools">
+      <label class="field cs-subject-filter-wrap"><span>Find a subject</span>
+        <input type="search" id="professor-subject-filter" placeholder="Type a code or name, e.g. CCP or Database" autocomplete="off">
+      </label>
+      <span class="cs-picked-count" id="professor-picked-count" aria-live="polite">No subjects selected yet</span>
     </div>
 
     <div class="cs-section">
       <h3>Subjects you currently teach <span class="muted">({{ current_sem_label }})</span></h3>
-      <p class="muted">Every subject across BSIT and BSCS currently in its 1st-semester slot this school year.</p>
+      <p class="muted">Every subject across BSIT and BSCS offered this semester (electives are added below).</p>
       <div id="professor-current-subjects"></div>
     </div>
 
     <div class="cs-section">
       <h3>Subjects you taught last semester <span class="muted">({{ previous_sem_label }})</span></h3>
-      <p class="muted">Every subject across BSIT and BSCS that falls in the 2nd-semester slot of the previous school year.</p>
+      <p class="muted">Every subject across BSIT and BSCS offered last semester.</p>
       <div id="professor-previous-subjects"></div>
     </div>
 
+    {% if previous_summer_label %}
     <div class="cs-section">
-      <button type="button" class="link-inline" id="professor-summer-toggle">+ Also report {{ previous_summer_label }} subjects taught</button>
-      <div id="professor-summer-subjects" hidden></div>
+      <h3>Subjects you taught last summer <span class="muted">({{ previous_summer_label }})</span></h3>
+      <p class="muted">Every subject across BSIT and BSCS offered last summer.</p>
+      <div id="professor-summer-subjects"></div>
+    </div>
+    {% endif %}
+
+    <div class="cs-section">
+      <h3>Subjects not in the list</h3>
+      <p class="muted">Teaching a Professional Elective or another subject that isn't listed above? Add it here.</p>
+      <div id="professor-other-subject"></div>
     </div>
 
     <div class="cs-section">
       <h3>Skills per subject</h3>
-      <p class="muted">For each subject you checked above: pick the skills you cover and mark how — Introduced (first exposure), Practiced (guided exercises), or Applied (students use it independently/in a project).</p>
+      <p class="muted">For each subject you checked or added above: pick the skills you cover and mark how — Introduced (first exposure), Practiced (guided exercises), or Applied (students use it independently/in a project).</p>
       <div id="professor-subject-blocks"></div>
     </div>
 
     <p class="form-msg form-msg--error" id="professor-error" hidden></p>
-    <button type="submit" class="btn btn-navy">Submit survey</button>
+    <div class="ps-save-bar">
+      <button type="submit" class="btn btn-navy" id="professor-save">{% if has_record %}Save changes{% else %}Submit survey{% endif %}</button>
+      <span class="muted ms-status" id="professor-status" role="status">{% if has_record and edited_at %}Last saved {{ edited_at|date:"M j, Y g:i A" }}{% endif %}</span>
+    </div>
   </form>
-</main>
+</div>
+  </div>
+</section>
 
 <script type="application/json" id="cs-bootstrap">{{ bootstrap_json }}</script>
 {% endblock %}

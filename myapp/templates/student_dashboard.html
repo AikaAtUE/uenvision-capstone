@@ -1,0 +1,144 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}My skill gap{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'myapp/recommendations.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/student-dashboard.css' %}?v={% now 'U' %}">
+{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-student-dashboard">
+  <header class="page-header"><h1>My skill gap</h1></header>
+  <div class="page-body">
+
+    {% if not has_survey %}
+    <div class="panel sd-callout">
+      <p><strong>Take the curriculum survey first.</strong> Your skill gap is worked out from the subjects and skills you report in it.</p>
+      <a class="btn btn-red btn-sm" href="{{ survey_url }}">Take the survey</a>
+    </div>
+    {% endif %}
+
+    {% if not stats.exists %}
+      <p class="empty-note">No job-market data has been collected yet, so there's nothing to compare against.</p>
+    {% else %}
+    <form class="sd-role-form" method="post" action="{% url 'student_role' %}">
+      {% csrf_token %}
+      <label class="select-field"><span>Job role I'm aiming for</span>
+        <select name="role" onchange="this.form.submit()">
+          <option value="">Any IT/CS role (overall top skills)</option>
+          {% for r in roles %}<option value="{{ r.key }}"{% if role and r.key == role.key %} selected{% endif %}>{{ r.label }}</option>{% endfor %}
+        </select>
+      </label>
+      <noscript><button class="btn btn-navy btn-sm" type="submit">Save</button></noscript>
+    </form>
+
+    <div class="stat-grid sd-stats">
+      <div class="stat-card">
+        <p class="stat-label">Job readiness</p>
+        <p class="stat-value">{% if readiness is not None %}{{ readiness }}%{% else %}—{% endif %}</p>
+        <p class="stat-note">You have {{ have }} of the top {{ compare|length }} skills{% if role %} for {{ role.label }}{% endif %} at Intermediate or better</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Skills you reported</p>
+        <p class="stat-value">{{ my_skills|length }}</p>
+        <p class="stat-note">From your survey answers</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Skills to build</p>
+        <p class="stat-value">{{ to_build|length }}</p>
+        <p class="stat-note">{% if to_build %}Start with {{ to_build.0.skill }}{% else %}Nothing missing from the top skills{% endif %}</p>
+      </div>
+    </div>
+
+    <div class="sd-cols">
+      <section class="panel">
+        <h2 class="section-title">Top skills {% if role %}for {{ role.label }}{% else %}across IT/CS roles{% endif %}</h2>
+        <p class="muted sd-sub">{% if role %}From {{ role.postings }} posting{{ role.postings|pluralize }}; the grey number is the share across all IT/CS postings.{% else %}Pick a job role above to see its own top skills.{% endif %}</p>
+        <table class="sd-table">
+          <thead><tr><th>Skill</th><th>In postings</th><th>You</th></tr></thead>
+          <tbody>
+          {% for s in compare %}
+            <tr>
+              <td>{{ s.skill }}</td>
+              <td>{{ s.pct }}%{% if role %} <small class="muted">vs {{ s.overall_pct }}%</small>{% endif %}</td>
+              <td><span class="sd-pill sd-pill--{{ s.status }}">{% if s.status == "missing" %}Not yet{% else %}{{ s.my_level|default:"Reported" }}{% endif %}</span></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2 class="section-title">Compared with overall in-demand skills</h2>
+        <p class="muted sd-sub">The most requested skills across all IT/CS job postings.</p>
+        <table class="sd-table">
+          <thead><tr><th>Skill</th><th>In postings</th><th>You</th></tr></thead>
+          <tbody>
+          {% for s in overall %}
+            <tr>
+              <td>{{ s.skill }}</td>
+              <td>{{ s.pct }}%</td>
+              <td><span class="sd-pill sd-pill--{{ s.status }}">{% if s.status == "missing" %}Not yet{% else %}{{ s.my_level|default:"Reported" }}{% endif %}</span></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <section class="sd-section">
+      <h2 class="section-title">Learning resources for your gaps</h2>
+      {% if not to_build %}
+        <p class="empty-note">You already have every top skill at Intermediate or better. Try another job role above.</p>
+      {% else %}
+      <p class="form-msg rec-caveat">Resources are suggested by AI (with live web search when available) and haven't been checked by a person yet. Check a course before paying for it.</p>
+      <form id="rec-form" method="post" action="{% url 'student_generate' %}" data-max="{{ max_per_run }}" data-verb="Find resources">
+        {% csrf_token %}
+        <div class="rec-toolbar">
+          <button type="submit" class="btn btn-red btn-sm" id="rec-generate-btn">Find resources for selected skills</button>
+          <span class="muted rec-limit">Up to {{ max_per_run }} skills at a time</span>
+          <button type="button" class="link-inline rec-clear" id="rec-clear">Clear selection</button>
+          <span class="muted" id="rec-status" role="status"></span>
+        </div>
+        <p class="form-msg is-error" id="rec-error" role="alert"></p>
+        <div class="rec-list">
+          {% for s in to_build %}
+          <div class="rec-skill" data-skill="{{ s.skill }}">
+            <div class="rec-skill-head">
+              <label class="rec-skill-pick">
+                <input type="checkbox" name="skills" value="{{ s.skill }}" {% if not s.cached_resources %}checked{% endif %}>
+                <span class="rec-skill-name">{{ s.skill }}</span>
+              </label>
+              <span class="rec-skill-stats muted">{{ s.pct }}% of postings · you: {% if s.status == "missing" %}not yet{% else %}{{ s.my_level|lower }}{% endif %}</span>
+              {% if s.cached_resources %}<span class="pill rec-pill-generated">found</span>{% endif %}
+            </div>
+            <div class="rec-resources" data-skill-slot="{{ s.skill }}">
+              {% include "_rec_cards.html" with resources=s.cached_resources %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </form>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if my_skills %}
+    <section class="sd-section">
+      <h2 class="section-title">Skills you reported</h2>
+      <div class="sd-skill-cloud">
+        {% for m in my_skills %}<span class="sd-pill sd-pill--{% if m.weight >= 0.5 %}strong{% else %}building{% endif %}">{{ m.skill }}{% if m.level %} · {{ m.level }}{% endif %}</span>{% endfor %}
+      </div>
+      <p class="muted sd-sub"><a class="link-inline" href="{% url 'my_skills' %}">Edit my subjects &amp; skills</a> whenever you finish a subject or pick up a new skill.</p>
+    </section>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script>
+  window.__recGenerateUrl = "{% url 'student_generate' %}";
+  window.__recDownloadUrl = "";
+  window.__recDefaultPhoto = "{{ default_photo }}";
+</script>
+<script src="{% static 'myapp/recommendations.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

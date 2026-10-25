@@ -78,6 +78,12 @@ a{color:inherit;}
   background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 2px, transparent 2px 46px),
                      repeating-linear-gradient(0deg, rgba(255,255,255,.06) 0 2px, transparent 2px 46px);
 }
+.auth-side{position:relative; z-index:1; height:100%; display:flex; flex-direction:column; justify-content:center; padding:56px 56px; color:#fff; max-width:560px;}
+.auth-side-kicker{font-size:.8rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; opacity:.8; margin-bottom:14px;}
+.auth-side-title{font-size:2rem; line-height:1.2; margin-bottom:26px;}
+.auth-side-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:14px;}
+.auth-side-list li{padding-left:18px; border-left:3px solid var(--red); line-height:1.45; font-size:.98rem; opacity:.95;}
+.auth-side-list strong{display:block; font-family:var(--font-head);}
 .auth-card{
   display:flex; flex-direction:column; justify-content:center; align-items:center;
   padding: 48px 40px; gap: 28px;
@@ -95,11 +101,11 @@ a{color:inherit;}
 .auth-form{width:100%; max-width:340px; display:flex; flex-direction:column; gap:16px;}
 .field{display:flex; flex-direction:column; gap:6px; font-size:.85rem; font-weight:600; color:var(--ink);}
 .field--spaced{margin-top:6px;}
-.field input, .select-field select{
+.field input, .field select, .select-field select{
   font-family: inherit; font-size:.95rem; font-weight:400;
   padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#f7f7f8;
 }
-.field input:focus, .select-field select:focus{background:#fff; border-color:var(--navy);}
+.field input:focus, .field select:focus, .select-field select:focus{background:#fff; border-color:var(--navy);}
 .auth-foot{text-align:center; font-size:.88rem; color:var(--muted); margin-top:4px;}
 .auth-demo{text-align:center; font-size:.76rem; color:var(--muted-2); margin-top:2px;}
 
@@ -126,7 +132,11 @@ a{color:inherit;}
 .sidebar{
   width:236px; flex-shrink:0; background:var(--sidebar); display:flex; flex-direction:column;
   padding: 22px 14px; transition: width .2s ease;
+  /* stays in view on long pages so Log out and the nav never scroll away */
+  position:sticky; top:0; height:100vh; overflow-y:auto;
 }
+.mobile-bar{display:none;}
+.sidebar-backdrop{display:none;}
 .sidebar.is-collapsed{width:76px;}
 .sidebar-top{display:flex; align-items:center; justify-content:center; gap:10px; padding: 0 6px 22px;}
 .sidebar-logo{width:30px; height:30px; flex-shrink:0;}
@@ -315,9 +325,34 @@ tbody tr:hover{background:#fafafa;}
   .auth-photo{display:none;}
 }
 @media (max-width: 720px){
-  .sidebar{position:fixed; z-index:30; height:100vh;}
+  .sidebar{
+    position:fixed; left:0; top:0; z-index:40; height:100vh; width:264px;
+    transform:translateX(-100%); transition:transform .22s ease; box-shadow:none;
+  }
+  .sidebar.is-open{transform:none; box-shadow:0 10px 40px rgba(22,35,63,.35);}
+  /* the desktop "collapsed" state doesn't apply to the phone menu */
+  .sidebar.is-collapsed{width:264px;}
+  .sidebar.is-collapsed .profile-text, .sidebar.is-collapsed .nav-item span:not(.nav-icon){display:inline;}
+  .sidebar.is-collapsed .profile-text{display:flex;}
+  .sidebar.is-collapsed img.sidebar-logo--full{display:block;}
+  .sidebar.is-collapsed img.sidebar-logo--mark{display:none;}
+  .sidebar-backdrop:not([hidden]){display:block; position:fixed; inset:0; z-index:35; background:rgba(22,35,63,.45);}
+  .mobile-bar{
+    display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:25;
+    background:#fff; border-bottom:1px solid var(--line); padding:8px 14px;
+  }
+  .mobile-menu-btn{
+    width:40px; height:40px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--navy);
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .mobile-menu-btn svg{width:22px; height:22px;}
+  .mobile-bar .mobile-bar-logo img.sidebar-logo{width:92px; height:auto; display:block;}
+  .page-header{padding:16px 20px;}
   .app-shell{padding-left:0;}
-  .stat-grid{grid-template-columns:1fr;}
+  .stat-grid{grid-template-columns:1fr 1fr; gap:10px;}
+  .stat-grid > :last-child:nth-child(odd){grid-column:1 / -1;}
+  .stat-card{padding:14px;}
+  .stat-value{font-size:1.4rem; overflow-wrap:anywhere;}
   .page-body{padding:20px;}
   .chip-grid{grid-template-columns:1fr;}
 }

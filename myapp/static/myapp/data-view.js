@@ -53,12 +53,35 @@
       td.className = 'table-empty';
       td.textContent = 'No matching rows.';
     }
+    if (!tbody.dataset.clampBound) {
+      tbody.dataset.clampBound = '1';
+      const toggle = e => {
+        const c = e.target.closest('.cell-clamp');
+        if (!c) return;
+        if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        c.classList.toggle('is-open');
+        c.title = c.classList.contains('is-open') ? 'Click to collapse' : 'Click to show all';
+      };
+      tbody.addEventListener('click', toggle);
+      tbody.addEventListener('keydown', toggle);
+    }
     d.rows.forEach(r => {
       const tr = tbody.insertRow();
       r.forEach(v => {
         const td = tr.insertCell();
-        td.textContent = v;
-        if (v.length > 90) td.className = 'is-long';
+        if (v.length > 90) {
+          // long text (job descriptions...) is clamped to 3 lines; click to expand
+          td.className = 'is-long';
+          const clamp = document.createElement('div');
+          clamp.className = 'cell-clamp';
+          clamp.textContent = v;
+          clamp.tabIndex = 0;
+          clamp.title = 'Click to show all';
+          td.appendChild(clamp);
+        } else {
+          td.textContent = v;
+        }
       });
     });
     countEl.textContent = d.matched === d.total

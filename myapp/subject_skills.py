@@ -1,0 +1,73 @@
+"""
+UEnvision — hand-curated skill suggestions per curriculum subject (by subject name,
+so a subject shared by BSIT and BSCS gets the same list).
+
+The MIND Tech Skills Ontology is tool-heavy and lacks many classroom skills
+(Linux, Microsoft Excel, UML, Agile, Big O Notation, ...). Names that have no
+ontology entry are added once to data/ontology/custom_skills.csv with status
+"curated" (skills_catalog.ensure_curated), so they are searchable and line up
+in the gap analysis like any other skill. Edit these lists freely; subjects not
+listed here (Professional Electives) get no suggestions, only the search box.
+"""
+
+SUBJECT_SKILLS = {
+    'Computer Programming 1': ['Python', 'C', 'C++', 'Java', 'Visual Studio Code', 'Debugging', 'Recursion', 'Procedural Programming', 'Algorithm', 'Pseudocode', 'Flowchart'],
+    'Fundamentals of Programming': ['Python', 'C', 'C++', 'Java', 'Visual Studio Code', 'Debugging', 'Procedural Programming', 'Algorithm', 'Pseudocode', 'Flowchart'],
+    'Introduction to Computing': ['Microsoft Word', 'Microsoft Excel', 'Microsoft PowerPoint', 'Google Workspace', 'Operating Systems', 'Windows', 'Computer Hardware', 'Internet Fundamentals', 'HTML', 'Number Systems'],
+    'Social and Professional Issues in Computing': ['Data Privacy', 'Computing Ethics', 'Intellectual Property', 'Information Security', 'Data Privacy Act (RA 10173)', 'Cybersecurity Awareness'],
+    'Computer Programming 2': ['Java', 'C++', 'Python', 'Object-Oriented Programming', 'Data Structures', 'Exception Handling', 'File I/O', 'Recursion', 'Git', 'Unit Testing'],
+    'Intermediate Programming': ['Java', 'C++', 'Python', 'Object-Oriented Programming', 'Data Structures', 'Exception Handling', 'Recursion', 'Git', 'Unit Testing'],
+    'Data Structures and Algorithms': ['Data Structures', 'Algorithm', 'Sorting Algorithm', 'Big O Notation', 'Linked List', 'Hash Table', 'Binary Tree', 'Graph Theory', 'Recursion', 'Java', 'C++', 'Python'],
+    'Fundamentals of Database Systems': ['SQL', 'MySQL', 'PostgreSQL', 'Microsoft SQL Server', 'Relational Database', 'Entity-Relationship Model', 'Database Normalization', 'Database Design', 'SQLite', 'Oracle Database'],
+    'Business Process Management': ['BPMN', 'Business Process Modeling', 'Microsoft Visio', 'Lucidchart', 'Workflow Automation', 'ERP', 'Process Mining', 'Microsoft Excel'],
+    'Computer Programming 3': ['Java', 'C#', 'Python', 'Object-Oriented Programming', 'Design Patterns', 'JavaFX', '.NET', 'Git', 'Unit Testing', 'JUnit'],
+    'Applications Development and Emerging Technologies': ['JavaScript', 'React', 'Node.js', 'Flutter', 'Android', 'REST API', 'Firebase', 'Git', 'Docker', 'Cloud Computing', 'Machine Learning'],
+    'Discrete Mathematics for ITE': ['Discrete Mathematics', 'Logic', 'Set Theory', 'Graph Theory', 'Combinatorics', 'Boolean Algebra', 'Probability'],
+    'Discrete Structures 1': ['Discrete Mathematics', 'Logic', 'Set Theory', 'Combinatorics', 'Boolean Algebra', 'Mathematical Induction'],
+    'Discrete Structures 2': ['Graph Theory', 'Discrete Mathematics', 'Automata Theory', 'Combinatorics', 'Probability', 'Number Theory'],
+    'Information Management': ['SQL', 'MySQL', 'PostgreSQL', 'Microsoft SQL Server', 'Database Design', 'Stored Procedures', 'NoSQL', 'MongoDB', 'Data Modeling', 'Oracle Database'],
+    'Application of Statistics in IT': ['Statistics', 'Microsoft Excel', 'R', 'Python', 'SPSS', 'Hypothesis Testing', 'Regression Analysis', 'Data Visualization'],
+    'Statistics for CS': ['Statistics', 'Probability', 'R', 'Python', 'NumPy', 'pandas', 'Hypothesis Testing', 'Regression Analysis'],
+    'Hardware, Software, and Peripherals': ['Computer Hardware', 'Operating Systems', 'Windows', 'Linux', 'Troubleshooting', 'BIOS', 'Device Drivers', 'Technical Support', 'Computer Assembly'],
+    'Data Analytics': ['Data Analysis', 'Microsoft Excel', 'Power BI', 'Tableau', 'Python', 'pandas', 'SQL', 'Data Visualization', 'Data Cleaning', 'R'],
+    'Human Computer Interaction': ['User Experience', 'User Interface Design', 'Figma', 'Usability Testing', 'Wireframing', 'Prototyping', 'Accessibility', 'Adobe XD'],
+    'Information Assurance and Security 1': ['Information Security', 'Cryptography', 'Network Security', 'Access Control', 'Risk Assessment', 'Firewall', 'Authentication', 'ISO 27001'],
+    'Information Assurance and Security 2': ['Penetration Testing', 'Vulnerability Assessment', 'Kali Linux', 'Wireshark', 'Nmap', 'Security Auditing', 'Incident Response', 'OWASP', 'Metasploit'],
+    'Integrative Programming and Technologies 1': ['PHP', 'JavaScript', 'HTML', 'CSS', 'JSON', 'XML', 'REST API', 'MySQL', 'Laravel', 'AJAX'],
+    'Integrative Programming and Technologies 2': ['REST API', 'Web Services', 'JSON', 'XML', 'Node.js', 'Laravel', 'API Integration', 'Microservices', 'SOAP', 'Postman'],
+    'Networking 1': ['Computer Networking', 'TCP/IP', 'OSI Model', 'Cisco Packet Tracer', 'Subnetting', 'Ethernet', 'IP Addressing', 'DNS', 'LAN'],
+    'Networking 2': ['Routing', 'Switching', 'VLAN', 'OSPF', 'Cisco IOS', 'Cisco Packet Tracer', 'DHCP', 'Network Address Translation'],
+    'Networking 3': ['WAN', 'VPN', 'Network Security', 'Firewall', 'BGP', 'Network Troubleshooting', 'Wireshark', 'Network Monitoring'],
+    'Systems Analysis, Design and Prototyping': ['Systems Analysis', 'UML', 'Use Case', 'Requirements Analysis', 'Agile', 'Scrum', 'Figma', 'Prototyping', 'Data Flow Diagram', 'Jira'],
+    'Platform Technologies': ['Operating Systems', 'Linux', 'Windows Server', 'Virtualization', 'VirtualBox', 'Bash', 'Shell Scripting', 'Process Management'],
+    'Systems Integration and Architecture': ['System Integration', 'Software Architecture', 'Microservices', 'REST API', 'Middleware', 'Enterprise Service Bus', 'Docker', 'Message Queue', 'ERP'],
+    'Methods of Research for IT/IS': ['Research Methodology', 'Statistics', 'Technical Writing', 'Microsoft Excel', 'Survey', 'Data Analysis'],
+    'Methods of Research for CS': ['Research Methodology', 'Statistics', 'Technical Writing', 'LaTeX', 'Data Analysis', 'Python'],
+    'Multimedia Systems': ['Adobe Photoshop', 'Adobe Premiere Pro', 'Adobe Illustrator', 'Blender', 'Audio Editing', 'Video Editing', 'Animation', 'Canva'],
+    'Numerical Analysis for ITE': ['Numerical Analysis', 'MATLAB', 'Python', 'NumPy', 'Linear Algebra', 'Calculus'],
+    'Capstone Project and Research 1': ['Project Management', 'Requirements Analysis', 'Technical Writing', 'Git', 'Agile', 'Scrum', 'UML', 'Figma'],
+    'Capstone Project and Research 2': ['Software Development', 'Git', 'Software Testing', 'Deployment', 'Project Management', 'Technical Writing', 'Agile'],
+    'Certification Course': ['CompTIA A+', 'CompTIA Network+', 'CompTIA Security+', 'Cisco CCNA', 'AWS Certified Cloud Practitioner', 'Microsoft Azure'],
+    'Systems Administration and Maintenance': ['System Administration', 'Linux', 'Windows Server', 'Active Directory', 'Bash', 'PowerShell', 'Backup', 'Virtualization', 'Monitoring'],
+    'Quantitative Methods (including Modeling and Simulation)': ['Modeling and Simulation', 'Statistics', 'Linear Programming', 'Microsoft Excel', 'Python', 'Operations Research', 'Forecasting'],
+    'Practicum for IT/IS': ['Git', 'Technical Support', 'Software Development', 'Microsoft Office', 'Documentation', 'Troubleshooting'],
+    'Practicum for CS': ['Git', 'Software Development', 'Software Testing', 'Agile', 'Documentation', 'Code Review'],
+    'Analysis 1 for CS': ['Calculus', 'Limits', 'Differential Calculus'],
+    'Analysis 2 for CS': ['Calculus', 'Integral Calculus', 'Linear Algebra'],
+    'Object-Oriented Programming': ['Object-Oriented Programming', 'Java', 'C#', 'C++', 'Python', 'Design Patterns', 'UML', 'Inheritance', 'Polymorphism', 'Encapsulation'],
+    'Architecture and Organization': ['Computer Architecture', 'Assembly Language', 'CPU', 'Memory Management', 'Digital Logic', 'Instruction Set Architecture', 'Cache'],
+    'Operating Systems': ['Operating Systems', 'Linux', 'Process Management', 'Memory Management', 'Concurrency', 'Multithreading', 'Bash', 'File Systems', 'CPU Scheduling'],
+    'Software Engineering 1': ['Software Engineering', 'Software Development Life Cycle', 'Requirements Engineering', 'UML', 'Agile', 'Scrum', 'Git', 'Jira'],
+    'Software Engineering 2': ['Software Testing', 'Unit Testing', 'Continuous Integration', 'Design Patterns', 'Software Maintenance', 'Code Review', 'Git', 'DevOps'],
+    'Physics for CS (with Electromagnetism)': ['Physics', 'Electromagnetism', 'Electric Circuits'],
+    'Algorithm and Complexity': ['Algorithm', 'Computational Complexity', 'Big O Notation', 'Dynamic Programming', 'Greedy Algorithm', 'Graph Algorithms', 'Divide and Conquer', 'NP-completeness'],
+    'Networks and Communications': ['Computer Networking', 'TCP/IP', 'OSI Model', 'Socket Programming', 'HTTP', 'Wireshark', 'Routing', 'Network Protocols'],
+    'Artificial Intelligence': ['Artificial Intelligence', 'Machine Learning', 'Python', 'Search Algorithms', 'Neural Networks', 'scikit-learn', 'TensorFlow', 'Natural Language Processing', 'Knowledge Representation'],
+    'Automata Theory and Formal Languages': ['Automata Theory', 'Finite Automata', 'Regular Expressions', 'Context-Free Grammar', 'Turing Machine', 'Formal Languages'],
+    'Thesis Writing 1 for CS': ['Research Methodology', 'Technical Writing', 'LaTeX', 'Literature Review', 'Python', 'Statistics'],
+    'Thesis Writing 2 for CS': ['Research Methodology', 'Technical Writing', 'LaTeX', 'Python', 'Data Analysis', 'Experiment Design'],
+    'Modeling and Simulation': ['Modeling and Simulation', 'Python', 'MATLAB', 'Monte Carlo Method', 'Discrete Event Simulation', 'Statistics', 'AnyLogic'],
+    'Programming Languages': ['Programming Language Theory', 'Compiler', 'Functional Programming', 'Haskell', 'Python', 'Java', 'Lisp', 'Type System', 'Parsing'],
+    'Digital Electronics and Logic Design': ['Digital Logic', 'Boolean Algebra', 'Logic Gates', 'Verilog', 'VHDL', 'Arduino', 'Circuit Design'],
+    'Technopreneurship': ['Entrepreneurship', 'Business Model Canvas', 'Lean Startup', 'Business Plan', 'Digital Marketing', 'Product Management'],
+}

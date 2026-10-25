@@ -1,4 +1,5 @@
-/* Recommendations page: "Generate selected" POSTs to /recommendations/generate/
+/* Recommendations page (and the student/alumni dashboard, which reuses it with its
+   own window.__recGenerateUrl): "Generate selected" POSTs to /recommendations/generate/
    for the checked skills only (so simply opening the page never calls Gemini),
    then drops the returned resource cards into that skill's slot. */
 (function () {
@@ -10,6 +11,38 @@
   var status = document.getElementById('rec-status');
   var errEl = document.getElementById('rec-error');
   var DEFAULT_PHOTO = window.__recDefaultPhoto || '';
+  var MAX = parseInt(form.getAttribute('data-max'), 10) || 0;
+  var VERB = form.getAttribute('data-verb') || 'Generate';
+  var busy = false;
+
+  function boxes() { return Array.prototype.slice.call(form.querySelectorAll('input[name="skills"]')); }
+  function checkedBoxes() { return boxes().filter(function (b) { return b.checked; }); }
+
+  /* Only as many skills as one run allows start out checked, and the button says
+     how many will be sent, so nothing is silently dropped past the limit. */
+  function syncSelection() {
+    if (busy) return;
+    var n = checkedBoxes().length;
+    btn.disabled = n === 0;
+    btn.textContent = n ? VERB + ' for ' + n + ' skill' + (n === 1 ? '' : 's') : 'Select skills below';
+    boxes().forEach(function (b) {
+      var full = MAX && n >= MAX && !b.checked;
+      b.disabled = full;
+      var row = b.closest('.rec-skill');
+      if (row) { row.classList.toggle('is-selected', b.checked); row.classList.toggle('is-maxed', full); }
+    });
+  }
+  if (MAX) {
+    var seen = 0;
+    boxes().forEach(function (b) { if (b.checked && ++seen > MAX) b.checked = false; });
+  }
+  form.addEventListener('change', function (e) { if (e.target.name === 'skills') syncSelection(); });
+  var clearBtn = document.getElementById('rec-clear');
+  if (clearBtn) clearBtn.addEventListener('click', function () {
+    boxes().forEach(function (b) { b.checked = false; });
+    syncSelection();
+  });
+  syncSelection();
 
   function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
 
@@ -40,7 +73,7 @@
   }
 
   function ensureDownloadLink() {
-    if (document.querySelector('.rec-download')) return;
+    if (!window.__recDownloadUrl || document.querySelector('.rec-download')) return;
     var p = document.createElement('p'); p.className = 'rec-download';
     var a = document.createElement('a'); a.className = 'btn btn-ghost btn-sm';
     a.href = window.__recDownloadUrl; a.textContent = 'Download CSV';
@@ -53,9 +86,18 @@
     var checked = Array.prototype.slice.call(form.querySelectorAll('input[name="skills"]:checked'));
     if (!checked.length) { errEl.textContent = 'Choose at least one skill.'; return; }
     errEl.textContent = '';
+    busy = true;
     btn.disabled = true;
-    var prevText = btn.textContent;
-    btn.textContent = 'Generating…';
+    btn.textContent = 'Searching…';
+    checked.forEach(function (b) {
+      var slot = findSlot(b.value);
+      if (slot) slot.classList.add('is-loading');
+    });
+    function done() {
+      busy = false;
+      Array.prototype.forEach.call(form.querySelectorAll('.rec-resources.is-loading'), function (s) { s.classList.remove('is-loading'); });
+      syncSelection();
+    }
     status.textContent = 'Calling Gemini for ' + checked.length + ' skill(s) — this can take a little while.';
 
     var fd = new FormData(form);
@@ -66,7 +108,7 @@
         return r.json().catch(function () { return {}; }).then(function (body) { return { ok: r.ok, body: body }; });
       })
       .then(function (res) {
-        btn.disabled = false; btn.textContent = prevText;
+        done();
         if (!res.ok || !res.body || res.body.ok !== true) {
           errEl.textContent = (res.body && res.body.error) || 'Could not reach the server.';
           status.textContent = '';
@@ -95,11 +137,15 @@
         if (failSkills.length) {
           msgs.push(failSkills.length + ' failed: ' + failSkills.map(function (s) { return s + ' (' + errors[s] + ')'; }).join('; '));
         }
+        var keyErrors = res.body.key_errors || [];
+        if (keyErrors.length) {
+          msgs.push('API key problems: ' + keyErrors.map(function (k) { return k.key + ' (' + k.error + ')'; }).join('; '));
+        }
         status.textContent = msgs.join(' ');
         if (okSkills.length) ensureDownloadLink();
       })
       .catch(function () {
-        btn.disabled = false; btn.textContent = prevText;
+        done();
         errEl.textContent = 'Could not reach the server. Try again.';
         status.textContent = '';
       });

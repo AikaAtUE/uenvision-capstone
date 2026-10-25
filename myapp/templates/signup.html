@@ -2,7 +2,7 @@
 {% block title %}Sign up{% endblock %}
 {% block content %}
 <section id="screen-signup" class="auth-screen is-active">
-  <div class="auth-photo" aria-hidden="true"></div>
+  {% include "_auth_side.html" %}
   <div class="auth-card">
     <div class="auth-brand auth-brand--compact">
       {% include "_logo.html" with logo_class="auth-logo auth-logo--sm" %}

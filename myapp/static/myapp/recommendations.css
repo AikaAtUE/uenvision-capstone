@@ -2,11 +2,28 @@
 .rec-note, .rec-caveat{margin-bottom:14px; padding:10px 14px; border-radius:8px; background:#f7f7f8; font-weight:400;}
 .rec-caveat{background:#fff8e1; color:var(--ink);}
 
-.rec-toolbar{display:flex; align-items:center; gap:14px; margin-bottom:10px; flex-wrap:wrap;}
+.rec-toolbar{
+  display:flex; align-items:center; gap:14px; margin-bottom:10px; flex-wrap:wrap;
+  /* stays reachable while scrolling a long skill list */
+  position:sticky; top:0; z-index:5; background:var(--bg); padding:10px 0;
+}
+@media (max-width:720px){ .rec-toolbar{top:57px;} }
+#rec-generate-btn[disabled]{opacity:.55; cursor:not-allowed;}
+.rec-clear{font-size:.85rem;}
 #rec-status{font-size:.85rem;}
 
-.rec-list{display:flex; flex-direction:column; gap:16px; margin-top:12px;}
-.rec-skill{background:var(--card); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow-card);}
+.rec-list{display:flex; flex-direction:column; gap:10px; margin-top:4px;}
+.rec-skill{background:var(--card); border-radius:var(--radius); padding:14px 18px; box-shadow:var(--shadow-card); border:1px solid transparent; transition:border-color .12s;}
+.rec-skill.is-selected{border-color:#c9d3e8;}
+.rec-skill.is-maxed .rec-skill-pick{opacity:.55; cursor:not-allowed;}
+/* no resources yet -> no empty block under the skill */
+.rec-resources:not(:has(.rec-card)):not(.is-loading){display:none;}
+.rec-resources.is-loading{min-height:60px; border-radius:8px;
+  background:linear-gradient(90deg, #f1f2f5 25%, #e6e8ee 50%, #f1f2f5 75%); background-size:200% 100%;
+  animation:rec-shimmer 1.2s linear infinite;}
+.rec-resources.is-loading > *{display:none;}
+@keyframes rec-shimmer{from{background-position:200% 0;} to{background-position:-200% 0;}}
+@media (prefers-reduced-motion: reduce){ .rec-resources.is-loading{animation:none;} }
 .rec-skill-head{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
 .rec-skill-pick{display:flex; align-items:center; gap:8px; font-weight:700; cursor:pointer;}
 .rec-skill-pick input{width:16px; height:16px;}
@@ -28,3 +45,4 @@
 @media (max-width: 640px){
   .rec-skill-head{flex-direction:column; align-items:flex-start;}
 }
+.rec-subject-form{display:flex; gap:12px; align-items:flex-end; margin:4px 0 14px; max-width:720px;}

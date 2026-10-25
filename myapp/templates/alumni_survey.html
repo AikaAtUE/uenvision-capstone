@@ -4,8 +4,10 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'myapp/uenvision-additions.css' %}?v={% now 'U' %}">
 <link rel="stylesheet" href="{% static 'myapp/curriculum-survey.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">
 {% endblock %}
 {% block content %}
+{% include "_public_header.html" %}
 <main class="cs-page">
   <header class="cs-header">
     <h1>UEnvision Curriculum Survey — Fresh Graduates &amp; Alumni</h1>

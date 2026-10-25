@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}No access{% endblock %}
+{% block extra_head %}{% load static %}<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">{% endblock %}
+{% block content %}
+{% include "_public_header.html" %}
+<main class="pub-main pub-main--narrow err-page">
+  <p class="err-code">403</p>
+  <h1>You don't have access to this page</h1>
+  <p class="muted">This page is for another kind of account (for example, Accounts is for administrators only). If you think you should have access, ask a UEnvision administrator.</p>
+  <p><a class="btn btn-navy" href="{% if user.is_authenticated %}{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}{% else %}{% url 'home' %}{% endif %}">Go to my dashboard</a></p>
+</main>
+{% endblock %}

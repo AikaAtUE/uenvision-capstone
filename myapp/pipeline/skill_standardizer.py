@@ -117,7 +117,7 @@ def load_index(ontology_csv, custom_csv) -> SkillIndex:
     return idx
 
 
-def append_custom(custom_csv, name: str, synonyms, times_seen: int):
+def append_custom(custom_csv, name: str, synonyms, times_seen: int, status: str = "auto"):
     p = Path(custom_csv)
     p.parent.mkdir(parents=True, exist_ok=True)
     new_file = not p.is_file() or p.stat().st_size == 0
@@ -126,7 +126,7 @@ def append_custom(custom_csv, name: str, synonyms, times_seen: int):
         if new_file:
             w.writeheader()
         w.writerow({"record_kind": "Skill", "name": name, "synonyms": " | ".join(synonyms), "type": "",
-                    "status": "auto", "first_seen": date.today().isoformat(), "times_seen": times_seen})
+                    "status": status, "first_seen": date.today().isoformat(), "times_seen": times_seen})
 
 
 def load_mapping(path) -> dict:
