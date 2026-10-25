@@ -49,8 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
       $('edit-first').value = d.first;
       $('edit-middle').value = d.middle;
       $('edit-email').value = d.email;
-      $('edit-dummy').checked = d.dummy === '1';
-      $('edit-dummy-wrap').hidden = d.admin === '1';
+      $('edit-type').value = d.type;
+      // an administrator can't change their own role (no locking yourself out)
+      $('edit-type').disabled = d.self === '1';
+      $('edit-type-hint').textContent = d.self === '1'
+        ? "You can't change your own role. Ask another administrator."
+        : "Dummy accounts' survey answers, including ones already submitted, are kept out of the real results.";
       show('edit-backdrop');
     } else if (btn.dataset.action === 'approve'){
       confirmThen(`Approve ${label} as faculty? They'll get full access and an email saying so.`,
@@ -68,11 +72,18 @@ document.addEventListener('DOMContentLoaded', () => {
   $('edit-form').addEventListener('submit', e => {
     e.preventDefault();
     const name = editingRow ? editingRow.dataset.name : 'this account';
-    const wasDummy = editingRow && editingRow.dataset.dummy === '1';
-    const isDummy = $('edit-dummy').checked && !$('edit-dummy-wrap').hidden;
+    const sel = $('edit-type');
+    const before = editingRow ? editingRow.dataset.type : sel.value;
+    const after = sel.value;
     let extra = '';
-    if (isDummy && !wasDummy) extra = ' Their survey answers will move to dummy (test) data and stop counting in the real results.';
-    if (!isDummy && wasDummy) extra = ' Their survey answers will move back into the real results.';
+    if (!sel.disabled && after !== before) {
+      const label = sel.options[sel.selectedIndex].text;
+      extra = ` Their role changes from ${editingRow.dataset.typeLabel} to ${label}.`;
+      const wasDummy = before.startsWith('dummy_'), isDummy = after.startsWith('dummy_');
+      if (isDummy && !wasDummy) extra += ' Their survey answers will move to dummy (test) data and stop counting in the real results.';
+      if (!isDummy && wasDummy) extra += ' Their survey answers will move back into the real results.';
+      if (after === 'administrator') extra += ' Administrators can manage every account and all data.';
+    }
     confirmThen(`Save these changes to ${name}?${extra}`, 'Yes, save', false, () => $('edit-form').submit());
   });
 });

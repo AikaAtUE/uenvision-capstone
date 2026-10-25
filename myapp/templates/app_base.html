@@ -86,13 +86,6 @@
         </a>
         {% endif %}
         {% if user.is_administrator %}
-        <a class="nav-item {% if active_page == 'notifications' %}is-active{% endif %}" href="{% url 'notifications' %}">
-          <span class="nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          </span>
-          <span>Notifications</span>
-          {% if unread_notifications %}<span class="nav-badge" aria-label="{{ unread_notifications }} unread">{{ unread_notifications }}</span>{% endif %}
-        </a>
         <a class="nav-item {% if active_page == 'accounts' %}is-active{% endif %}" href="{% url 'accounts' %}">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.4c1.9.7 3 2.5 3 5.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -118,15 +111,13 @@
     <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
 
     <main class="content">
-      {# Phone-width only: the sidebar becomes a slide-in menu opened from this bar. #}
+      {% if user.is_administrator %}{% include "_notif_bell.html" %}{% endif %}
+      {# Phone-width only: one red top bar with the menu button, the page name and (admins) the bell. #}
       <div class="mobile-bar">
         <button type="button" class="mobile-menu-btn" id="nav-open" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          {% if unread_notifications %}<span class="menu-dot" aria-label="{{ unread_notifications }} unread notifications"></span>{% endif %}
         </button>
-        <a href="{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" class="mobile-bar-logo">
-          {% include "_logo.html" with logo_class="sidebar-logo sidebar-logo--full" %}
-        </a>
+        <span class="mobile-bar-title"></span>
       </div>
       {% if user.is_dummy %}<p class="dummy-banner" role="note"><strong>Test account.</strong> Your survey answers are saved as dummy data and don't count in the real results. Overall results you see here come from dummy answers only.</p>{% endif %}
       {% block page_content %}{% endblock %}

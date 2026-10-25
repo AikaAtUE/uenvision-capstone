@@ -108,6 +108,59 @@ document.addEventListener('DOMContentLoaded', () => {
      reset_password_view): the reset link is emailed to the user. */
 
   /* ======================================================================
+     SIDEBAR: collapse + logout (present on dashboard/data/feedback/about/settings)
+  ====================================================================== */
+  const sidebar = document.getElementById('sidebar');
+  const collapseBtn = document.getElementById('collapse-btn');
+  const isPhone = () => window.matchMedia('(max-width: 720px)').matches;
+  const COLLAPSE_KEY = 'ue_sidebar_collapsed';
+  if (sidebar){
+    // remember the desktop collapse choice between pages (per browser; harmless if storage is blocked)
+    try { if (localStorage.getItem(COLLAPSE_KEY) === '1') sidebar.classList.add('is-collapsed'); } catch (e) {}
+  }
+  if (collapseBtn){
+    collapseBtn.addEventListener('click', () => {
+      if (isPhone()) { closeNav(); return; }
+      const collapsed = sidebar.classList.toggle('is-collapsed');
+      try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {}
+    });
+  }
+
+  // Phone width: the red top bar shows the page name (taken from the page's own header, which is then hidden)
+  const barTitle = document.querySelector('.mobile-bar-title');
+  const pageTitle = document.querySelector('.page-header h1');
+  if (barTitle && pageTitle) barTitle.textContent = pageTitle.textContent.trim();
+
+  // Phone-width slide-in menu
+  const navOpen = document.getElementById('nav-open');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  function openNav(){
+    sidebar.classList.add('is-open');
+    if (backdrop) backdrop.hidden = false;
+    if (navOpen) navOpen.setAttribute('aria-expanded', 'true');
+    const first = sidebar.querySelector('.nav-item'); if (first) first.focus();
+  }
+  function closeNav(){
+    if (!sidebar || !sidebar.classList.contains('is-open')) return;
+    sidebar.classList.remove('is-open');
+    if (backdrop) backdrop.hidden = true;
+    if (navOpen) { navOpen.setAttribute('aria-expanded', 'false'); navOpen.focus(); }
+  }
+  if (navOpen && sidebar){
+    navOpen.addEventListener('click', openNav);
+    if (backdrop) backdrop.addEventListener('click', closeNav);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNav(); });
+  }
+
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn){
+    logoutBtn.addEventListener('click', () => {
+      clearSessionUser();
+      // default <a href> navigation to the login page proceeds normally
+    });
+  }
+
+  /* ======================================================================
      DASHBOARD TABS
   ====================================================================== */
   const tabs = document.querySelectorAll('.tab');

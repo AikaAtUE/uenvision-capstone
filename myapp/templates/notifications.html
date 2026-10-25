@@ -16,7 +16,7 @@
         <span class="notif-dot" aria-hidden="true"></span>
         <div class="notif-body">
           <p class="notif-msg">{% if n.pk in unread_ids %}<span class="sr-only">New: </span>{% endif %}{{ n.message }}</p>
-          <p class="notif-time muted">{% with ago=n.created_at|timesince %}{% if ago == "0 minutes" %}Just now{% else %}{{ ago }} ago{% endif %}{% endwith %}</p>
+          <p class="notif-time muted">{{ n.when }}</p>
         </div>
         <div class="notif-actions">
           {% if n.subject_user and not n.subject_user.is_approved %}

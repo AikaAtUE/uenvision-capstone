@@ -431,6 +431,18 @@ ACCOUNT_FILTERS = [
 ]
 
 
+# Sort options on the Accounts page: value -> (label, order_by fields)
+ACCOUNT_SORTS = {
+    "": ("Waiting for approval first", ("is_approved", "last_name", "first_name")),
+    "name": ("Name (A–Z)", ("last_name", "first_name")),
+    "-name": ("Name (Z–A)", ("-last_name", "-first_name")),
+    "-joined": ("Newest first", ("-date_joined", "-pk")),
+    "joined": ("Oldest first", ("date_joined", "pk")),
+    "role": ("Role", ("role", "is_dummy", "last_name", "first_name")),
+    "email": ("Email", ("email",)),
+}
+
+
 @administrator_required
 def accounts_view(request):
     from django.db.models import Q
@@ -444,14 +456,18 @@ def accounts_view(request):
     for word in q.split():
         accounts = accounts.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word) |
                                    Q(middle_name__icontains=word) | Q(email__icontains=word))
-    # waiting-for-approval accounts first, then by name
-    accounts = accounts.order_by("is_approved", "last_name", "first_name")
+    sort = request.GET.get("sort", "")
+    if sort not in ACCOUNT_SORTS:
+        sort = ""
+    accounts = accounts.order_by(*ACCOUNT_SORTS[sort][1])
     return render(request, "accounts.html", {
         "active_page": "accounts",
         "accounts": accounts,
         "q": q,
         "status": status,
         "status_choices": [(v, label) for v, label, _ in ACCOUNT_FILTERS],
+        "sort": sort,
+        "sort_choices": [(v, label) for v, (label, _) in ACCOUNT_SORTS.items()],
         "pending_count": CustomUser.objects.filter(is_approved=False).count(),
         "total_count": CustomUser.objects.count(),
         "roles": ACCOUNT_TYPES,
@@ -488,14 +504,24 @@ def account_create_view(request):
 def account_edit_view(request, pk):
     target = get_object_or_404(CustomUser, pk=pk)
     data, error = _clean_account_fields(request.POST, exclude_pk=target.pk)
+    account_type = request.POST.get("account_type") or _account_type(target)
+    if not error and account_type not in dict(ACCOUNT_TYPES):
+        error = "Choose a valid role."
+    if not error and target.pk == request.user.pk and account_type != _account_type(target):
+        # so an administrator can't lock themselves (or the last administrator) out
+        error = "You can't change your own role. Ask another administrator."
     if error:
         messages.error(request, error)
-        return redirect("accounts")
+        return redirect(request.POST.get("next") or "accounts")
     for field, value in data.items():
         setattr(target, field, value)
-    note = ""
-    # Administrators can't be dummy accounts (they'd see test numbers on the real Data pages).
-    is_dummy = request.POST.get("is_dummy") == "1" and not target.is_administrator
+    notes = []
+    old_label = target.role_label
+    role = DUMMY_TYPES.get(account_type, account_type)
+    is_dummy = account_type in DUMMY_TYPES
+    if role != target.role:
+        target.role = role
+        data["role"] = role
     if is_dummy != target.is_dummy:
         target.is_dummy = is_dummy
         data["is_dummy"] = is_dummy
@@ -503,10 +529,21 @@ def account_edit_view(request, pk):
         moved = target.curriculum_survey_responses.update(is_dummy=is_dummy)
         target.survey_responses.update(is_dummy=is_dummy)
         where = "dummy (test) data" if is_dummy else "the real results"
-        note = f" It is now a {target.role_label} account; {moved} survey answer{'' if moved == 1 else 's'} moved to {where}."
+        if moved:
+            notes.append(f"{moved} survey answer{'' if moved == 1 else 's'} moved to {where}.")
+    if target.role_label != old_label:
+        notes.insert(0, f"Role changed from {old_label} to {target.role_label}.")
     target.save(update_fields=list(data))
-    messages.success(request, f"Account updated for {target.email}.{note}")
+    messages.success(request, " ".join([f"Account updated for {target.email}."] + notes))
+    next_url = request.POST.get("next")
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        return redirect(next_url)
     return redirect("accounts")
+
+
+def _account_type(user):
+    """The Accounts page's type value for a user, e.g. "faculty" or "dummy_faculty"."""
+    return f"dummy_{user.role}" if user.is_dummy else user.role
 
 
 @administrator_required
@@ -524,7 +561,7 @@ def account_approve_view(request, pk):
 
 
 @administrator_required
-def notifications_view(request):
+def notifications_view(request):  # "See all notifications" from the bell
     items = list(Notification.objects.filter(recipient=request.user).select_related("subject_user")[:100])
     unread_ids = [n.pk for n in items if n.read_at is None]
     response = render(request, "notifications.html", {"active_page": "notifications", "items": items,
@@ -532,6 +569,14 @@ def notifications_view(request):
     # Opening the page counts as reading them (the badge clears on the next page).
     Notification.objects.filter(pk__in=unread_ids).update(read_at=timezone.now())
     return response
+
+
+@administrator_required
+@require_POST
+def notifications_read_view(request):
+    """Opening the bell's dropdown marks everything as read (clears the red count)."""
+    Notification.objects.filter(recipient=request.user, read_at__isnull=True).update(read_at=timezone.now())
+    return JsonResponse({"ok": True})
 
 
 @administrator_required

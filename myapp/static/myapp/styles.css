@@ -339,14 +339,18 @@ tbody tr:hover{background:#fafafa;}
   .sidebar-backdrop:not([hidden]){display:block; position:fixed; inset:0; z-index:35; background:rgba(22,35,63,.45);}
   .mobile-bar{
     display:flex; align-items:center; gap:12px; position:sticky; top:0; z-index:25;
-    background:#fff; border-bottom:1px solid var(--line); padding:8px 14px;
+    min-height:60px; background:var(--red); color:#fff; padding:8px 14px;
   }
   .mobile-menu-btn{
-    width:44px; height:44px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--navy);
+    width:44px; height:44px; flex-shrink:0; border-radius:8px; border:1px solid rgba(255,255,255,.4); background:transparent; color:#fff;
     display:inline-flex; align-items:center; justify-content:center;
   }
+  .mobile-menu-btn:hover{background:rgba(255,255,255,.12);}
   .mobile-menu-btn svg{width:22px; height:22px;}
-  .mobile-bar .mobile-bar-logo img.sidebar-logo{width:92px; height:auto; display:block;}
+  .mobile-bar-title{font-family:var(--font-head); font-weight:700; font-size:1.2rem; letter-spacing:.02em;
+    min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  /* the bar carries the page name, so the page's own red header would just repeat it */
+  .content:has(.mobile-bar-title:not(:empty)) .page-header{display:none;}
   .page-header{padding:16px 20px;}
   .app-shell{padding-left:0;}
   .stat-grid{grid-template-columns:1fr 1fr; gap:10px;}
@@ -495,13 +499,7 @@ img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }
 .acct-filters input[type=search]:focus{background:#fff; border-color:var(--navy); outline:none;}
 .acct-filters .select-field select{min-width:200px;}
 .acct-filters .btn{align-self:flex-end; min-height:44px;}
-.acct-clear{align-self:center; font-size:.85rem;}
-.nav-badge{margin-left:auto; min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:var(--red); color:#fff;
-  font-size:.72rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center;}
-.nav-item.is-active .nav-badge{background:#fff; color:var(--red);}
-.sidebar.is-collapsed .nav-badge{position:absolute; margin:0; transform:translate(14px,-10px); min-width:16px; height:16px; font-size:.65rem;}
-.mobile-menu-btn{position:relative;}
-.menu-dot{position:absolute; top:7px; right:7px; width:9px; height:9px; border-radius:50%; background:var(--red); border:2px solid #fff;}
+.acct-clear{align-self:flex-end; padding-bottom:13px; font-size:.85rem;}
 .notif-head{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
 .notif-head p{margin:0;}
 .notif-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; max-width:860px;}
@@ -520,4 +518,50 @@ img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }
   .notif-actions{width:100%; padding-left:21px;}
   .acct-filters .select-field, .acct-filters .select-field select{width:100%; min-width:0;}
   .acct-filters .btn{width:100%; justify-content:center;}
+}
+
+/* ---------- Notification bell (administrators), top right, UEnvision navy with a red count ---------- */
+.content{position:relative;}
+.notif-bell{position:absolute; top:15px; right:24px; z-index:30;}
+.notif-bell-btn{position:relative; width:40px; height:40px; border-radius:50%; border:0; cursor:pointer;
+  background:transparent; color:var(--navy); display:inline-flex; align-items:center; justify-content:center;}
+.notif-bell-btn svg{width:28px; height:28px;}
+.notif-bell-btn:hover{color:var(--navy-light);}
+.notif-bell.is-open .notif-bell-btn{color:#fff;}
+.notif-bell-btn:focus-visible{outline:2px solid #fff; outline-offset:2px;}
+.notif-bell-count{position:absolute; top:-2px; right:-6px; min-width:19px; height:19px; padding:0 5px; border-radius:999px;
+  background:var(--red); color:#fff; font-size:.72rem; font-weight:700; line-height:15px; text-align:center; border:2px solid #fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.notif-panel{position:absolute; top:48px; right:0; width:360px; max-height:min(560px, calc(100vh - 80px)); overflow:auto;
+  background:#fff; color:var(--ink); border-radius:10px; padding:8px; box-shadow:0 12px 28px rgba(0,0,0,.2), 0 2px 4px rgba(0,0,0,.1);}
+.notif-panel[hidden]{display:none;}
+.notif-panel-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 8px 10px;}
+.notif-panel-head h2{margin:0; font-size:1.35rem;}
+.notif-panel-head .link-inline{font-size:.8rem;}
+.notif-panel-list{list-style:none; margin:0; padding:0;}
+.notif-panel-item{border-radius:8px;}
+.notif-panel-item:hover{background:var(--bg);}
+.notif-panel-link{display:flex; align-items:center; gap:12px; padding:8px; color:inherit; text-decoration:none;}
+.notif-panel-icon{width:48px; height:48px; border-radius:50%; flex-shrink:0; background:#e1e7f4; color:var(--navy);
+  display:inline-flex; align-items:center; justify-content:center;}
+.notif-panel-icon svg{width:26px; height:26px;}
+.notif-panel-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+.notif-panel-msg{font-size:.88rem; line-height:1.35; overflow-wrap:anywhere;}
+.notif-panel-time{font-size:.76rem; color:var(--muted);}
+.notif-panel-item.is-unread .notif-panel-time{color:var(--red); font-weight:600;}
+.notif-panel-dot{width:12px; height:12px; border-radius:50%; background:var(--red); flex-shrink:0;}
+.notif-panel-actions{display:flex; gap:8px; padding:0 8px 10px 68px;}
+.notif-panel-actions .btn{text-decoration:none;}
+.notif-panel-empty{margin:0; padding:14px 8px; color:var(--muted); font-size:.88rem;}
+.notif-panel-all{display:block; margin-top:4px; padding:10px; border-radius:8px; text-align:center; font-weight:600;
+  font-size:.88rem; color:var(--navy); text-decoration:none; background:var(--bg);}
+.notif-panel-all:hover{background:var(--line);}
+/* keep page titles clear of the bell */
+.content:has(> .notif-bell) .page-header{padding-right:84px;}
+@media (max-width: 720px){
+  /* sits in the red top bar and stays there while the page scrolls */
+  .notif-bell{position:fixed; top:10px; right:14px;}
+  .content:has(> .notif-bell) .mobile-bar{padding-right:68px;}
+  .notif-panel{position:fixed; top:64px; left:8px; right:8px; width:auto; max-height:calc(100vh - 80px);}
+  .content:has(> .notif-bell) .page-header{padding-right:20px;}
 }

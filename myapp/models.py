@@ -187,3 +187,13 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.message
+
+    @property
+    def when(self):
+        """"Just now" or e.g. "5 minutes ago", as shown in the bell's dropdown."""
+        from django.utils import timezone
+        from django.utils.timesince import timesince
+
+        if (timezone.now() - self.created_at).total_seconds() < 60:
+            return "Just now"
+        return f"{timesince(self.created_at)} ago"

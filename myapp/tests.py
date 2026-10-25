@@ -1134,21 +1134,49 @@ class DummyToggleTests(TestCase):
         other = C.objects.create(respondent_type="student", data={"subjects": []})
         self.client.force_login(admin)
         fields = {"last_name": "Eng", "first_name": "Pa", "email": "me@ue.edu.ph"}
-        r = self.client.post(reverse("account_edit", args=[stu.pk]), {**fields, "is_dummy": "1"}, follow=True)
-        self.assertContains(r, "1 survey answer moved to dummy (test) data")
+        r = self.client.post(reverse("account_edit", args=[stu.pk]), {**fields, "account_type": "dummy_student"}, follow=True)
+        self.assertContains(r, "Role changed from Student to Dummy Student. 1 survey answer moved to dummy (test) data")
         stu.refresh_from_db(); old.refresh_from_db(); other.refresh_from_db()
         self.assertTrue(stu.is_dummy)
         self.assertTrue(old.is_dummy)
         self.assertFalse(other.is_dummy)
-        # unticking moves them back
+        # editing without touching the role keeps it
         self.client.post(reverse("account_edit", args=[stu.pk]), fields)
+        stu.refresh_from_db()
+        self.assertTrue(stu.is_dummy)
+        # back to a real student moves them back
+        self.client.post(reverse("account_edit", args=[stu.pk]), {**fields, "account_type": "student"})
         old.refresh_from_db()
         self.assertFalse(old.is_dummy)
-        # administrators can't become dummy accounts
-        self.client.post(reverse("account_edit", args=[admin.pk]),
-                         {"last_name": "D", "first_name": "A", "email": "adm@ue.edu.ph", "is_dummy": "1"})
+        # an administrator can't change their own role
+        r = self.client.post(reverse("account_edit", args=[admin.pk]),
+                             {"last_name": "D", "first_name": "A", "email": "adm@ue.edu.ph", "account_type": "faculty"},
+                             follow=True)
+        self.assertContains(r, "change your own role")
         admin.refresh_from_db()
-        self.assertFalse(admin.is_dummy)
+        self.assertEqual(admin.role, "administrator")
+
+    def test_change_role_and_sort(self):
+        admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                               last_name="Admin", role=CustomUser.Role.ADMINISTRATOR)
+        fac = CustomUser.objects.create_user(email="zed@ue.edu.ph", password="secret123", first_name="Zed",
+                                             last_name="Zamora", role=CustomUser.Role.FACULTY)
+        self.client.force_login(admin)
+        fields = {"last_name": "Zamora", "first_name": "Zed", "email": "zed@ue.edu.ph"}
+        self.client.post(reverse("account_edit", args=[fac.pk]), {**fields, "account_type": "administrator"})
+        fac.refresh_from_db()
+        self.assertEqual((fac.role, fac.is_dummy), ("administrator", False))
+        self.client.post(reverse("account_edit", args=[fac.pk]), {**fields, "account_type": "nonsense"})
+        fac.refresh_from_db()
+        self.assertEqual(fac.role, "administrator")
+        self.client.post(reverse("account_edit", args=[fac.pk]), {**fields, "account_type": "dummy_faculty"})
+        fac.refresh_from_db()
+        self.assertEqual((fac.role, fac.is_dummy), ("faculty", True))
+
+        page = lambda sort: self.client.get(reverse("accounts"), {"sort": sort}).content.decode()
+        self.assertLess(page("name").index("adm@ue.edu.ph"), page("name").index("zed@ue.edu.ph"))
+        self.assertLess(page("-name").index("zed@ue.edu.ph"), page("-name").index("adm@ue.edu.ph"))
+        self.assertLess(page("-joined").index("zed@ue.edu.ph"), page("-joined").index("adm@ue.edu.ph"))
 
 
 class ForgotPasswordTests(TestCase):
@@ -1222,10 +1250,12 @@ class FacultyApprovalTests(TestCase):
 
         self.client.force_login(self.admin)
         page = self.client.get(reverse("accounts"))
-        self.assertContains(page, '<span class="nav-badge" aria-label="1 unread">1</span>', html=True)
+        self.assertContains(page, '<span class="notif-bell-count" id="notif-bell-count">1</span>', html=True)
         self.assertContains(page, "1 faculty sign-up</strong> waiting for approval")
+        self.assertContains(page, "Prof Santos (prof@ue.edu.ph) signed up")          # in the bell's dropdown
+        self.assertEqual(self.client.post(reverse("notifications_read")).json(), {"ok": True})  # dropdown opened
+        self.assertNotContains(self.client.get(reverse("accounts")), "notif-bell-count")
         self.assertContains(self.client.get(reverse("notifications")), "Prof Santos (prof@ue.edu.ph) signed up")
-        self.assertNotContains(self.client.get(reverse("accounts")), "nav-badge")   # read once opened
 
         self.client.post(reverse("account_approve", args=[prof.pk]))
         prof.refresh_from_db()
@@ -1269,14 +1299,16 @@ class FacultyApprovalTests(TestCase):
                                        last_name="Cruz", role=CustomUser.Role.STUDENT)
         self.client.force_login(self.admin)
         url = reverse("accounts")
-        r = self.client.get(url, {"q": "cruz"})
-        self.assertContains(r, "juan@ue.edu.ph")
-        self.assertNotContains(r, "prof@ue.edu.ph")
-        r = self.client.get(url, {"status": "pending"})
-        self.assertContains(r, "prof@ue.edu.ph")
-        self.assertNotContains(r, "juan@ue.edu.ph")
-        r = self.client.get(url, {"status": "student"})
-        self.assertContains(r, "juan@ue.edu.ph")
-        self.assertNotContains(r, "adm2@ue.edu.ph")
-        r = self.client.get(url, {"q": "nobody-here"})
-        self.assertContains(r, "No accounts match")
+
+        def table(**params):  # just the accounts table (the bell's dropdown also names the sign-up)
+            html = self.client.get(url, params).content.decode()
+            start = html.index('id="accounts-table"')
+            return html[start:html.index("</table>", start)]
+
+        self.assertIn("juan@ue.edu.ph", table(q="cruz"))
+        self.assertNotIn("prof@ue.edu.ph", table(q="cruz"))
+        self.assertIn("prof@ue.edu.ph", table(status="pending"))
+        self.assertNotIn("juan@ue.edu.ph", table(status="pending"))
+        self.assertIn("juan@ue.edu.ph", table(status="student"))
+        self.assertNotIn("adm2@ue.edu.ph", table(status="student"))
+        self.assertIn("No accounts match", table(q="nobody-here"))

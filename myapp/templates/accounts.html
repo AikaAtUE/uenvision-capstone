@@ -19,13 +19,19 @@
         <input type="search" name="q" value="{{ q }}" placeholder="Name or email" autocomplete="off">
       </label>
       <label class="select-field">
+        <span>Sort by</span>
+        <select name="sort" onchange="this.form.submit()">
+          {% for value, label in sort_choices %}<option value="{{ value }}"{% if value == sort %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="select-field">
         <span>Show</span>
         <select name="status" onchange="this.form.submit()">
           {% for value, label in status_choices %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}{% if value == "pending" and pending_count %} ({{ pending_count }}){% endif %}</option>{% endfor %}
         </select>
       </label>
       <button type="submit" class="btn btn-navy btn-sm">Search</button>
-      {% if q or status %}<a class="link-inline acct-clear" href="{% url 'accounts' %}">Clear</a>{% endif %}
+      {% if q or status or sort %}<a class="link-inline acct-clear" href="{% url 'accounts' %}">Clear</a>{% endif %}
     </form>
     <p class="muted table-count">{% if q or status %}{{ accounts|length }} of {{ total_count }} accounts{% else %}{{ accounts|length }} account{{ accounts|length|pluralize }}{% endif %}</p>
 
@@ -37,7 +43,7 @@
           <tr
             data-last="{{ a.last_name }}" data-first="{{ a.first_name }}" data-middle="{{ a.middle_name }}"
             data-email="{{ a.email }}" data-name="{{ a.get_full_name }}"
-            data-dummy="{% if a.is_dummy %}1{% endif %}" data-admin="{% if a.is_administrator %}1{% endif %}"
+            data-type="{% if a.is_dummy %}dummy_{% endif %}{{ a.role }}" data-type-label="{{ a.role_label }}" data-self="{% if a.pk == user.pk %}1{% endif %}"
             data-edit-url="{% url 'account_edit' a.pk %}"
             data-reset-url="{% url 'account_reset_password' a.pk %}"
             data-delete-url="{% url 'account_delete' a.pk %}"
@@ -99,10 +105,10 @@
       <label class="field"><span>First name</span><input type="text" name="first_name" id="edit-first" required></label>
       <label class="field"><span>Middle name (optional)</span><input type="text" name="middle_name" id="edit-middle"></label>
       <label class="field"><span>Email</span><input type="email" name="email" id="edit-email" required></label>
-      <label class="check-field" id="edit-dummy-wrap">
-        <input type="checkbox" name="is_dummy" value="1" id="edit-dummy">
-        <span><strong>Dummy (test) account</strong><br><small class="field-hint">Their survey answers, including ones already submitted, are kept out of the real results.</small></span>
-      </label>
+      <label class="field"><span>Role</span>
+        <select name="account_type" id="edit-type">{% for value, label in roles %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+        <small class="field-hint" id="edit-type-hint">Dummy accounts' survey answers, including ones already submitted, are kept out of the real results.</small></label>
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
       <div class="modal-actions">
         <button type="submit" class="btn btn-navy">Save changes</button>
         <button type="button" class="btn btn-cancel" data-close="edit-backdrop">Cancel</button>
