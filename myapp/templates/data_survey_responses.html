@@ -1,0 +1,108 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Survey Responses{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-survey-responses">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
+    <h2 class="section-title">Survey responses</h2>
+    <p class="muted sr-intro">Student, alumni and professor curriculum survey answers. Deleted responses are removed from the skill gap analysis right away and can't be restored.</p>
+
+    <form class="data-toolbar sr-filters" method="get" action="{% url 'survey_responses' %}">
+      <label class="select-field select-field--grow">
+        <span>Search</span>
+        <input type="search" name="q" value="{{ q }}" placeholder="Name, email, student no., course, subject or skill" autocomplete="off">
+      </label>
+      <label class="select-field">
+        <span>Respondent</span>
+        <select name="type">
+          <option value="">All</option>
+          {% for value, label in types %}<option value="{{ value }}"{% if value == rtype %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="select-field">
+        <span>Data set</span>
+        <select name="set">
+          {% for value, label in data_sets %}<option value="{{ value }}"{% if value == data_set %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn btn-navy btn-sm">Search</button>
+      {% if q or rtype or data_set != "real" %}<a class="link-inline sr-clear" href="{% url 'survey_responses' %}">Clear</a>{% endif %}
+    </form>
+
+    <form method="post" action="{% url 'survey_responses_delete' %}" id="sr-delete-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="sr-bulk">
+        <p class="muted table-count">{{ total }} response{{ total|pluralize }}{% if q %} matching “{{ q }}”{% endif %}</p>
+        <button type="button" class="btn btn-red btn-sm" id="sr-delete-selected" disabled>Delete selected</button>
+      </div>
+
+      {% if page.object_list %}
+      <div class="table-wrap">
+        <table class="sr-table">
+          <thead><tr>
+            <th class="sr-check"><input type="checkbox" id="sr-select-all" aria-label="Select all on this page"></th>
+            <th>Respondent</th><th>Type</th><th>Course</th><th>Subjects</th><th>Submitted</th><th></th>
+          </tr></thead>
+          <tbody>
+          {% for r in page.object_list %}
+            <tr data-label="#{{ r.obj.pk }} {{ r.name|default:r.email }}">
+              <td class="sr-check"><input type="checkbox" name="ids" value="{{ r.obj.pk }}" aria-label="Select response {{ r.obj.pk }}"></td>
+              <td><div class="sr-who">
+                <strong>{{ r.name|default:"(no name)" }}</strong>
+                <span class="muted">{{ r.email }}{% if r.student_number %} · {{ r.student_number }}{% endif %}</span>
+                {% if r.account %}<span class="muted">Account: {{ r.account }}</span>{% endif %}
+              </div></td>
+              <td>{{ r.obj.get_respondent_type_display }}{% if r.obj.is_dummy %} <span class="pill pill--dummy">Dummy</span>{% endif %}</td>
+              <td>{{ r.course|default:"—" }}{% if r.year %}<br><span class="muted">{{ r.year }}</span>{% endif %}</td>
+              <td>
+                <details class="sr-details">
+                  <summary>{{ r.subjects|length }} subject{{ r.subjects|length|pluralize }}, {{ r.skill_count }} skill{{ r.skill_count|pluralize }}</summary>
+                  <ul>
+                  {% for s in r.subjects %}
+                    <li><strong>{{ s.code }}</strong>{% if s.name %} {{ s.name }}{% endif %}{% if s.term %} <span class="muted">({{ s.term }})</span>{% endif %}
+                      {% if s.skills %}<br><span class="muted">{% for k in s.skills %}{{ k.name }}{% if k.level %} ({{ k.level }}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+                    </li>
+                  {% endfor %}
+                  </ul>
+                </details>
+              </td>
+              <td class="sr-date">{{ r.obj.created_at|date:"M j, Y" }}<br><span class="muted">#{{ r.obj.pk }}</span></td>
+              <td><button type="button" class="btn btn-ghost btn-sm" data-delete-one="{{ r.obj.pk }}">Delete</button></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="empty-note">No survey responses{% if q or rtype %} match these filters{% endif %}.</p>
+      {% endif %}
+    </form>
+
+    {% if page.paginator.num_pages > 1 %}
+    <nav class="pager" aria-label="Pages">
+      {% if page.has_previous %}<a class="btn btn-ghost btn-sm" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page.previous_page_number }}">‹ Previous</a>{% endif %}
+      <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+      {% if page.has_next %}<a class="btn btn-ghost btn-sm" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page.next_page_number }}">Next ›</a>{% endif %}
+    </nav>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_partials %}
+<div class="modal-backdrop modal-backdrop--top" id="sr-confirm">
+  <div class="modal" role="alertdialog" aria-labelledby="sr-confirm-text">
+    <p id="sr-confirm-text"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-red" id="sr-confirm-yes">Yes, delete</button>
+      <button type="button" class="btn btn-cancel" id="sr-confirm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'myapp/survey-responses.js' %}?v={% now 'U' %}"></script>{% endblock %}

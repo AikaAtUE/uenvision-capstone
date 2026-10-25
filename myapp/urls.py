@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import student_views, views
+from . import student_views, survey_admin, views
 
 urlpatterns = [
     # Public site
@@ -26,6 +26,7 @@ urlpatterns = [
     path("verify-email/<uidb64>/<token>/", views.verify_email_view, name="verify_email"),
     path("forgot-password/", views.forgot_password_view, name="forgot_password"),
     path("reset-password/", views.reset_password_view, name="reset_password"),
+    path("reset-password/<uidb64>/<token>/", views.reset_password_confirm_view, name="reset_password_confirm"),
     path("dashboard/", views.dashboard_view, name="dashboard"),
     path("dashboard/skills/", views.dashboard_skills_view, name="dashboard_skills"),
     path("recommendations/", views.recommendations_view, name="recommendations"),
@@ -53,6 +54,10 @@ urlpatterns = [
     path("accounts/", views.accounts_view, name="accounts"),
     path("accounts/create/", views.account_create_view, name="account_create"),
     path("accounts/<int:pk>/edit/", views.account_edit_view, name="account_edit"),
+    path("accounts/<int:pk>/approve/", views.account_approve_view, name="account_approve"),
+    path("notifications/", views.notifications_view, name="notifications"),
+    path("settings/notifications/", views.notification_settings_view, name="notification_settings"),
+    path("pending-approval/", views.pending_approval_view, name="pending_approval"),
     path("accounts/<int:pk>/reset-password/", views.account_reset_password_view, name="account_reset_password"),
     path("accounts/<int:pk>/delete/", views.account_delete_view, name="account_delete"),
     path("logout/", views.logout_view, name="logout"),
@@ -63,6 +68,8 @@ urlpatterns = [
     path("survey/student/submit/", views.student_survey_submit_view, name="student_survey_submit"),
     path("survey/alumni/", views.alumni_survey_view, name="alumni_survey"),
     path("survey/alumni/submit/", views.alumni_survey_submit_view, name="alumni_survey_submit"),
+    path("data/survey-responses/", survey_admin.survey_responses_view, name="survey_responses"),
+    path("data/survey-responses/delete/", survey_admin.survey_responses_delete_view, name="survey_responses_delete"),
     path("data/professor-survey/", views.professor_survey_view, name="professor_survey"),
     path("data/professor-survey/submit/", views.professor_survey_submit_view, name="professor_survey_submit"),
     path("survey/professor/", RedirectView.as_view(pattern_name="professor_survey", permanent=False)),

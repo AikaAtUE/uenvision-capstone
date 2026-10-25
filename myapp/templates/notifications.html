@@ -1,0 +1,40 @@
+{% extends "app_base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-notifications">
+  <header class="page-header"><h1>Notifications</h1></header>
+  <div class="page-body">
+    {% include "_messages.html" %}
+    <div class="notif-head">
+      <p class="muted">Sign-ups and other things that need an administrator.</p>
+      <a class="link-inline" href="{% url 'settings' %}#notification-settings">Email alerts: {% if user.notify_by_email %}on{% else %}off{% endif %}</a>
+    </div>
+    {% if items %}
+    <ul class="notif-list">
+      {% for n in items %}
+      <li class="notif{% if n.pk in unread_ids %} is-unread{% endif %}">
+        <span class="notif-dot" aria-hidden="true"></span>
+        <div class="notif-body">
+          <p class="notif-msg">{% if n.pk in unread_ids %}<span class="sr-only">New: </span>{% endif %}{{ n.message }}</p>
+          <p class="notif-time muted">{% with ago=n.created_at|timesince %}{% if ago == "0 minutes" %}Just now{% else %}{{ ago }} ago{% endif %}{% endwith %}</p>
+        </div>
+        <div class="notif-actions">
+          {% if n.subject_user and not n.subject_user.is_approved %}
+          <form method="post" action="{% url 'account_approve' n.subject_user.pk %}">
+            {% csrf_token %}<input type="hidden" name="next" value="{% url 'notifications' %}">
+            <button type="submit" class="btn btn-navy btn-sm">Approve</button>
+          </form>
+          {% elif n.subject_user %}
+          <span class="pill pill--approved">Approved</span>
+          {% endif %}
+          {% if n.link %}<a class="btn btn-ghost btn-sm" href="{{ n.link }}">View</a>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <p class="empty-note">No notifications yet. You'll see faculty sign-ups that need approval here.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

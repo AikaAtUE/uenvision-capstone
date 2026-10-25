@@ -1,0 +1,7 @@
+Hi {{ user.first_name }},
+
+An administrator approved your UEnvision faculty account. You can log in now:
+
+{{ url }}
+
+This is an automated message from UEnvision. Please don't reply to it.

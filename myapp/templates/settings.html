@@ -11,7 +11,7 @@
       <div class="settings-row"><dt>User ID</dt><dd id="set-userid">{{ user.pk }}</dd></div>
       <div class="settings-row"><dt>User name</dt><dd id="set-name" data-editable data-type="text">{{ user.get_full_name }}</dd></div>
       <div class="settings-row"><dt>Email</dt><dd id="set-email" data-editable data-type="email">{{ user.email }}</dd></div>
-      <div class="settings-row"><dt>Role</dt><dd id="set-role">{{ user.get_role_display }}</dd></div>
+      <div class="settings-row"><dt>Role</dt><dd id="set-role">{{ user.role_label }}</dd></div>
     </dl>
     <div class="settings-actions">
       <button class="btn btn-red" id="delete-btn">Delete</button>
@@ -20,6 +20,18 @@
         <button class="btn btn-navy" id="edit-btn">Edit</button>
       </span>
     </div>
+
+    {% if user.is_administrator %}
+    <h2 class="section-title settings-section-gap" id="notification-settings">Notifications</h2>
+    <form class="settings-card" method="post" action="{% url 'notification_settings' %}">
+      {% csrf_token %}
+      <label class="check-field">
+        <input type="checkbox" name="notify_by_email" value="1"{% if user.notify_by_email %} checked{% endif %}>
+        <span><strong>Email me when a faculty member signs up</strong><br><small class="field-hint">Sent to {{ user.email }}. New sign-ups always show on the Notifications page either way.</small></span>
+      </label>
+      <button type="submit" class="btn btn-navy">Save</button>
+    </form>
+    {% endif %}
 
     <h2 class="section-title settings-section-gap">Change password</h2>
     <form class="settings-card" id="password-form" method="post" action="{% url 'change_password' %}">

@@ -107,3 +107,31 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 .run-note{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 20px; font-size:.9rem;}
 .run-log .log-err{color:#ff8a94;}
 .form-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;}
+
+/* ---------- Survey Responses (admin) ---------- */
+.sr-intro{font-size:.85rem; margin:-10px 0 16px;}
+.sr-filters{justify-content:flex-start; margin-bottom:14px;}
+.sr-filters .select-field select{min-width:150px;}
+.sr-filters input[type=search]{
+  font-family:inherit; font-size:.95rem; font-weight:400; color:inherit; width:100%;
+  padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#f7f7f8;
+}
+.sr-filters input[type=search]:focus{background:#fff; border-color:var(--navy); outline:none;}
+.sr-filters .btn{align-self:flex-end; min-height:44px;}
+.sr-clear{align-self:center; font-size:.85rem;}
+.sr-bulk{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;}
+.sr-bulk .table-count{margin:0;}
+.sr-bulk .btn[disabled]{opacity:.45; cursor:not-allowed;}
+.sr-table{width:100%;}
+.sr-table td{vertical-align:top; white-space:normal;}
+.sr-table .sr-check{width:36px;}
+.sr-table .sr-check input{width:18px; height:18px;}
+.sr-who{display:flex; flex-direction:column; gap:2px; min-width:200px;}
+.sr-who .muted{font-size:.8rem; overflow-wrap:anywhere;}
+.sr-date{white-space:nowrap !important;}
+.sr-details summary{cursor:pointer; color:var(--navy); font-weight:600; white-space:nowrap;}
+.sr-details ul{margin:8px 0 0; padding-left:18px; font-size:.82rem; display:grid; gap:6px; min-width:260px; max-width:460px;}
+@media (max-width: 640px){
+  .sr-filters .select-field, .sr-filters .select-field select{width:100%; min-width:0;}
+  .sr-filters .btn{width:100%; justify-content:center;}
+}

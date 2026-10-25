@@ -1,4 +1,4 @@
-{# Sub-navigation for the Data pages. Import / Scrape / Extract are Administrator-only. #}
+{# Sub-navigation for the Data pages. Import / Scrape / Extract / Survey Responses are Administrator-only. #}
 <nav class="data-tabs" aria-label="Data sections">
   <a class="data-tab{% if data_tab == 'view' %} is-active{% endif %}" href="{% url 'data' %}"{% if data_tab == 'view' %} aria-current="page"{% endif %}>View Data</a>
   <a class="data-tab{% if data_tab == 'professor_survey' %} is-active{% endif %}" href="{% url 'professor_survey' %}"{% if data_tab == 'professor_survey' %} aria-current="page"{% endif %}>Professor Survey</a>
@@ -6,5 +6,6 @@
   <a class="data-tab{% if data_tab == 'import' %} is-active{% endif %}" href="{% url 'data_import' %}"{% if data_tab == 'import' %} aria-current="page"{% endif %}>Import Data</a>
   <a class="data-tab{% if data_tab == 'scrape' %} is-active{% endif %}" href="{% url 'data_scrape' %}"{% if data_tab == 'scrape' %} aria-current="page"{% endif %}>Scrape Data</a>
   <a class="data-tab{% if data_tab == 'extract' %} is-active{% endif %}" href="{% url 'data_extract' %}"{% if data_tab == 'extract' %} aria-current="page"{% endif %}>Extract Skills</a>
+  <a class="data-tab{% if data_tab == 'responses' %} is-active{% endif %}" href="{% url 'survey_responses' %}"{% if data_tab == 'responses' %} aria-current="page"{% endif %}>Survey Responses</a>
   {% endif %}
 </nav>

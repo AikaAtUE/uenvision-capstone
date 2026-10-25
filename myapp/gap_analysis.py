@@ -168,20 +168,22 @@ def _skill_entries(entries):
             yield str(name), lvl
 
 
-def _academic_responses(program: str = ""):
+def _academic_responses(program: str = "", dummy: bool = False):
     """-> (list of responses, counts-by-respondent-type dict). Each response is
     {"type", "skills": {key: display}, "weights": {key: 0-1}, "subjects": {code: {key: 0-1}}}
     and only responses that named at least one taught/learned skill are kept.
     Subjects are keyed by code alone: BSIT and BSCS share some subjects, and a
     shared code counts as one subject. `program` ("BSIT"/"BSCS") keeps
-    students/alumni of that course and professor subjects in that curriculum."""
+    students/alumni of that course and professor subjects in that curriculum.
+    `dummy` picks the data set: real answers (default) or only the answers of
+    dummy (test) accounts -- the two are never mixed."""
     from . import curriculum_data
 
     index = _ontology_index()
     by_code = curriculum_data.subject_by_code()
     out = []
     by_type = {"student": 0, "alumni": 0, "professor": 0}
-    rows = list(CurriculumSurveyResponse.objects.order_by("created_at", "pk").values_list("respondent_type", "data", "user_id"))
+    rows = list(CurriculumSurveyResponse.objects.filter(is_dummy=dummy).order_by("created_at", "pk").values_list("respondent_type", "data", "user_id"))
     # Anyone with an account has one current record per side (learner / professor) --
     # their latest response, which they can edit on My subjects & skills -- so older
     # ones don't count twice.
@@ -310,12 +312,13 @@ def _by_subject(responses, industry_pct, industry_label, under_taught_keys, prog
 # ---------------------------------------------------------------------------
 # Put it together
 # ---------------------------------------------------------------------------
-def compute(top: int = 10, source: str = "", level: str = "", program: str = "") -> dict:
+def compute(top: int = 10, source: str = "", level: str = "", program: str = "", dummy: bool = False) -> dict:
     """Numbers behind the Dashboard's "Alignment score" / "High-priority skill
     gaps" stat cards and the Skill Gap Analysis tab. `top` / `source` / `level`
     match the same controls already used for the Top-in-demand-skills tab, so the
     two stay in sync — this always looks at hard skills only (see module docstring).
-    `program` ("BSIT"/"BSCS", blank = both) narrows the academic side."""
+    `program` ("BSIT"/"BSCS", blank = both) narrows the academic side; `dummy`
+    uses dummy accounts' answers instead of the real ones."""
     top = max(1, min(int(top), 30))
     industry_jobs, info = _industry_mentions(source, level)
     if not info["exists"]:
@@ -328,7 +331,7 @@ def compute(top: int = 10, source: str = "", level: str = "", program: str = "")
     industry_pct = {k: (round(c / total_postings * 100, 1) if total_postings else 0.0)
                     for k, c in industry_counts.items()}
 
-    responses, by_type = _academic_responses(program)
+    responses, by_type = _academic_responses(program, dummy)
     total_responses = len(responses)
     has_survey_data = total_responses > 0
     mention_counts, weight_sums = {}, {}
@@ -397,7 +400,7 @@ def compute(top: int = 10, source: str = "", level: str = "", program: str = "")
 # ---------------------------------------------------------------------------
 # Per-subject targets (Recommendations page, professor view)
 # ---------------------------------------------------------------------------
-def subject_targets(code: str, limit: int = 12, info: dict | None = None) -> dict:
+def subject_targets(code: str, limit: int = 12, info: dict | None = None, dummy: bool = False) -> dict:
     """Which in-demand skills a professor could teach (more deeply) in one subject:
     the subject's curated skills (skills_catalog / subject_skills.py) that appear in
     job postings, ranked by priority = demand % x (1 - depth already reported for
@@ -416,7 +419,7 @@ def subject_targets(code: str, limit: int = 12, info: dict | None = None) -> dic
     total = len(industry_jobs)
     index = _ontology_index()
 
-    responses, _ = _academic_responses()
+    responses, _ = _academic_responses(dummy=dummy)
     depth_here = {}
     for resp in responses:
         for k, w in resp["subjects"].get(code, {}).items():

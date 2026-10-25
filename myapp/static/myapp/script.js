@@ -34,14 +34,11 @@ document.addEventListener('DOMContentLoaded', () => {
      NOTE: Login and signup now go through Django (see login_view /
      signup_view in views.py), which is the real source of truth for
      accounts and passwords. This local "accounts" list is kept only
-     for pages not yet wired to the backend (forgot/reset password,
-     settings, delete account). Those will need the same treatment
+     for pages not yet wired to the backend (settings, delete account). Those will need the same treatment
      as login/signup eventually.
   ====================================================================== */
   const STORAGE_KEY = 'uenvision_accounts';
   const SESSION_KEY = 'uenvision_session';
-  const RESET_EMAIL_KEY = 'uenvision_reset_email';
-  const RESET_CODE_KEY = 'uenvision_reset_code';
 
   function loadAccounts(){
     try {
@@ -107,118 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
      so this file no longer intercepts it or creates accounts client-side.
   ====================================================================== */
 
-  /* ======================================================================
-     FORGOT PASSWORD PAGE
-  ====================================================================== */
-  const forgotForm = document.getElementById('forgot-form');
-  if (forgotForm){
-    forgotForm.addEventListener('submit', e => e.preventDefault());
-
-    document.getElementById('send-code-btn').addEventListener('click', () => {
-      const msg = document.getElementById('forgot-msg');
-      const email = document.getElementById('forgot-email').value.trim().toLowerCase();
-      if (!accounts.some(a => a.email.toLowerCase() === email)){
-        setMsg(msg, 'No account found with that email.', 'error');
-        return;
-      }
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      sessionStorage.setItem(RESET_EMAIL_KEY, email);
-      sessionStorage.setItem(RESET_CODE_KEY, code);
-      setMsg(msg, '');
-      showToast(`Verification code sent: ${code} (simulated email)`);
-    });
-
-    document.getElementById('verify-code-btn').addEventListener('click', () => {
-      const msg = document.getElementById('forgot-msg');
-      const entered = document.getElementById('forgot-code').value.trim();
-      const storedCode = sessionStorage.getItem(RESET_CODE_KEY);
-      if (!storedCode){
-        setMsg(msg, 'Send a code first.', 'error');
-        return;
-      }
-      if (entered !== storedCode){
-        setMsg(msg, 'That code is incorrect.', 'error');
-        return;
-      }
-      setMsg(msg, '');
-      goTo('resetUrl');
-    });
-  }
-
-  /* ======================================================================
-     RESET PASSWORD PAGE
-  ====================================================================== */
-  const resetForm = document.getElementById('reset-form');
-  if (resetForm){
-    resetForm.addEventListener('submit', e => {
-      e.preventDefault();
-      const msg = document.getElementById('reset-msg');
-      const p1 = document.getElementById('reset-password').value;
-      const p2 = document.getElementById('reset-password2').value;
-      if (!p1 || p1 !== p2){
-        setMsg(msg, 'Passwords do not match.', 'error');
-        return;
-      }
-      const email = sessionStorage.getItem(RESET_EMAIL_KEY);
-      const acct = accounts.find(a => a.email.toLowerCase() === email);
-      if (acct){
-        acct.password = p1;
-        saveAccounts(accounts);
-      }
-      sessionStorage.removeItem(RESET_EMAIL_KEY);
-      sessionStorage.removeItem(RESET_CODE_KEY);
-      showToast('Password updated. Please log in.');
-      goTo('loginUrl');
-    });
-  }
-
-  /* ======================================================================
-     SIDEBAR: collapse + logout (present on dashboard/data/feedback/about/settings)
-  ====================================================================== */
-  const sidebar = document.getElementById('sidebar');
-  const collapseBtn = document.getElementById('collapse-btn');
-  const isPhone = () => window.matchMedia('(max-width: 720px)').matches;
-  const COLLAPSE_KEY = 'ue_sidebar_collapsed';
-  if (sidebar){
-    // remember the desktop collapse choice between pages (per browser; harmless if storage is blocked)
-    try { if (localStorage.getItem(COLLAPSE_KEY) === '1') sidebar.classList.add('is-collapsed'); } catch (e) {}
-  }
-  if (collapseBtn){
-    collapseBtn.addEventListener('click', () => {
-      if (isPhone()) { closeNav(); return; }
-      const collapsed = sidebar.classList.toggle('is-collapsed');
-      try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {}
-    });
-  }
-
-  // Phone-width slide-in menu
-  const navOpen = document.getElementById('nav-open');
-  const backdrop = document.getElementById('sidebar-backdrop');
-  function openNav(){
-    sidebar.classList.add('is-open');
-    if (backdrop) backdrop.hidden = false;
-    if (navOpen) navOpen.setAttribute('aria-expanded', 'true');
-    const first = sidebar.querySelector('.nav-item'); if (first) first.focus();
-  }
-  function closeNav(){
-    if (!sidebar || !sidebar.classList.contains('is-open')) return;
-    sidebar.classList.remove('is-open');
-    if (backdrop) backdrop.hidden = true;
-    if (navOpen) { navOpen.setAttribute('aria-expanded', 'false'); navOpen.focus(); }
-  }
-  if (navOpen && sidebar){
-    navOpen.addEventListener('click', openNav);
-    if (backdrop) backdrop.addEventListener('click', closeNav);
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNav(); });
-  }
-
-  const logoutBtn = document.getElementById('logout-btn');
-  if (logoutBtn){
-    logoutBtn.addEventListener('click', () => {
-      clearSessionUser();
-      // default <a href> navigation to the login page proceeds normally
-    });
-  }
+  /* Forgot / reset password are handled by Django now (forgot_password_view,
+     reset_password_view): the reset link is emailed to the user. */
 
   /* ======================================================================
      DASHBOARD TABS

@@ -37,6 +37,18 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # confirmation email yet (see email_verification.py). Accounts made by an
     # administrator, createsuperuser, and accounts from before this existed count as confirmed.
     email_verified = models.BooleanField(default=True)
+    # Dummy (test) accounts: a Dummy Student is a student and a Dummy Faculty is a
+    # faculty member in every way, except that their survey answers are marked
+    # is_dummy, are left out of the real skill gap analysis, and the dashboards
+    # they see are computed from dummy answers only.
+    is_dummy = models.BooleanField(default=False)
+    # Faculty who sign up themselves wait for an administrator to approve them
+    # before they get past the "waiting for approval" page. Accounts an
+    # administrator creates (and every account from before this) are approved.
+    is_approved = models.BooleanField(default=True)
+    # Administrators only: also email me when there's something to review
+    # (e.g. a new faculty sign-up). Off unless they turn it on in Settings.
+    notify_by_email = models.BooleanField(default=False)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -58,6 +70,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     def is_learner(self):
         """Students and alumni: they only get their own dashboard, SUS and settings."""
         return self.role in (self.Role.STUDENT, self.Role.ALUMNI)
+
+    @property
+    def role_label(self):
+        """Role as shown in the app, e.g. "Faculty" or "Dummy Faculty"."""
+        label = self.get_role_display()
+        return f"Dummy {label}" if self.is_dummy else label
 
     def get_full_name(self):
         parts = [self.first_name, self.middle_name, self.last_name]
@@ -94,6 +112,8 @@ class SurveyResponse(models.Model):
         related_name="survey_responses",
     )
     data = models.JSONField()
+    # Submitted by a dummy (test) account; kept out of the real results.
+    is_dummy = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -135,6 +155,8 @@ class CurriculumSurveyResponse(models.Model):
         related_name="curriculum_survey_responses",
     )
     data = models.JSONField()
+    # Submitted by a dummy (test) account; kept out of the real results.
+    is_dummy = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -142,3 +164,26 @@ class CurriculumSurveyResponse(models.Model):
 
     def __str__(self):
         return f"{self.get_respondent_type_display()} curriculum survey #{self.pk}"
+
+
+class Notification(models.Model):
+    """An item in an administrator's Notifications page (e.g. a faculty sign-up to approve)."""
+
+    FACULTY_SIGNUP = "faculty_signup"
+    KINDS = [(FACULTY_SIGNUP, "Faculty sign-up")]
+
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
+    kind = models.CharField(max_length=30, choices=KINDS)
+    message = models.CharField(max_length=300)
+    link = models.CharField(max_length=300, blank=True)
+    # The account the notification is about, if any (deleting it removes the notification).
+    subject_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE,
+                                     related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self):
+        return self.message

@@ -15,8 +15,12 @@ LEARNER_URL_NAMES = {
     "student_dashboard", "student_role", "student_generate", "my_skills", "my_skills_save",
     "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
     "feedback", "survey_submit", "about", "settings", "change_password", "session_ping",
-    "verify_email", "resend_verification",
+    "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
 }
+
+# Dummy (test) students can also open the overall Dashboard, which for them is
+# computed from dummy answers only.
+DUMMY_LEARNER_URL_NAMES = {"dashboard", "dashboard_skills"}
 
 
 class LearnerAccessMiddleware:
@@ -30,7 +34,8 @@ class LearnerAccessMiddleware:
                 match = resolve(request.path_info)
             except Resolver404:
                 match = None
-            if match is not None and match.url_name not in LEARNER_URL_NAMES:
+            allowed = LEARNER_URL_NAMES | (DUMMY_LEARNER_URL_NAMES if user.is_dummy else set())
+            if match is not None and match.url_name not in allowed:
                 return redirect("student_dashboard")
         return self.get_response(request)
 
@@ -76,4 +81,29 @@ class IdleTimeoutMiddleware:
             # so normal browsing doesn't save the session on every request.
             if BACKGROUND_HEADER not in request.META and (last is None or now - last >= min(15, timeout // 10)):
                 request.session[LAST_ACTIVITY_KEY] = now
+        return self.get_response(request)
+
+
+# What a faculty member who signed up themselves can open until an administrator approves them.
+PENDING_URL_NAMES = {
+    "pending_approval", "logout", "login", "session_ping", "verify_email", "resend_verification",
+    "forgot_password", "reset_password", "reset_password_confirm", "home", "about",
+}
+
+
+class PendingApprovalMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated and not getattr(user, "is_approved", True):
+            try:
+                match = resolve(request.path_info)
+            except Resolver404:
+                match = None
+            if match is not None and match.url_name not in PENDING_URL_NAMES:
+                if _wants_json(request):
+                    return JsonResponse({"ok": False, "error": "Your account is waiting for approval."}, status=403)
+                return redirect("pending_approval")
         return self.get_response(request)

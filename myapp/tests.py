@@ -936,7 +936,8 @@ class EmailVerificationTests(TestCase):
         self.assertContains(self.client.get(link), "This link doesn't work")
 
         r = self.client.post(reverse("login"), {"email": "new@ue.edu.ph", "password": "longenough1"})
-        self.assertRedirects(r, reverse("dashboard"), fetch_redirect_response=False)
+        # faculty sign-ups still wait for an administrator after confirming
+        self.assertRedirects(r, reverse("pending_approval"), fetch_redirect_response=False)
 
     def test_bad_link_is_rejected(self):
         self.signup()
@@ -968,7 +969,7 @@ class EmailVerificationTests(TestCase):
     @override_settings(REQUIRE_EMAIL_VERIFICATION=False)
     def test_without_email_settings_signup_logs_in_directly(self):
         r = self.signup("direct@ue.edu.ph")
-        self.assertRedirects(r, reverse("dashboard"), fetch_redirect_response=False)
+        self.assertRedirects(r, reverse("pending_approval"), fetch_redirect_response=False)
         self.assertTrue(CustomUser.objects.get(email="direct@ue.edu.ph").email_verified)
 
 
@@ -989,3 +990,293 @@ class StudentRegisterVerificationTests(StudentFlowTests):
         self.assertContains(self.client.get(link), "Email confirmed")
         r = self.client.post(reverse("login"), {"email": "juan@ue.edu.ph", "password": "secret123"})
         self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)
+
+
+class DummyAccountTests(IsolatedDataMixin, TestCase):
+    """Dummy Student / Dummy Faculty answers live in their own data set."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                                    last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+
+    def make(self, kind, email):
+        self.client.force_login(self.admin)
+        self.client.post(reverse("account_create"), {"last_name": "T", "first_name": "Tester", "email": email,
+                                                     "role": kind, "password": "secret123"})
+        return CustomUser.objects.get(email=email)
+
+    def student_payload(self, email):
+        return {"consent": True,
+                "personal_info": {"name": "Dummy Kid", "ue_email": email, "course": "BSIT",
+                                  "student_number": "2099-1", "year_level": 1},
+                "has_previous": False, "target_role": "data-analyst",
+                "subjects": [{"code": "CCP 1101", "term": "current",
+                              "skills": [{"name": "Python", "level": "advanced"}]}]}
+
+    def test_admin_can_create_dummy_accounts(self):
+        ds = self.make("dummy_student", "ds@ue.edu.ph")
+        df = self.make("dummy_faculty", "df@ue.edu.ph")
+        self.assertEqual((ds.role, ds.is_dummy, ds.role_label), ("student", True, "Dummy Student"))
+        self.assertEqual((df.role, df.is_dummy, df.role_label), ("faculty", True, "Dummy Faculty"))
+        self.assertContains(self.client.get(reverse("accounts")), "Dummy Faculty")
+
+    def test_dummy_answers_are_kept_out_of_the_real_analysis(self):
+        from . import gap_analysis
+        from .models import CurriculumSurveyResponse
+        ds = self.make("dummy_student", "ds@ue.edu.ph")
+        df = self.make("dummy_faculty", "df@ue.edu.ph")
+        self.client.force_login(ds)
+        r = self.client.post(reverse("student_survey_submit"), data=json.dumps(self.student_payload("ds@ue.edu.ph")),
+                             content_type="application/json")
+        self.assertEqual(r.json()["next_url"], reverse("student_dashboard"))
+        self.client.force_login(df)
+        self.client.post(reverse("professor_survey_submit"), content_type="application/json", data=json.dumps(
+            {"consent": True, "subjects": [{"code": "CCP 1101", "skills": [{"name": "SQL", "level": "applied"}]}]}))
+        self.assertEqual(CurriculumSurveyResponse.objects.filter(is_dummy=True).count(), 2)
+        self.assertEqual(CurriculumSurveyResponse.objects.get(user=ds).is_dummy, True)
+
+        # a real public answer
+        self.client.logout()
+        self.client.post(reverse("student_survey_submit"), data=json.dumps(self.student_payload("real@ue.edu.ph")),
+                         content_type="application/json")
+        real = CurriculumSurveyResponse.objects.get(is_dummy=False)
+
+        _, real_counts = gap_analysis._academic_responses()
+        _, dummy_counts = gap_analysis._academic_responses(dummy=True)
+        self.assertEqual(real_counts, {"student": 1, "alumni": 0, "professor": 0})
+        self.assertEqual(dummy_counts, {"student": 1, "alumni": 0, "professor": 1})
+        self.assertEqual(real.user, None)
+
+    def test_dashboard_uses_the_users_data_set(self):
+        from unittest import mock
+        ds = self.make("dummy_student", "ds@ue.edu.ph")
+        real_student = CustomUser.objects.create_user(email="rs@ue.edu.ph", password="secret123", first_name="R",
+                                                      last_name="S", role=CustomUser.Role.STUDENT)
+        self.client.force_login(real_student)
+        self.assertRedirects(self.client.get(reverse("dashboard")), reverse("student_dashboard"),
+                             fetch_redirect_response=False)
+        self.client.force_login(ds)
+        page = self.client.get(reverse("dashboard"))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Test account.")
+        with mock.patch("myapp.views.pipeline.skills_dashboard", return_value={"exists": True}), \
+                mock.patch("myapp.views.gap_analysis.compute", return_value={"exists": False}) as compute:
+            self.client.get(reverse("dashboard_skills"))
+            self.assertTrue(compute.call_args.kwargs["dummy"])
+            self.client.force_login(self.admin)
+            self.client.get(reverse("dashboard_skills"))
+            self.assertFalse(compute.call_args.kwargs["dummy"])
+
+
+class SurveyResponsesAdminTests(TestCase):
+    def setUp(self):
+        from .models import CurriculumSurveyResponse as C
+        self.admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                                    last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+        self.faculty = CustomUser.objects.create_user(email="fac@ue.edu.ph", password="secret123", first_name="F",
+                                                      last_name="C", role=CustomUser.Role.FACULTY)
+        info = lambda n, e: {"name": n, "ue_email": e, "course": "BSIT", "student_number": "2023-9", "year_level": 2}
+        self.juan = C.objects.create(respondent_type="student", data={"personal_info": info("Juan Cruz", "juan@ue.edu.ph"),
+            "subjects": [{"code": "CCP 1101", "skills": [{"name": "Python", "level": "advanced"}]}]})
+        self.maria = C.objects.create(respondent_type="alumni", data={"personal_info": info("Maria Santos", "maria@ue.edu.ph"),
+            "subjects": [{"code": "CFD 1101", "skills": [{"name": "SQL", "level": "beginner"}]}]})
+        self.dummy = C.objects.create(respondent_type="student", is_dummy=True,
+            data={"personal_info": info("Test Kid", "t@ue.edu.ph"), "subjects": []})
+        self.prof = C.objects.create(respondent_type="professor", user=self.faculty,
+            data={"subjects": [{"code": "CCP 1101", "skills": [{"name": "Java", "level": "applied"}]}]})
+
+    def test_admin_only(self):
+        self.client.force_login(self.faculty)
+        self.assertEqual(self.client.get(reverse("survey_responses")).status_code, 403)
+        self.assertEqual(self.client.post(reverse("survey_responses_delete"), {"ids": [self.juan.pk]}).status_code, 403)
+
+    def test_search_and_filters(self):
+        self.client.force_login(self.admin)
+        url = reverse("survey_responses")
+        r = self.client.get(url)
+        self.assertContains(r, "Juan Cruz")
+        self.assertContains(r, "Maria Santos")
+        self.assertContains(r, "fac@ue.edu.ph")          # professor shown by their account
+        self.assertNotContains(r, "Test Kid")             # dummy answers hidden by default
+        r = self.client.get(url, {"q": "sql"})
+        self.assertContains(r, "Maria Santos")
+        self.assertNotContains(r, "Juan Cruz")
+        r = self.client.get(url, {"q": "juan@ue"})
+        self.assertContains(r, "Juan Cruz")
+        self.assertNotContains(r, "Maria Santos")
+        r = self.client.get(url, {"type": "professor"})
+        self.assertContains(r, "fac@ue.edu.ph")
+        self.assertNotContains(r, "Juan Cruz")
+        r = self.client.get(url, {"set": "dummy"})
+        self.assertContains(r, "Test Kid")
+        self.assertNotContains(r, "Juan Cruz")
+
+    def test_delete_selected(self):
+        from .models import CurriculumSurveyResponse as C
+        self.client.force_login(self.admin)
+        r = self.client.post(reverse("survey_responses_delete"),
+                             {"ids": [self.juan.pk, self.maria.pk], "next": reverse("survey_responses") + "?q=x"})
+        self.assertRedirects(r, reverse("survey_responses") + "?q=x", fetch_redirect_response=False)
+        self.assertEqual(set(C.objects.values_list("pk", flat=True)), {self.dummy.pk, self.prof.pk})
+        r = self.client.post(reverse("survey_responses_delete"), {"ids": [self.prof.pk], "next": "https://evil.example/"})
+        self.assertRedirects(r, reverse("survey_responses"), fetch_redirect_response=False)
+
+
+class DummyToggleTests(TestCase):
+    def test_switching_an_account_to_dummy_moves_its_answers(self):
+        from .models import CurriculumSurveyResponse as C
+        admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                               last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+        stu = CustomUser.objects.create_user(email="me@ue.edu.ph", password="secret123", first_name="Pa",
+                                             last_name="Eng", role=CustomUser.Role.STUDENT)
+        old = C.objects.create(respondent_type="student", user=stu, data={"subjects": []})
+        other = C.objects.create(respondent_type="student", data={"subjects": []})
+        self.client.force_login(admin)
+        fields = {"last_name": "Eng", "first_name": "Pa", "email": "me@ue.edu.ph"}
+        r = self.client.post(reverse("account_edit", args=[stu.pk]), {**fields, "is_dummy": "1"}, follow=True)
+        self.assertContains(r, "1 survey answer moved to dummy (test) data")
+        stu.refresh_from_db(); old.refresh_from_db(); other.refresh_from_db()
+        self.assertTrue(stu.is_dummy)
+        self.assertTrue(old.is_dummy)
+        self.assertFalse(other.is_dummy)
+        # unticking moves them back
+        self.client.post(reverse("account_edit", args=[stu.pk]), fields)
+        old.refresh_from_db()
+        self.assertFalse(old.is_dummy)
+        # administrators can't become dummy accounts
+        self.client.post(reverse("account_edit", args=[admin.pk]),
+                         {"last_name": "D", "first_name": "A", "email": "adm@ue.edu.ph", "is_dummy": "1"})
+        admin.refresh_from_db()
+        self.assertFalse(admin.is_dummy)
+
+
+class ForgotPasswordTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.user = CustomUser.objects.create_user(email="Paeng@ue.edu.ph", password="oldpass123",
+                                                   first_name="Pa", last_name="Eng")
+
+    def test_reset_by_email_link(self):
+        from django.core import mail
+        r = self.client.post(reverse("forgot_password"), {"email": "paeng@UE.edu.ph"})   # any letter case
+        self.assertContains(r, "emailed it a link to reset")
+        self.assertEqual(mail.outbox[0].to, ["Paeng@ue.edu.ph"])
+        link = mail.outbox[0].body.split("http://testserver", 1)[1].split()[0]
+        self.assertContains(self.client.get(link), "Choose a new password")
+        r = self.client.post(link, {"password": "short", "password2": "short"})
+        self.assertContains(r, "at least 8")
+        r = self.client.post(link, {"password": "newpass123", "password2": "newpass123"})
+        self.assertContains(r, "Password changed")
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("newpass123"))
+        # the link only works once
+        self.assertContains(self.client.get(link), "This link doesn")
+
+    def test_unknown_email_gets_the_same_answer_and_no_email(self):
+        from django.core import mail
+        r = self.client.post(reverse("forgot_password"), {"email": "nobody@ue.edu.ph"})
+        self.assertContains(r, "If <strong>nobody@ue.edu.ph</strong> has a UEnvision account")
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_rate_limited(self):
+        from django.core import mail
+        self.client.post(reverse("forgot_password"), {"email": "paeng@ue.edu.ph"})
+        r = self.client.post(reverse("forgot_password"), {"email": "paeng@ue.edu.ph"})
+        self.assertContains(r, "wait a minute")
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_old_reset_address_redirects(self):
+        self.assertRedirects(self.client.get(reverse("reset_password")), reverse("forgot_password"))
+
+
+
+class FacultyApprovalTests(TestCase):
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                                    last_name="Dmin", role=CustomUser.Role.ADMINISTRATOR)
+        self.admin2 = CustomUser.objects.create_user(email="adm2@ue.edu.ph", password="secret123", first_name="B",
+                                                     last_name="Dmin", role=CustomUser.Role.ADMINISTRATOR,
+                                                     notify_by_email=True)
+
+    def signup(self):
+        return self.client.post(reverse("signup"), {"last_name": "Santos", "first_name": "Prof", "email": "prof@ue.edu.ph",
+                                                    "password": "longenough1", "password2": "longenough1"})
+
+    def test_signup_waits_for_approval_and_admins_are_notified(self):
+        from django.core import mail
+        from .models import Notification
+        r = self.signup()
+        self.assertRedirects(r, reverse("pending_approval"), fetch_redirect_response=False)
+        prof = CustomUser.objects.get(email="prof@ue.edu.ph")
+        self.assertFalse(prof.is_approved)
+        # blocked from the app until approved
+        self.assertRedirects(self.client.get(reverse("dashboard")), reverse("pending_approval"), fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("data")), reverse("pending_approval"), fetch_redirect_response=False)
+        self.assertContains(self.client.get(reverse("pending_approval")), "Waiting for approval")
+        # both admins get a notification; only the one who opted in gets an email
+        self.assertEqual(Notification.objects.filter(subject_user=prof).count(), 2)
+        self.assertEqual([m.to for m in mail.outbox], [["adm2@ue.edu.ph"]])
+        self.assertIn("Prof Santos", mail.outbox[0].subject)
+
+        self.client.force_login(self.admin)
+        page = self.client.get(reverse("accounts"))
+        self.assertContains(page, '<span class="nav-badge" aria-label="1 unread">1</span>', html=True)
+        self.assertContains(page, "1 faculty sign-up</strong> waiting for approval")
+        self.assertContains(self.client.get(reverse("notifications")), "Prof Santos (prof@ue.edu.ph) signed up")
+        self.assertNotContains(self.client.get(reverse("accounts")), "nav-badge")   # read once opened
+
+        self.client.post(reverse("account_approve", args=[prof.pk]))
+        prof.refresh_from_db()
+        self.assertTrue(prof.is_approved)
+        self.assertEqual(mail.outbox[-1].to, ["prof@ue.edu.ph"])
+        self.assertFalse(Notification.objects.filter(subject_user=prof, read_at__isnull=True).exists())
+        self.client.force_login(prof)
+        self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+
+    def test_admin_made_and_student_accounts_need_no_approval(self):
+        self.client.force_login(self.admin)
+        self.client.post(reverse("account_create"), {"last_name": "F", "first_name": "G", "email": "f@ue.edu.ph",
+                                                     "role": "faculty", "password": "secret123"})
+        self.assertTrue(CustomUser.objects.get(email="f@ue.edu.ph").is_approved)
+
+    def test_only_admins_approve(self):
+        self.signup()
+        prof = CustomUser.objects.get(email="prof@ue.edu.ph")
+        other = CustomUser.objects.create_user(email="fac@ue.edu.ph", password="secret123", first_name="F",
+                                               last_name="C", role=CustomUser.Role.FACULTY)
+        self.client.force_login(other)
+        self.assertEqual(self.client.post(reverse("account_approve", args=[prof.pk])).status_code, 403)
+        self.assertEqual(self.client.get(reverse("notifications")).status_code, 403)
+        prof.refresh_from_db()
+        self.assertFalse(prof.is_approved)
+
+    def test_email_alert_setting(self):
+        self.assertFalse(self.admin.notify_by_email)          # off by default
+        self.client.force_login(self.admin)
+        self.assertContains(self.client.get(reverse("settings")), "Email me when a faculty member signs up")
+        self.client.post(reverse("notification_settings"), {"notify_by_email": "1"})
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.notify_by_email)
+        self.client.post(reverse("notification_settings"), {})
+        self.admin.refresh_from_db()
+        self.assertFalse(self.admin.notify_by_email)
+
+    def test_accounts_search_and_filter(self):
+        self.signup()
+        CustomUser.objects.create_user(email="juan@ue.edu.ph", password="secret123", first_name="Juan",
+                                       last_name="Cruz", role=CustomUser.Role.STUDENT)
+        self.client.force_login(self.admin)
+        url = reverse("accounts")
+        r = self.client.get(url, {"q": "cruz"})
+        self.assertContains(r, "juan@ue.edu.ph")
+        self.assertNotContains(r, "prof@ue.edu.ph")
+        r = self.client.get(url, {"status": "pending"})
+        self.assertContains(r, "prof@ue.edu.ph")
+        self.assertNotContains(r, "juan@ue.edu.ph")
+        r = self.client.get(url, {"status": "student"})
+        self.assertContains(r, "juan@ue.edu.ph")
+        self.assertNotContains(r, "adm2@ue.edu.ph")
+        r = self.client.get(url, {"q": "nobody-here"})
+        self.assertContains(r, "No accounts match")

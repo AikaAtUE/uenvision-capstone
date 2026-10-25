@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Waiting for approval{% endblock %}
+{% block content %}
+<section class="auth-screen is-active">
+  {% include "_auth_side.html" %}
+  <div class="auth-card">
+    <div class="auth-brand auth-brand--compact">
+      {% include "_logo.html" with logo_class="auth-logo auth-logo--sm" %}
+    </div>
+    <div class="auth-form">
+      <h1 class="verify-title">Waiting for approval</h1>
+      <p>Thanks for signing up, {{ user.first_name }}. An administrator needs to approve your faculty account before you can use UEnvision. We'll email <strong>{{ user.email }}</strong> once it's approved.</p>
+      <p class="muted verify-note">If it's taking a while, contact your department's UEnvision administrator.</p>
+      <a class="btn btn-navy btn-block" href="{% url 'logout' %}">Log out</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

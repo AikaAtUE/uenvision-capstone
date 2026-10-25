@@ -18,10 +18,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 
-from .models import CustomUser, SurveyResponse, CurriculumSurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
+from .models import CustomUser, Notification, SurveyResponse, CurriculumSurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
 from .pipeline import manager as pipeline
 from . import curriculum_data
-from . import email_verification
+from . import email_verification, notifications
 from . import gap_analysis
 from . import ontology
 from . import recommendations
@@ -29,7 +29,10 @@ from . import recommendations
 # Create your views here.
 
 def home_url_for(user):
-    """Where a logged-in user lands: students/alumni get their own dashboard."""
+    """Where a logged-in user lands: students/alumni get their own dashboard, and
+    faculty who signed up themselves wait on the approval page until approved."""
+    if not getattr(user, "is_approved", True):
+        return reverse("pending_approval")
     return reverse("student_dashboard") if getattr(user, "is_learner", False) else reverse("dashboard")
 
 
@@ -80,12 +83,15 @@ def signup_view(request):
             last_name=last_name,
             role=CustomUser.Role.FACULTY,  # self-signups are always Faculty; only an admin can create admins
             email_verified=not email_verification.verification_required(),
+            is_approved=False,  # an administrator approves self sign-ups
         )
         if not user.email_verified:
+            # Administrators hear about it once the email is confirmed (see verify_email_view).
             sent = email_verification.send_verification_email(request, user)
             return render(request, "verify_email.html", {"state": "sent", "email": user.email, "send_failed": not sent})
+        notifications.notify_faculty_signup(request, user)
         login(request, user)
-        return redirect("dashboard")
+        return redirect("pending_approval")
     return render(request, "signup.html")
 
 
@@ -109,7 +115,16 @@ def verify_email_view(request, uidb64, token):
         return render(request, "verify_email.html", {"state": "invalid"})
     user.email_verified = True
     user.save(update_fields=["email_verified"])
-    return render(request, "verify_email.html", {"state": "confirmed"})
+    if not user.is_approved:
+        notifications.notify_faculty_signup(request, user)
+    return render(request, "verify_email.html", {"state": "confirmed", "pending": not user.is_approved})
+
+
+@login_required
+def pending_approval_view(request):
+    if request.user.is_approved:
+        return redirect(home_url_for(request.user))
+    return render(request, "pending_approval.html")
 
 
 @require_POST
@@ -128,11 +143,44 @@ def resend_verification_view(request):
 
 
 def forgot_password_view(request):
-    return render(request, "forgot_password.html")
+    if request.method != "POST":
+        return render(request, "forgot_password.html")
+    email = (request.POST.get("email") or "").strip()
+    try:
+        validate_email(email)
+    except ValidationError:
+        return render(request, "forgot_password.html", {"error": "Enter a valid email address.", "email": email})
+    if email_verification.reset_rate_limited(email):
+        return render(request, "forgot_password.html", {"sent": True, "email": email, "wait": True})
+    user = CustomUser.objects.filter(email__iexact=email, is_active=True).first()
+    if user is not None:
+        email_verification.send_password_reset_email(request, user)
+    # Same answer whether or not the account exists, so this can't be used to look up emails.
+    return render(request, "forgot_password.html", {"sent": True, "email": email})
 
 
 def reset_password_view(request):
-    return render(request, "reset_password.html")
+    """Old address of the reset page; the real one comes from the emailed link."""
+    return redirect("forgot_password")
+
+
+def reset_password_confirm_view(request, uidb64, token):
+    user = email_verification.reset_user_from_link(uidb64, token)
+    if user is None:
+        return render(request, "reset_password.html", {"invalid": True})
+    ctx = {"min_password_length": MIN_PASSWORD_LENGTH, "email": user.email}
+    if request.method != "POST":
+        return render(request, "reset_password.html", ctx)
+    new = request.POST.get("password", "")
+    confirm = request.POST.get("password2", "")
+    if len(new) < MIN_PASSWORD_LENGTH:
+        return render(request, "reset_password.html", {**ctx, "error": f"Password must be at least {MIN_PASSWORD_LENGTH} characters."})
+    if new != confirm:
+        return render(request, "reset_password.html", {**ctx, "error": "Passwords do not match."})
+    user.set_password(new)
+    user.email_verified = True  # they opened a link sent to this address
+    user.save(update_fields=["password", "email_verified"])
+    return render(request, "reset_password.html", {"done": True})
 
 
 @login_required
@@ -164,7 +212,7 @@ def dashboard_skills_view(request):
         return JsonResponse({"ok": False, "error": f"Couldn't read the data: {exc}"}, status=500)
     if data.get("exists"):
         try:
-            data["gap"] = gap_analysis.compute(top, source, level, program)
+            data["gap"] = gap_analysis.compute(top, source, level, program, dummy=request.user.is_dummy)
         except (OSError, UnicodeDecodeError) as exc:
             data["gap"] = {"exists": False, "error": str(exc)}
     return JsonResponse({"ok": True, **data})
@@ -234,9 +282,10 @@ def recommendations_view(request):
     choices = _subject_choices()
     custom = _my_custom_subjects(request.user)
     subject = None
-    gap = gap_analysis.compute(top=10)
+    dummy = request.user.is_dummy
+    gap = gap_analysis.compute(top=10, dummy=dummy)
     if subject_value in dict(choices) or subject_value in custom:
-        subject = gap_analysis.subject_targets(subject_value, info=custom.get(subject_value))
+        subject = gap_analysis.subject_targets(subject_value, info=custom.get(subject_value), dummy=dummy)
         rows = list(subject.get("targets") or []) if subject.get("exists") else []
     else:
         subject_value = ""
@@ -360,13 +409,52 @@ def _clean_account_fields(post, exclude_pk=None):
     return data, None
 
 
+# Account types offered on the Accounts page: the four roles plus the two dummy
+# (test) types, which are a student / faculty role with is_dummy set.
+ACCOUNT_TYPES = [
+    *CustomUser.Role.choices,
+    ("dummy_student", "Dummy Student"),
+    ("dummy_faculty", "Dummy Faculty"),
+]
+DUMMY_TYPES = {"dummy_student": CustomUser.Role.STUDENT, "dummy_faculty": CustomUser.Role.FACULTY}
+
+
+# Filters on the Accounts page: (value, label, queryset filter)
+ACCOUNT_FILTERS = [
+    ("", "All accounts", {}),
+    ("pending", "Waiting for approval", {"is_approved": False}),
+    ("administrator", "Administrators", {"role": CustomUser.Role.ADMINISTRATOR}),
+    ("faculty", "Faculty", {"role": CustomUser.Role.FACULTY, "is_dummy": False}),
+    ("student", "Students", {"role": CustomUser.Role.STUDENT, "is_dummy": False}),
+    ("alumni", "Alumni", {"role": CustomUser.Role.ALUMNI, "is_dummy": False}),
+    ("dummy", "Dummy (test) accounts", {"is_dummy": True}),
+]
+
+
 @administrator_required
 def accounts_view(request):
-    accounts = CustomUser.objects.order_by("last_name", "first_name")
+    from django.db.models import Q
+
+    status = request.GET.get("status", "")
+    filters = {value: f for value, _, f in ACCOUNT_FILTERS}
+    if status not in filters:
+        status = ""
+    q = request.GET.get("q", "").strip()
+    accounts = CustomUser.objects.filter(**filters[status])
+    for word in q.split():
+        accounts = accounts.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word) |
+                                   Q(middle_name__icontains=word) | Q(email__icontains=word))
+    # waiting-for-approval accounts first, then by name
+    accounts = accounts.order_by("is_approved", "last_name", "first_name")
     return render(request, "accounts.html", {
         "active_page": "accounts",
         "accounts": accounts,
-        "roles": CustomUser.Role.choices,
+        "q": q,
+        "status": status,
+        "status_choices": [(v, label) for v, label, _ in ACCOUNT_FILTERS],
+        "pending_count": CustomUser.objects.filter(is_approved=False).count(),
+        "total_count": CustomUser.objects.count(),
+        "roles": ACCOUNT_TYPES,
         "min_password_length": MIN_PASSWORD_LENGTH,
         "default_password": DEFAULT_PASSWORD,
     })
@@ -378,6 +466,8 @@ def account_create_view(request):
     data, error = _clean_account_fields(request.POST)
     role = request.POST.get("role", CustomUser.Role.FACULTY)
     password = request.POST.get("password", "") or DEFAULT_PASSWORD  # blank -> default
+    is_dummy = role in DUMMY_TYPES
+    role = DUMMY_TYPES.get(role, role)
 
     if not error and role not in CustomUser.Role.values:
         error = "Choose a valid role."
@@ -387,7 +477,7 @@ def account_create_view(request):
     if error:
         messages.error(request, error)
     else:
-        CustomUser.objects.create_user(password=password, role=role, **data)
+        CustomUser.objects.create_user(password=password, role=role, is_dummy=is_dummy, **data)
         note = " with the default password." if password == DEFAULT_PASSWORD else "."
         messages.success(request, f"Account created for {data['email']}{note}")
     return redirect("accounts")
@@ -400,12 +490,58 @@ def account_edit_view(request, pk):
     data, error = _clean_account_fields(request.POST, exclude_pk=target.pk)
     if error:
         messages.error(request, error)
-    else:
-        for field, value in data.items():
-            setattr(target, field, value)
-        target.save(update_fields=list(data))
-        messages.success(request, f"Account updated for {target.email}.")
+        return redirect("accounts")
+    for field, value in data.items():
+        setattr(target, field, value)
+    note = ""
+    # Administrators can't be dummy accounts (they'd see test numbers on the real Data pages).
+    is_dummy = request.POST.get("is_dummy") == "1" and not target.is_administrator
+    if is_dummy != target.is_dummy:
+        target.is_dummy = is_dummy
+        data["is_dummy"] = is_dummy
+        # Their answers so far move with them, so the real results stay clean.
+        moved = target.curriculum_survey_responses.update(is_dummy=is_dummy)
+        target.survey_responses.update(is_dummy=is_dummy)
+        where = "dummy (test) data" if is_dummy else "the real results"
+        note = f" It is now a {target.role_label} account; {moved} survey answer{'' if moved == 1 else 's'} moved to {where}."
+    target.save(update_fields=list(data))
+    messages.success(request, f"Account updated for {target.email}.{note}")
     return redirect("accounts")
+
+
+@administrator_required
+@require_POST
+def account_approve_view(request, pk):
+    target = get_object_or_404(CustomUser, pk=pk)
+    if not target.is_approved:
+        target.is_approved = True
+        target.save(update_fields=["is_approved"])
+        notifications.mark_read_about(target)
+        notifications.notify_approved(request, target)
+        messages.success(request, f"Approved {target.get_full_name()} ({target.email}). They can use UEnvision now.")
+    return redirect(request.POST.get("next") if url_has_allowed_host_and_scheme(
+        request.POST.get("next"), allowed_hosts={request.get_host()}) else "accounts")
+
+
+@administrator_required
+def notifications_view(request):
+    items = list(Notification.objects.filter(recipient=request.user).select_related("subject_user")[:100])
+    unread_ids = [n.pk for n in items if n.read_at is None]
+    response = render(request, "notifications.html", {"active_page": "notifications", "items": items,
+                                                      "unread_ids": set(unread_ids)})
+    # Opening the page counts as reading them (the badge clears on the next page).
+    Notification.objects.filter(pk__in=unread_ids).update(read_at=timezone.now())
+    return response
+
+
+@administrator_required
+@require_POST
+def notification_settings_view(request):
+    request.user.notify_by_email = request.POST.get("notify_by_email") == "1"
+    request.user.save(update_fields=["notify_by_email"])
+    state = "on" if request.user.notify_by_email else "off"
+    messages.success(request, f"Email alerts are {state}.")
+    return redirect("settings")
 
 
 @administrator_required
@@ -477,7 +613,7 @@ def survey_submit_view(request):
             row["sus_score"] = _compute_sus_score(answers)  # never trust the client's score
 
     SurveyResponse.objects.bulk_create(
-        [SurveyResponse(survey_type=kind, user=request.user, data=row) for row in rows]
+        [SurveyResponse(survey_type=kind, user=request.user, data=row, is_dummy=request.user.is_dummy) for row in rows]
     )
     return JsonResponse({"ok": True, "saved": len(rows)})
 
@@ -766,8 +902,14 @@ def _parse_curriculum_submission(request, needs_personal_info=True):
     return payload, None
 
 
-def _save_curriculum_survey(respondent_type, payload, user=None):
-    return CurriculumSurveyResponse.objects.create(respondent_type=respondent_type, data=payload, user=user)
+def _save_curriculum_survey(respondent_type, payload, user=None, dummy=False):
+    return CurriculumSurveyResponse.objects.create(respondent_type=respondent_type, data=payload, user=user,
+                                                   is_dummy=dummy or bool(user and user.is_dummy))
+
+
+def _is_dummy(request):
+    """Answers sent while logged in as a dummy (test) account go to the dummy data set."""
+    return request.user.is_authenticated and request.user.is_dummy
 
 
 def _learner_survey_saved(request, response):
@@ -810,7 +952,7 @@ def student_survey_submit_view(request):
     if payload.get("has_previous") and "previous" not in terms:
         return JsonResponse({"ok": False, "error": "Please select at least one previous-semester subject."}, status=400)
     _clean_target_role(payload)
-    response = _save_curriculum_survey(CurriculumSurveyResponse.STUDENT, payload)
+    response = _save_curriculum_survey(CurriculumSurveyResponse.STUDENT, payload, dummy=_is_dummy(request))
     return _learner_survey_saved(request, response)
 
 
@@ -826,7 +968,7 @@ def alumni_survey_submit_view(request):
     if not isinstance(employment, dict):
         return JsonResponse({"ok": False, "error": "Missing employment information."}, status=400)
     _clean_target_role(payload)
-    response = _save_curriculum_survey(CurriculumSurveyResponse.ALUMNI, payload)
+    response = _save_curriculum_survey(CurriculumSurveyResponse.ALUMNI, payload, dummy=_is_dummy(request))
     return _learner_survey_saved(request, response)
 
 

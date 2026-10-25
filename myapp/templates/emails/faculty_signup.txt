@@ -1,0 +1,7 @@
+{{ new_user.get_full_name }} ({{ new_user.email }}) signed up for UEnvision as faculty and is waiting for your approval.
+
+Review it here: {{ url }}
+
+You get this email because email alerts are on in your UEnvision settings. Turn them off here: {{ settings_url }}
+
+This is an automated message from UEnvision. Please don't reply to it.

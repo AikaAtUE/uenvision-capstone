@@ -49,7 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
       $('edit-first').value = d.first;
       $('edit-middle').value = d.middle;
       $('edit-email').value = d.email;
+      $('edit-dummy').checked = d.dummy === '1';
+      $('edit-dummy-wrap').hidden = d.admin === '1';
       show('edit-backdrop');
+    } else if (btn.dataset.action === 'approve'){
+      confirmThen(`Approve ${label} as faculty? They'll get full access and an email saying so.`,
+        'Yes, approve', false, () => submitAction(d.approveUrl));
     } else if (btn.dataset.action === 'reset'){
       confirmThen(`Reset the password for ${label} to the default password? They will need to log in with it again.`,
         'Yes, reset', false, () => submitAction(d.resetUrl));
@@ -63,6 +68,11 @@ document.addEventListener('DOMContentLoaded', () => {
   $('edit-form').addEventListener('submit', e => {
     e.preventDefault();
     const name = editingRow ? editingRow.dataset.name : 'this account';
-    confirmThen(`Save these changes to ${name}?`, 'Yes, save', false, () => $('edit-form').submit());
+    const wasDummy = editingRow && editingRow.dataset.dummy === '1';
+    const isDummy = $('edit-dummy').checked && !$('edit-dummy-wrap').hidden;
+    let extra = '';
+    if (isDummy && !wasDummy) extra = ' Their survey answers will move to dummy (test) data and stop counting in the real results.';
+    if (!isDummy && wasDummy) extra = ' Their survey answers will move back into the real results.';
+    confirmThen(`Save these changes to ${name}?${extra}`, 'Yes, save', false, () => $('edit-form').submit());
   });
 });

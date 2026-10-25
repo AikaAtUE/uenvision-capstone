@@ -10,7 +10,24 @@
       <h2 class="section-title" style="margin:0">Manage accounts</h2>
       <button type="button" class="btn btn-navy btn-sm" id="add-account-btn">+ Add account</button>
     </div>
-    <p class="muted table-count">{{ accounts|length }} account{{ accounts|length|pluralize }}</p>
+    {% if pending_count and status != "pending" %}
+    <p class="acct-pending-note"><strong>{{ pending_count }} faculty sign-up{{ pending_count|pluralize }}</strong> waiting for approval. <a class="link-inline" href="?status=pending">Review</a></p>
+    {% endif %}
+    <form class="data-toolbar acct-filters" method="get" action="{% url 'accounts' %}">
+      <label class="select-field select-field--grow">
+        <span>Search</span>
+        <input type="search" name="q" value="{{ q }}" placeholder="Name or email" autocomplete="off">
+      </label>
+      <label class="select-field">
+        <span>Show</span>
+        <select name="status" onchange="this.form.submit()">
+          {% for value, label in status_choices %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}{% if value == "pending" and pending_count %} ({{ pending_count }}){% endif %}</option>{% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn btn-navy btn-sm">Search</button>
+      {% if q or status %}<a class="link-inline acct-clear" href="{% url 'accounts' %}">Clear</a>{% endif %}
+    </form>
+    <p class="muted table-count">{% if q or status %}{{ accounts|length }} of {{ total_count }} accounts{% else %}{{ accounts|length }} account{{ accounts|length|pluralize }}{% endif %}</p>
 
     <div class="table-wrap">
       <table id="accounts-table">
@@ -20,20 +37,25 @@
           <tr
             data-last="{{ a.last_name }}" data-first="{{ a.first_name }}" data-middle="{{ a.middle_name }}"
             data-email="{{ a.email }}" data-name="{{ a.get_full_name }}"
+            data-dummy="{% if a.is_dummy %}1{% endif %}" data-admin="{% if a.is_administrator %}1{% endif %}"
             data-edit-url="{% url 'account_edit' a.pk %}"
             data-reset-url="{% url 'account_reset_password' a.pk %}"
-            data-delete-url="{% url 'account_delete' a.pk %}">
+            data-delete-url="{% url 'account_delete' a.pk %}"
+            data-approve-url="{% url 'account_approve' a.pk %}">
             <td>{{ a.pk }}</td>
             <td>{{ a.get_full_name }}{% if a.pk == user.pk %} <span class="pill pill--you">You</span>{% endif %}</td>
             <td>{{ a.email }}</td>
-            <td><span class="pill pill--{{ a.role }}">{{ a.get_role_display }}</span></td>
+            <td><span class="pill pill--{{ a.role }}{% if a.is_dummy %} pill--dummy{% endif %}">{{ a.role_label }}</span>{% if not a.is_approved %} <span class="pill pill--pending">Waiting for approval</span>{% endif %}{% if not a.email_verified %} <span class="pill pill--unverified">Email not confirmed</span>{% endif %}</td>
             <td>{{ a.date_joined|date:"M j, Y" }}</td>
             <td class="row-actions">
+              {% if not a.is_approved %}<button type="button" class="btn btn-navy btn-sm" data-action="approve">Approve</button>{% endif %}
               <button type="button" class="btn btn-ghost btn-sm" data-action="edit">Edit</button>
-              <button type="button" class="btn btn-ghost btn-sm" data-action="reset">Reset password</button>
+              {% if a.is_approved %}<button type="button" class="btn btn-ghost btn-sm" data-action="reset">Reset password</button>{% endif %}
               {% if a.pk != user.pk %}<button type="button" class="btn btn-red btn-sm" data-action="delete">Remove</button>{% endif %}
             </td>
           </tr>
+        {% empty %}
+          <tr><td colspan="6" class="muted">No accounts match.</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -44,7 +66,7 @@
 
 {% block extra_partials %}
 {# Shared hidden form used by Reset password / Remove (action URL is set by accounts.js) #}
-<form id="action-form" method="post" hidden>{% csrf_token %}</form>
+<form id="action-form" method="post" hidden>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
 
 <div class="modal-backdrop" id="add-backdrop">
   <div class="modal modal--form" role="dialog" aria-labelledby="add-title">
@@ -77,6 +99,10 @@
       <label class="field"><span>First name</span><input type="text" name="first_name" id="edit-first" required></label>
       <label class="field"><span>Middle name (optional)</span><input type="text" name="middle_name" id="edit-middle"></label>
       <label class="field"><span>Email</span><input type="email" name="email" id="edit-email" required></label>
+      <label class="check-field" id="edit-dummy-wrap">
+        <input type="checkbox" name="is_dummy" value="1" id="edit-dummy">
+        <span><strong>Dummy (test) account</strong><br><small class="field-hint">Their survey answers, including ones already submitted, are kept out of the real results.</small></span>
+      </label>
       <div class="modal-actions">
         <button type="submit" class="btn btn-navy">Save changes</button>
         <button type="button" class="btn btn-cancel" data-close="edit-backdrop">Cancel</button>

@@ -22,8 +22,12 @@
         <p class="muted verify-note">Check your spam or junk folder too.</p>
       {% elif state == "confirmed" %}
         <h1 class="verify-title">Email confirmed</h1>
+        {% if pending %}
+        <p>Thanks! An administrator now needs to approve your faculty account. We'll email you as soon as it's approved.</p>
+        {% else %}
         <p>Your account is ready. You can log in now.</p>
         <a class="btn btn-navy btn-block" href="{% url 'login' %}">Log in</a>
+        {% endif %}
       {% elif state == "invalid" %}
         <h1 class="verify-title">This link doesn't work</h1>
         <p>The confirmation link has expired or was already used. If you haven't confirmed your account yet, we can send you a new link.</p>
