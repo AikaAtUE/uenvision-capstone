@@ -520,14 +520,15 @@ img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }
   .acct-filters .btn{width:100%; justify-content:center;}
 }
 
-/* ---------- Notification bell (administrators), top right, UEnvision navy with a red count ---------- */
+/* ---------- Notification bell (administrators), top right: white bell with a red count ---------- */
 .content{position:relative;}
 .notif-bell{position:absolute; top:15px; right:24px; z-index:30;}
 .notif-bell-btn{position:relative; width:40px; height:40px; border-radius:50%; border:0; cursor:pointer;
-  background:transparent; color:var(--navy); display:inline-flex; align-items:center; justify-content:center;}
+  background:transparent; color:#fff; display:inline-flex; align-items:center; justify-content:center;}
 .notif-bell-btn svg{width:28px; height:28px;}
-.notif-bell-btn:hover{color:var(--navy-light);}
-.notif-bell.is-open .notif-bell-btn{color:#fff;}
+@media (hover: hover){ .notif-bell-btn:hover{opacity:.85;} }
+/* same bell, drawn as an outline while the dropdown is open */
+.notif-bell.is-open .notif-bell-btn svg path{fill:none; stroke:currentColor; stroke-width:1.7; stroke-linejoin:round;}
 .notif-bell-btn:focus-visible{outline:2px solid #fff; outline-offset:2px;}
 .notif-bell-count{position:absolute; top:-2px; right:-6px; min-width:19px; height:19px; padding:0 5px; border-radius:999px;
   background:var(--red); color:#fff; font-size:.72rem; font-weight:700; line-height:15px; text-align:center; border:2px solid #fff;
