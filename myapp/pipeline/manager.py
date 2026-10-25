@@ -342,8 +342,18 @@ def read_api_keys_text() -> str:
     return p.read_text(encoding="utf-8") if p.is_file() else ""
 
 
+def env_api_keys() -> list[str]:
+    """Extra keys from the GEMINI_API_KEYS environment variable (comma- or
+    newline-separated). Empty when it isn't set, which is the usual local case."""
+    raw = os.environ.get(getattr(settings, "GEMINI_API_KEYS_ENV", "GEMINI_API_KEYS"), "")
+    return [k.strip() for k in raw.replace(",", "\n").splitlines() if k.strip()]
+
+
 def count_api_keys(text: str | None = None) -> int:
-    text = read_api_keys_text() if text is None else text
+    if text is None:
+        keys = [ln.strip() for ln in read_api_keys_text().splitlines()
+                if ln.strip() and not ln.strip().startswith("#")]
+        return len(dict.fromkeys(keys + env_api_keys()))
     return sum(1 for ln in text.splitlines() if ln.strip() and not ln.strip().startswith("#"))
 
 

@@ -72,6 +72,10 @@ Still in progress:
 
 *(Full tooling and environment details are documented in Chapter 3 of the project paper and will be reflected here as implementation progresses.)*
 
+## Deployment
+
+The production setup (Hostinger Ubuntu VPS with nginx, gunicorn and systemd) is described step by step in [deploy/DEPLOY.md](deploy/DEPLOY.md). Local development needs no extra setup: `python manage.py runserver` works as before.
+
 ## Research Team
 
 **Adviser:** Sheila M. Geronimo

@@ -1,0 +1,27 @@
+# systemd unit that runs UEnvision with gunicorn.
+# Install:  sudo cp deploy/uenvision.service /etc/systemd/system/uenvision.service
+[Unit]
+Description=UEnvision (Django via gunicorn)
+After=network.target
+
+[Service]
+User=uenvision
+# nginx runs as www-data and must be able to open the socket.
+Group=www-data
+WorkingDirectory=/home/uenvision/uenvision-capstone
+EnvironmentFile=/home/uenvision/uenvision-capstone/.env
+# Creates /run/uenvision/ for the socket each time the service starts.
+RuntimeDirectory=uenvision
+UMask=0007
+# --timeout 300: generating recommendations calls Gemini and can take a few minutes.
+ExecStart=/home/uenvision/uenvision-capstone/venv/bin/gunicorn \
+    --workers 3 \
+    --timeout 300 \
+    --bind unix:/run/uenvision/gunicorn.sock \
+    --access-logfile - \
+    UEnvision.wsgi:application
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -306,6 +306,7 @@ def generate_for_skills(skills: list, audience: str = "professor", context: str 
 
     keys_text = pipeline.read_api_keys_text()
     keys = [ln.strip() for ln in keys_text.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    keys = list(dict.fromkeys(keys + pipeline.env_api_keys()))
     if not keys:
         raise RecommendationError(
             "No Gemini API key is set. Add one on Data → Extract Skills first.")

@@ -1,0 +1,29 @@
+# Secrets and local data
+api_keys.txt
+.env
+db.sqlite3
+db.sqlite3-journal
+*.sqlite3.bak
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+
+# Django
+staticfiles/
+media/
+
+# Pipeline run state and logs
+data/.state/run.json
+data/.state/run.log
+data/.state/run_config.json
+data/.state/*.tmp
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

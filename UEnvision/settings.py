@@ -10,22 +10,43 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+def _env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-#x&h+l_1+g3wq61$2a#d8k10)riwcg*vl4(2_x(es*it7v-!!)'
+
+def _env_list(name, default=""):
+    return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
+
+
+# Everything below defaults to local-development values, so `python manage.py
+# runserver` works with no setup. On the server these come from the .env file
+# that systemd loads (see deploy/.env.example and deploy/DEPLOY.md).
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = _env_bool('DJANGO_DEBUG', True)
 
-ALLOWED_HOSTS = []
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
+if not SECRET_KEY:
+    if not DEBUG:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured("Set DJANGO_SECRET_KEY when DJANGO_DEBUG is off.")
+    SECRET_KEY = 'django-insecure-#x&h+l_1+g3wq61$2a#d8k10)riwcg*vl4(2_x(es*it7v-!!)'
+
+ALLOWED_HOSTS = _env_list('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]')
+
+# Full origins, e.g. "https://uenvision.example.com,http://201.18.219.201"
+CSRF_TRUSTED_ORIGINS = _env_list('DJANGO_CSRF_TRUSTED_ORIGINS')
 
 
 # Application definition
@@ -81,7 +102,7 @@ WSGI_APPLICATION = 'UEnvision.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.environ.get('DJANGO_DB_PATH', BASE_DIR / 'db.sqlite3'),
     }
 }
 
@@ -122,6 +143,32 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+# `python manage.py collectstatic` copies every static file here; nginx serves it.
+STATIC_ROOT = Path(os.environ.get('DJANGO_STATIC_ROOT', BASE_DIR / 'staticfiles'))
+
+# ---------------------------------------------------------------------------
+# Production security (only when DEBUG is off)
+# ---------------------------------------------------------------------------
+if not DEBUG:
+    # nginx terminates HTTPS and tells Django the original scheme.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    # Turn these on in .env once certbot has set up HTTPS. Left off by
+    # default so the site still works over plain http://<VPS IP>.
+    _https = _env_bool('DJANGO_HTTPS', False)
+    SESSION_COOKIE_SECURE = _https
+    CSRF_COOKIE_SECURE = _https
+    SECURE_SSL_REDIRECT = _https
+    SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_HSTS_SECONDS', '0')) if _https else 0
+    SESSION_COOKIE_HTTPONLY = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {'console': {'class': 'logging.StreamHandler'}},
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -137,7 +184,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # data/extracted_skills.csv                        Gemini skill extraction output
 DATA_DIR = BASE_DIR / "data"
 # One Gemini API key per line. Editable from Data > Scrape Data (administrators only).
-API_KEYS_FILE = BASE_DIR / "api_keys.txt"
+API_KEYS_FILE = Path(os.environ.get("UENVISION_API_KEYS_FILE", BASE_DIR / "api_keys.txt"))
+# Optional extra keys from the environment (comma- or newline-separated). They are
+# used together with the keys in API_KEYS_FILE; leave unset to use only the file.
+GEMINI_API_KEYS_ENV = "GEMINI_API_KEYS"
 
 # Importing a folder of job JSONs can post hundreds of files at once (Django's default is 100).
 DATA_UPLOAD_MAX_NUMBER_FILES = 5000

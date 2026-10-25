@@ -96,10 +96,14 @@ class KeyPool:
 
     def __init__(self, path: str):
         p = Path(path)
-        if not p.exists():
+        # Extra keys may also come from the GEMINI_API_KEYS environment variable.
+        env_keys = [k.strip() for k in os.environ.get("GEMINI_API_KEYS", "").replace(",", "\n").splitlines()
+                    if k.strip()]
+        if not p.exists() and not env_keys:
             raise FileNotFoundError(f"{path} not found. Put one Gemini API key per line in it.")
-        self.keys = [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines()
-                     if ln.strip() and not ln.strip().startswith("#")]
+        file_keys = [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines()
+                     if ln.strip() and not ln.strip().startswith("#")] if p.exists() else []
+        self.keys = list(dict.fromkeys(file_keys + env_keys))
         if not self.keys:
             raise ValueError(f"{path} contains no API keys.")
         self.idx = 0

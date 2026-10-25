@@ -803,3 +803,29 @@ class ProfessorMySkillsTests(IsolatedDataMixin, TestCase):
         self.assertEqual(data["subjects"][0]["skills"], [{"name": "Python", "level": "applied"}])
         self.assertIn("consent_at", data)
         self.assertIn("edited_at", data)
+
+
+class EnvApiKeyTests(TestCase):
+    """Gemini keys can come from GEMINI_API_KEYS as well as api_keys.txt."""
+
+    def test_env_keys_are_added_to_file_keys_without_duplicates(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from django.test import override_settings
+        from .pipeline import manager as pipeline
+
+        with tempfile.TemporaryDirectory() as tmp:
+            keys_file = Path(tmp) / "api_keys.txt"
+            keys_file.write_text("key-a\n# comment\nkey-b\n", encoding="utf-8")
+            with override_settings(API_KEYS_FILE=keys_file):
+                with mock.patch.dict(os.environ, {}, clear=False):
+                    os.environ.pop("GEMINI_API_KEYS", None)
+                    self.assertEqual(pipeline.env_api_keys(), [])
+                    self.assertEqual(pipeline.count_api_keys(), 2)
+                with mock.patch.dict(os.environ, {"GEMINI_API_KEYS": "key-b, key-c"}):
+                    self.assertEqual(pipeline.env_api_keys(), ["key-b", "key-c"])
+                    self.assertEqual(pipeline.count_api_keys(), 3)
+                    # The editable file on the Data page is left as it is.
+                    self.assertNotIn("key-c", pipeline.read_api_keys_text())
