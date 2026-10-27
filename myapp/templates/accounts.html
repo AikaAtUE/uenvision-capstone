@@ -107,7 +107,7 @@
       <label class="field"><span>Email</span><input type="email" name="email" id="edit-email" required></label>
       <label class="field"><span>Role</span>
         <select name="account_type" id="edit-type">{% for value, label in roles %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
-        <small class="field-hint" id="edit-type-hint">Dummy accounts' survey answers, including ones already submitted, are kept out of the real results.</small></label>
+        <small class="field-hint" id="edit-type-hint">Survey answers from dummy accounts and developers, including ones already submitted, are kept out of the real results. Developers have full administrator access.</small></label>
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       <div class="modal-actions">
         <button type="submit" class="btn btn-navy">Save changes</button>

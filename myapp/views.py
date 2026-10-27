@@ -213,7 +213,7 @@ def dashboard_skills_view(request):
         return JsonResponse({"ok": False, "error": f"Couldn't read the data: {exc}"}, status=500)
     if data.get("exists"):
         try:
-            data["gap"] = gap_analysis.compute(top, source, level, program, dummy=request.user.is_dummy)
+            data["gap"] = gap_analysis.compute(top, source, level, program, dummy=_sees_dummy_results(request))
         except (OSError, UnicodeDecodeError) as exc:
             data["gap"] = {"exists": False, "error": str(exc)}
     return JsonResponse({"ok": True, **data})
@@ -283,7 +283,7 @@ def recommendations_view(request):
     choices = _subject_choices()
     custom = _my_custom_subjects(request.user)
     subject = None
-    dummy = request.user.is_dummy
+    dummy = _sees_dummy_results(request)
     gap = gap_analysis.compute(top=10, dummy=dummy)
     if subject_value in dict(choices) or subject_value in custom:
         subject = gap_analysis.subject_targets(subject_value, info=custom.get(subject_value), dummy=dummy)
@@ -410,7 +410,7 @@ def _clean_account_fields(post, exclude_pk=None):
     return data, None
 
 
-# Account types offered on the Accounts page: the four roles plus the two dummy
+# Account types offered on the Accounts page: the roles (Developer included) plus the two dummy
 # (test) types, which are a student / faculty role with is_dummy set.
 ACCOUNT_TYPES = [
     *CustomUser.Role.choices,
@@ -425,6 +425,7 @@ ACCOUNT_FILTERS = [
     ("", "All accounts", {}),
     ("pending", "Waiting for approval", {"is_approved": False}),
     ("administrator", "Administrators", {"role": CustomUser.Role.ADMINISTRATOR}),
+    ("developer", "Developers", {"role": CustomUser.Role.DEVELOPER}),
     ("faculty", "Faculty", {"role": CustomUser.Role.FACULTY, "is_dummy": False}),
     ("student", "Students", {"role": CustomUser.Role.STUDENT, "is_dummy": False}),
     ("alumni", "Alumni", {"role": CustomUser.Role.ALUMNI, "is_dummy": False}),
@@ -518,6 +519,7 @@ def account_edit_view(request, pk):
         setattr(target, field, value)
     notes = []
     old_label = target.role_label
+    answers_were_dummy = target.answers_are_dummy
     role = DUMMY_TYPES.get(account_type, account_type)
     is_dummy = account_type in DUMMY_TYPES
     if role != target.role:
@@ -526,10 +528,13 @@ def account_edit_view(request, pk):
     if is_dummy != target.is_dummy:
         target.is_dummy = is_dummy
         data["is_dummy"] = is_dummy
-        # Their answers so far move with them, so the real results stay clean.
-        moved = target.curriculum_survey_responses.update(is_dummy=is_dummy)
-        target.survey_responses.update(is_dummy=is_dummy)
-        where = "dummy (test) data" if is_dummy else "the real results"
+    if target.answers_are_dummy != answers_were_dummy:
+        # Their answers so far move with them (to or from a dummy type or Developer),
+        # so the real results stay clean.
+        dummy_now = target.answers_are_dummy
+        moved = target.curriculum_survey_responses.update(is_dummy=dummy_now)
+        target.survey_responses.update(is_dummy=dummy_now)
+        where = "dummy (test) data" if dummy_now else "the real results"
         if moved:
             notes.append(f"{moved} survey answer{'' if moved == 1 else 's'} moved to {where}.")
     if target.role_label != old_label:
@@ -671,7 +676,7 @@ def survey_submit_view(request):
             row["sus_score"] = _compute_sus_score(answers)  # never trust the client's score
 
     SurveyResponse.objects.bulk_create(
-        [SurveyResponse(survey_type=kind, user=request.user, data=row, is_dummy=request.user.is_dummy) for row in rows]
+        [SurveyResponse(survey_type=kind, user=request.user, data=row, is_dummy=request.user.answers_are_dummy) for row in rows]
     )
     return JsonResponse({"ok": True, "saved": len(rows)})
 
@@ -962,12 +967,34 @@ def _parse_curriculum_submission(request, needs_personal_info=True):
 
 def _save_curriculum_survey(respondent_type, payload, user=None, dummy=False):
     return CurriculumSurveyResponse.objects.create(respondent_type=respondent_type, data=payload, user=user,
-                                                   is_dummy=dummy or bool(user and user.is_dummy))
+                                                   is_dummy=dummy or bool(user and user.answers_are_dummy))
+
+
+def _sees_dummy_results(request):
+    """Dummy accounts always see results computed from dummy answers. Developers see the
+    real results unless they've flipped the Real / Dummy switch to Dummy."""
+    from .context_processors import DEV_DUMMY_VIEW_KEY
+    user = request.user
+    return user.is_dummy or (user.is_developer and bool(request.session.get(DEV_DUMMY_VIEW_KEY)))
+
+
+@administrator_required
+@require_POST
+def developer_results_view(request):
+    """The Real / Dummy results switch (developers only)."""
+    from .context_processors import DEV_DUMMY_VIEW_KEY
+    if not request.user.is_developer:
+        raise PermissionDenied
+    request.session[DEV_DUMMY_VIEW_KEY] = request.POST.get("results") == "dummy"
+    next_url = request.POST.get("next")
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return redirect(next_url)
+    return redirect("dashboard")
 
 
 def _is_dummy(request):
-    """Answers sent while logged in as a dummy (test) account go to the dummy data set."""
-    return request.user.is_authenticated and request.user.is_dummy
+    """Answers sent while logged in as a dummy (test) account or a developer go to the dummy data set."""
+    return request.user.is_authenticated and request.user.answers_are_dummy
 
 
 def _learner_survey_saved(request, response):

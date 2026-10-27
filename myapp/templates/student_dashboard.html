@@ -90,7 +90,7 @@
       {% if not to_build %}
         <p class="empty-note">You already have every top skill at Intermediate or better. Try another job role above.</p>
       {% else %}
-      <p class="form-msg rec-caveat">Resources are suggested by AI (with live web search when available) and haven't been checked by a person yet. Check a course before paying for it.</p>
+      <p class="form-msg rec-caveat">Resources are suggested by AI. Links marked ✓ Link checked were opened automatically and lead to that course, but no person has reviewed them yet. Check a course before paying for it.</p>
       <form id="rec-form" method="post" action="{% url 'student_generate' %}" data-max="{{ max_per_run }}" data-verb="Find resources">
         {% csrf_token %}
         <div class="rec-toolbar">

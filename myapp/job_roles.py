@@ -8,6 +8,12 @@ Postings carry free-text titles ("Fullstack Developer {Java and Spring Boot}
 title to the first role whose patterns match; titles that match no role (and the
 non-IT postings Kalibrr also returns, such as accountants) are left out of the
 role statistics. Add or reorder patterns in ROLES to change the grouping.
+
+postings() / it_postings() are also the ONE place results read job postings from:
+the homepage, the student/alumni dashboard, the Dashboard's charts and stat cards,
+the skill gap analysis and the Recommendations page all count the same IT/CS
+postings with the same (ontology-standardized) skill names, so a skill's share is
+the same number wherever it is shown.
 """
 import re
 
@@ -54,9 +60,12 @@ def role_for(title, function=""):
     return None
 
 
-def _postings():
-    """-> list of (role_key or None, {skill_key: display}) per extracted posting, cached
-    until data/extracted_skills.csv changes."""
+def postings():
+    """-> one dict per extracted posting, cached until data/extracted_skills.csv changes:
+    {"role": role key or None, "source", "level" ("" if not given), "month" ("YYYY-MM" or None),
+     "hard": {skill_key: display}, "soft": {skill_key: display}}.
+    Skill names go through the same ontology standardization as the survey answers
+    (gap_analysis._standardize), so "REST APIs" / "RESTful API" count as one skill."""
     from . import gap_analysis
 
     path = pipeline.extracted_csv()
@@ -77,24 +86,47 @@ def _postings():
         return r[i].strip() if i is not None and i < len(r) else ""
 
     index = gap_analysis._ontology_index()
+
+    def skills(raw):
+        out = {}
+        for name in split_skills(raw):
+            hit = gap_analysis._standardize(name, index)
+            if hit:
+                out.setdefault(hit[0], hit[1])
+        return out
+
     out = []
     for r in rows:
-        skills = {}
-        for raw in split_skills(get(r, "hard_skills")):
-            hit = gap_analysis._standardize(raw, index)
-            if hit:
-                skills.setdefault(hit[0], hit[1])
-        out.append((role_for(get(r, "job_name"), get(r, "function")), skills))
+        m = pipeline._MONTH_RE.match(get(r, "date"))
+        out.append({
+            "role": role_for(get(r, "job_name"), get(r, "function")),
+            "source": get(r, "source"),
+            "level": get(r, "experience_level"),
+            "month": f"{m.group(1)}-{m.group(2)}" if m else None,
+            "hard": skills(get(r, "hard_skills")),
+            "soft": skills(get(r, "soft_skills")),
+        })
     _CACHE.update(key=stamp, value=out)
     return out
 
 
+def it_postings(source="", level=""):
+    """The postings every result counts: IT/CS-role postings only (non-IT postings that
+    the job boards also return, such as accountants or pharmacists, are left out),
+    optionally narrowed to one source / experience level ("Not specified" = blank).
+    -> list, or None when there's no extracted data yet."""
+    all_postings = postings()
+    if all_postings is None:
+        return None
+    return [p for p in all_postings if p["role"]
+            and (not source or p["source"] == source)
+            and (not level or (p["level"] or "Not specified") == level)]
+
+
 def _top(postings, top):
-    counts, label = {}, {}
-    for _, skills in postings:
-        for k, disp in skills.items():
-            counts[k] = counts.get(k, 0) + 1
-            label.setdefault(k, disp)
+    from . import gap_analysis
+
+    counts, label = gap_analysis._tally(p["hard"] for p in postings)
     total = len(postings)
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], label[kv[0]].lower()))
     pct = {k: round(c / total * 100, 1) for k, c in counts.items()} if total else {}
@@ -105,23 +137,22 @@ def skill_stats(role="", top=10):
     """Top hard skills across all IT-role postings, and (if `role` is given) for that
     role, each role skill with its overall % for comparison.
     -> {"exists", "roles": [{key, label, postings}], "overall": {...}, "role": {...} or None}"""
-    postings = _postings()
-    if postings is None:
+    it = it_postings()
+    if it is None:
         return {"exists": False}
-    it_postings = [p for p in postings if p[0]]
     counts = {}
-    for key, _ in it_postings:
-        counts[key] = counts.get(key, 0) + 1
+    for p in it:
+        counts[p["role"]] = counts.get(p["role"], 0) + 1
     roles = [{"key": k, "label": label, "postings": counts[k]} for k, label, _ in ROLES if counts.get(k)]
-    overall_top, overall_pct = _top(it_postings, top)
+    overall_top, overall_pct = _top(it, top)
     result = {
         "exists": True,
         "roles": roles,
-        "overall": {"postings": len(it_postings), "skills": overall_top},
+        "overall": {"postings": len(it), "skills": overall_top},
         "role": None,
     }
     if role in ROLE_LABELS:
-        role_postings = [p for p in it_postings if p[0] == role]
+        role_postings = [p for p in it if p["role"] == role]
         role_top, _ = _top(role_postings, top)
         for s in role_top:
             s["overall_pct"] = overall_pct.get(s["key"], 0.0)

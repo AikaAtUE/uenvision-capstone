@@ -60,6 +60,10 @@
       var p = document.createElement('span'); p.className = 'muted rec-card-provider'; p.textContent = r.provider;
       body.appendChild(p);
     }
+    if (r.verified === 'link checked') {
+      var check = document.createElement('span'); check.className = 'rec-card-check'; check.textContent = '\u2713 Link checked';
+      body.appendChild(check);
+    }
     card.appendChild(img); card.appendChild(body);
     return card;
   }

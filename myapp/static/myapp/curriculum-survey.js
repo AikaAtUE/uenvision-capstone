@@ -533,8 +533,12 @@
       if (elig.previous) {
         previousWrap.innerHTML =
           '<h3>Previous semester subjects <span class="muted">(' + escapeHtml(elig.previous.term_label) + ')</span></h3>' +
-          '<p class="muted">Select the subjects you took in your most recently completed term. At least one is required.</p>' +
-          termGrid(elig.previous, 'previous');
+          '<p class="muted">Select the subjects you took in your last regular semester' +
+            ((elig.previous_summer || []).length ? ' and the summer term after it' : '') + '. At least one is required.</p>' +
+          termGrid(elig.previous, 'previous') +
+          (elig.previous_summer || []).map(function (term) {
+            return '<h4>' + escapeHtml(term.term_label) + '</h4>' + termGrid(term, 'previous');
+          }).join('');
       } else {
         previousWrap.innerHTML = '<p class="cs-section--empty">This is your first semester at UE, so there is no previous semester to report.</p>';
       }
@@ -576,7 +580,8 @@
         var elig = currentElig();
         var bucket = e.target.getAttribute('data-bucket');
         var termKey = e.target.getAttribute('data-term-key');
-        var terms = bucket === 'earlier' ? elig.earlier : [elig[bucket]];
+        var terms = bucket === 'earlier' ? elig.earlier
+          : bucket === 'previous' ? [elig.previous].concat(elig.previous_summer || []) : [elig[bucket]];
         var term = terms.filter(function (t) { return t.term_key === termKey; })[0];
         var subj = term.subjects.filter(function (s) { return s.code === e.target.value; })[0];
         if (e.target.checked) {

@@ -6,6 +6,7 @@
     <span class="pill rec-card-type">{{ r.type }}</span>
     <a href="{{ r.link }}" target="_blank" rel="noopener noreferrer" class="rec-card-name">{{ r.name }}</a>
     {% if r.provider %}<span class="muted rec-card-provider">{{ r.provider }}</span>{% endif %}
+    {% if r.verified == "link checked" %}<span class="rec-card-check">✓ Link checked</span>{% endif %}
   </div>
 </div>
 {% endfor %}

@@ -255,10 +255,14 @@ class CurriculumCalendarTests(TestCase):
         # 1st years: no previous term; nobody gets their current year's 2nd semester
         self.assertIsNone(elig["BSIT"]["1"]["previous"])
         self.assertEqual(elig["BSIT"]["4"]["current"]["term_key"], "y4s1")
-        # BSIT 3rd year's previous term is the 2nd-year summer; BSCS's is 2nd year 2nd sem
-        self.assertEqual(elig["BSIT"]["3"]["previous"]["term_key"], "y2sum")
+        # previous semester is always the last regular semester; a summer in between is added
+        self.assertEqual(elig["BSIT"]["3"]["previous"]["term_key"], "y2s2")
+        self.assertEqual([t["term_key"] for t in elig["BSIT"]["3"]["previous_summer"]], ["y2sum"])
         self.assertEqual(elig["BSCS"]["3"]["previous"]["term_key"], "y2s2")
-        self.assertEqual([t["term_key"] for t in elig["BSIT"]["3"]["earlier"]], ["y1s1", "y1s2", "y2s1", "y2s2"])
+        self.assertEqual(elig["BSCS"]["3"]["previous_summer"], [])
+        self.assertEqual(elig["BSCS"]["4"]["previous"]["term_key"], "y3s2")
+        self.assertEqual([t["term_key"] for t in elig["BSCS"]["4"]["previous_summer"]], ["y3sum"])
+        self.assertEqual([t["term_key"] for t in elig["BSIT"]["3"]["earlier"]], ["y1s1", "y1s2", "y2s1"])
         codes = [s["code"] for s in elig["BSIT"]["1"]["current"]["subjects"]]
         self.assertIn("CCP 1101", codes)
 
@@ -267,6 +271,15 @@ class CurriculumCalendarTests(TestCase):
         elig = cd.build_student_eligibility("2")
         self.assertEqual(elig["BSCS"]["1"]["current"]["term_key"], "y1s2")
         self.assertEqual(elig["BSCS"]["1"]["previous"]["term_key"], "y1s1")
+        self.assertEqual(elig["BSCS"]["1"]["previous_summer"], [])
+
+    def test_summer_eligibility(self):
+        from . import curriculum_data as cd
+        elig = cd.build_student_eligibility("summer")
+        # a student in summer classes reports the 2nd semester that just ended
+        self.assertEqual(elig["BSIT"]["2"]["current"]["term_key"], "y2sum")
+        self.assertEqual(elig["BSIT"]["2"]["previous"]["term_key"], "y2s2")
+        self.assertEqual(elig["BSIT"]["2"]["previous_summer"], [])
 
 
 class CurriculumSurveySubmitTests(IsolatedDataMixin, TestCase):
@@ -402,6 +415,23 @@ class PublicSiteTests(IsolatedDataMixin, TestCase):
     def test_check_gap_page(self):
         r = self.client.get(reverse("check_gap"), {"role": "qa"})
         self.assertContains(r, "?role=qa")
+
+    def test_homepage_dashboard_and_gap_show_the_same_numbers(self):
+        from . import gap_analysis, job_roles
+        from .pipeline import manager as pipeline
+        home = job_roles.skill_stats("", 10)
+        if not home.get("exists"):
+            self.skipTest("no extracted_skills.csv")
+        dash = pipeline.skills_dashboard("hard", 10)
+        gap = gap_analysis.compute(10)
+        self.assertEqual(dash["stats"]["postings"], home["overall"]["postings"])
+        self.assertEqual(gap["postings_considered"], home["overall"]["postings"])
+        self.assertEqual([(b["skill"], b["count"], b["pct"]) for b in dash["bars"]],
+                         [(s["skill"], s["count"], s["pct"]) for s in home["overall"]["skills"]])
+        gap_rows = {r["skill"]: r["industry_pct"] for r in gap["under_taught"] + gap["well_covered"]}
+        for s in home["overall"]["skills"]:
+            if s["skill"] in gap_rows:
+                self.assertEqual(gap_rows[s["skill"]], s["pct"])
 
 
 class StudentFlowTests(IsolatedDataMixin, TestCase):
@@ -667,12 +697,113 @@ class RecommendationGroundingFallbackTests(TestCase):
         fake_google.genai.types = types
         with mock.patch.dict("sys.modules", {"google": fake_google, "google.genai": fake_google.genai,
                                              "google.genai.types": types}), \
-                mock.patch.object(recommendations, "_grounding_unavailable", False):
+                mock.patch.object(recommendations, "_grounding_unavailable", False), \
+                mock.patch.object(recommendations, "_check_links", side_effect=lambda rows: rows):
             rows = recommendations._call_gemini(client, "m", "SQL", "student")
             self.assertEqual(rows[0]["verified"], "no (ungrounded)")
             self.assertTrue(recommendations._grounding_unavailable)
             recommendations._call_gemini(client, "m", "R", "student")
         self.assertEqual(client.models.generate_content.call_count, 3)  # second skill skipped search
+
+
+class RecommendationLinkCheckTests(TestCase):
+    """verify_resource() opens each link Gemini suggests; requests is faked here."""
+
+    class _Resp:
+        def __init__(self, status=200, url="", body="", ctype="text/html; charset=utf-8", json_data=None):
+            self.status_code, self.url, self._body = status, url, body.encode()
+            self.headers, self.encoding, self._json = {"Content-Type": ctype}, "utf-8", json_data
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def iter_content(self, n):
+            yield self._body
+
+        def json(self):
+            return self._json
+
+    def _verify(self, link, name, resp=None, exc=None):
+        from unittest import mock
+        import requests
+        from . import recommendations
+
+        def get(url, **kw):
+            if exc:
+                raise exc
+            r = resp(url, kw) if callable(resp) else resp
+            if not r.url:
+                r.url = url
+            return r
+        with mock.patch.object(requests, "get", side_effect=get):
+            return recommendations.verify_resource(link, name)
+
+    def test_real_course_page_passes(self):
+        page = "<html><head><title>Introduction to Structured Query Language (SQL) | Coursera</title></head></html>"
+        self.assertEqual(self._verify("https://www.coursera.org/learn/intro-sql",
+                                      "Introduction to Structured Query Language (SQL)", self._Resp(body=page)), "ok")
+
+    def test_404_and_missing_domain_are_dropped(self):
+        import requests
+        self.assertEqual(self._verify("https://www.coursera.org/learn/made-up", "Made Up Course",
+                                      self._Resp(status=404)), "dead")
+        err = requests.exceptions.ConnectionError("Failed to resolve 'fake-academy.io' ([Errno -2] Name or service not known)")
+        self.assertEqual(self._verify("https://fake-academy.io/sql", "SQL Mastery", exc=err), "dead")
+
+    def test_homepage_redirect_and_wrong_page_are_dropped(self):
+        self.assertEqual(self._verify("https://www.freecodecamp.org/", "Data Analyst Certification",
+                                      self._Resp(body="<title>freeCodeCamp</title>")), "dead")
+        self.assertEqual(self._verify("https://www.edx.org/course/kubernetes-wizardry", "Kubernetes Wizardry",
+                                      self._Resp(url="https://www.edx.org/", body="<title>edX</title>")), "dead")
+        self.assertEqual(self._verify("https://example.com/courses/advanced-rust", "Advanced Rust Systems Programming",
+                                      self._Resp(body="<title>Cooking with Herbs</title>" + "x" * 30000)), "dead")
+
+    def test_bot_wall_is_kept_but_not_marked_checked(self):
+        from unittest import mock
+        from . import recommendations
+
+        self.assertEqual(self._verify("https://www.udemy.com/course/sql-bootcamp/", "SQL Bootcamp",
+                                      self._Resp(status=403)), "unknown")
+        rows = [{"name": "A", "link": "https://a.com/x"}, {"name": "B", "link": "https://b.com/y"},
+                {"name": "C", "link": "https://c.com/z"}]
+        verdicts = {"A": "unknown", "B": "ok", "C": "dead"}
+        with mock.patch.object(recommendations, "verify_resource", side_effect=lambda link, name: verdicts[name]):
+            kept = recommendations._check_links(rows)
+        self.assertEqual([(r["name"], r["verified"]) for r in kept],
+                         [("B", recommendations.LINK_CHECKED), ("A", recommendations.LINK_UNCHECKABLE)])
+
+    def test_youtube_uses_oembed_title(self):
+        def resp(url, kw):
+            if "oembed" in url:
+                vid = kw["params"]["url"]
+                if vid.endswith("fake"):
+                    return self._Resp(status=400)
+                return self._Resp(json_data={"title": "PostgreSQL Tutorial for Beginners", "author_name": "freeCodeCamp.org"})
+            raise AssertionError("watch page should not be fetched")
+        self.assertEqual(self._verify("https://www.youtube.com/watch?v=qw--VYLpxG4",
+                                      "PostgreSQL Tutorial for Beginners", resp), "ok")
+        self.assertEqual(self._verify("https://www.youtube.com/watch?v=fake", "PostgreSQL Tutorial", resp), "dead")
+        self.assertEqual(self._verify("https://www.youtube.com/watch?v=qw--VYLpxG4",
+                                      "Kotlin Coroutines Deep Dive", resp), "dead")
+
+    def test_all_fake_links_ask_gemini_again(self):
+        from unittest import mock
+        from . import recommendations
+
+        ok = mock.MagicMock(text='{"resources": [{"type": "Course", "name": "Fake", "link": "https://x.com/fake"}]}')
+        client = mock.MagicMock()
+        client.models.generate_content.return_value = ok
+        types = mock.MagicMock()
+        fake_google = mock.MagicMock()
+        fake_google.genai.types = types
+        with mock.patch.dict("sys.modules", {"google": fake_google, "google.genai": fake_google.genai,
+                                             "google.genai.types": types}), \
+                mock.patch.object(recommendations, "verify_resource", return_value="dead"):
+            with self.assertRaises(recommendations.RecommendationError):
+                recommendations._call_gemini(client, "m", "SQL", "student")
 
 
 class MySkillsTests(IsolatedDataMixin, TestCase):
@@ -1334,3 +1465,82 @@ class FacultyApprovalTests(TestCase):
         self.assertIn("juan@ue.edu.ph", table(status="student"))
         self.assertNotIn("adm2@ue.edu.ph", table(status="student"))
         self.assertIn("No accounts match", table(q="nobody-here"))
+
+
+class DeveloperRoleTests(TestCase):
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                                    last_name="Dmin", role=CustomUser.Role.ADMINISTRATOR)
+
+    def test_developer_is_an_admin_whose_survey_answers_are_dummy(self):
+        from . import gap_analysis
+        self.client.force_login(self.admin)
+        self.client.post(reverse("account_create"), {"last_name": "Dev", "first_name": "Paeng", "email": "dev@ue.edu.ph",
+                                                     "role": "developer", "password": "longenough1"})
+        dev = CustomUser.objects.get(email="dev@ue.edu.ph")
+        self.assertEqual(dev.role_label, "Developer")
+        self.assertTrue(dev.is_administrator)
+        self.assertFalse(dev.is_dummy)
+
+        self.client.force_login(dev)
+        # every admin page, the real dashboard and the bell
+        for name in ("accounts", "data_import", "survey_responses", "console"):
+            self.assertEqual(self.client.get(reverse(name)).status_code, 200, name)
+        page = self.client.get(reverse("dashboard"))
+        self.assertContains(page, 'id="notif-bell"')
+        self.assertContains(self.client.get(reverse("professor_survey")), "Developer account:")
+        # their professor survey goes to the dummy data set only
+        self.client.post(reverse("professor_survey_submit"), content_type="application/json", data=json.dumps(
+            {"consent": True, "subjects": [{"code": "CCP 1101", "skills": [{"name": "SQL", "level": "applied"}]}]}))
+        self.assertTrue(dev.curriculum_survey_responses.get().is_dummy)
+        self.assertEqual(gap_analysis._academic_responses()[1]["professor"], 0)
+        self.assertEqual(gap_analysis._academic_responses(dummy=True)[1]["professor"], 1)
+
+    def test_switching_to_and_from_developer_moves_answers(self):
+        from .models import CurriculumSurveyResponse as C
+        fac = CustomUser.objects.create_user(email="fac@ue.edu.ph", password="secret123", first_name="F",
+                                             last_name="Ac", role=CustomUser.Role.FACULTY)
+        answer = C.objects.create(respondent_type="professor", user=fac, data={"subjects": []})
+        self.client.force_login(self.admin)
+        fields = {"last_name": "Ac", "first_name": "F", "email": "fac@ue.edu.ph"}
+        r = self.client.post(reverse("account_edit", args=[fac.pk]), {**fields, "account_type": "developer"}, follow=True)
+        self.assertContains(r, "Role changed from Faculty to Developer. 1 survey answer moved to dummy (test) data")
+        answer.refresh_from_db()
+        self.assertTrue(answer.is_dummy)
+        # Developer -> Dummy Faculty: still dummy, nothing moves
+        r = self.client.post(reverse("account_edit", args=[fac.pk]), {**fields, "account_type": "dummy_faculty"}, follow=True)
+        self.assertNotContains(r, "moved")
+        answer.refresh_from_db()
+        self.assertTrue(answer.is_dummy)
+        self.client.post(reverse("account_edit", args=[fac.pk]), {**fields, "account_type": "administrator"})
+        answer.refresh_from_db()
+        self.assertFalse(answer.is_dummy)
+        # Developers show up under their own filter and get sign-up notifications
+        CustomUser.objects.filter(pk=fac.pk).update(role=CustomUser.Role.DEVELOPER)
+        r = self.client.get(reverse("accounts"), {"status": "developer"})
+        self.assertContains(r, "fac@ue.edu.ph")
+        from . import notifications
+        self.assertIn(fac, list(notifications._admins()))
+
+    def test_developer_can_switch_between_real_and_dummy_results(self):
+        from unittest import mock
+        dev = CustomUser.objects.create_user(email="dev@ue.edu.ph", password="secret123", first_name="D",
+                                             last_name="Ev", role=CustomUser.Role.DEVELOPER)
+        self.client.force_login(dev)
+        page = self.client.get(reverse("dashboard"))
+        self.assertContains(page, 'value="real" class="results-switch-btn is-active"')
+        with mock.patch("myapp.views.gap_analysis.compute", return_value={"exists": False}) as compute:
+            self.client.get(reverse("recommendations"))
+            self.assertEqual(compute.call_args.kwargs["dummy"], False)
+            r = self.client.post(reverse("developer_results"), {"results": "dummy", "next": "/recommendations/"})
+            self.assertRedirects(r, "/recommendations/", fetch_redirect_response=False)
+            self.assertContains(self.client.get(reverse("recommendations")),
+                                'value="dummy" class="results-switch-btn is-active"')
+            self.assertEqual(compute.call_args.kwargs["dummy"], True)
+            self.client.post(reverse("developer_results"), {"results": "real"})
+            self.client.get(reverse("recommendations"))
+            self.assertEqual(compute.call_args.kwargs["dummy"], False)
+        # only developers get the switch
+        self.client.force_login(self.admin)
+        self.assertNotContains(self.client.get(reverse("dashboard")), "results-switch")
+        self.assertEqual(self.client.post(reverse("developer_results"), {"results": "dummy"}).status_code, 403)

@@ -21,6 +21,10 @@
     {% endif %}
   </header>
 
+  {% if user.is_developer %}
+  <div class="cs-banner"><strong>Developer account:</strong> your answers here are saved as dummy (test) data. They show up only in the dummy results that dummy accounts see, never in the real skill gap analysis.</div>
+  {% endif %}
+
   {% if is_placeholder_curriculum %}
   <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
   {% endif %}

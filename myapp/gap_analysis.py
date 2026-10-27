@@ -53,9 +53,7 @@ import math
 from django.conf import settings
 
 from .models import CurriculumSurveyResponse
-from .pipeline import manager as pipeline
 from .pipeline.skill_standardizer import SkillIndex, clean_display, load_index, norm
-from .pipeline.skills_schema import split_skills
 
 MAX_LISTED = 12  # how many under-taught / well-covered skills the UI shows
 MAX_SUBJECT_SKILLS = 8  # per-subject lists in the breakdown
@@ -127,31 +125,16 @@ def _tally(mention_sets):
 # Industry side
 # ---------------------------------------------------------------------------
 def _industry_mentions(source: str = "", level: str = ""):
-    """-> (list of {key: display} per matching job posting, info dict)."""
-    loaded = pipeline.load_table("extracted")
-    if loaded is None:
+    """-> (list of {key: display} per matching job posting, info dict). Reads the same
+    IT/CS postings as the homepage and the Dashboard charts (job_roles.it_postings),
+    so a skill's industry % here is the % shown everywhere else."""
+    from . import job_roles
+
+    chosen = job_roles.it_postings(source, level)
+    if chosen is None:
         return [], {"exists": False}
-    columns, rows = loaded
-    idx = {c: i for i, c in enumerate(columns)}
-
-    def get(r, c):
-        i = idx.get(c)
-        return r[i].strip() if i is not None and i < len(r) else ""
-
-    chosen = [r for r in rows
-              if (not source or get(r, "source") == source)
-              and (not level or (get(r, "experience_level") or "Not specified") == level)]
-
-    index = _ontology_index()
-    jobs = []
-    for r in chosen:
-        skills = {}
-        for raw in split_skills(get(r, "hard_skills")):
-            hit = _standardize(raw, index)
-            if hit:
-                skills.setdefault(hit[0], hit[1])
-        jobs.append(skills)
-    return jobs, {"exists": True, "total_rows": len(rows), "matched_rows": len(chosen)}
+    return [p["hard"] for p in chosen], {"exists": True, "total_rows": len(job_roles.it_postings()),
+                                         "matched_rows": len(chosen)}
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@
 <section class="page is-active" id="page-recommendations">
   <header class="page-header"><h1>Recommendations</h1></header>
   <div class="page-body">
+    {% if user.is_developer %}<div class="rec-switch-row">{% include "_results_switch.html" %}</div>{% endif %}
     <p class="muted rec-intro">
       Skills below are ranked by job-market demand{% if gap.has_survey_data %} minus how often the
       curriculum surveys report each one being taught or learned{% endif %} — see the Dashboard's
@@ -54,9 +55,9 @@
 
     {% if under_taught %}
     <p class="form-msg rec-caveat">
-      Every resource below is AI-suggested (with live web search when the model supports it, otherwise
-      from its own training data) and marked <strong>unverified</strong> until a human checks it —
-      please review a course before sharing it with students.
+      Every resource below is AI-suggested. Each link is opened automatically and dropped if the page
+      doesn't exist or isn't about that course; ones marked <strong>✓ Link checked</strong> passed. That
+      confirms the course exists, not that it's good — please review a course before sharing it with students.
     </p>
     {% endif %}
 

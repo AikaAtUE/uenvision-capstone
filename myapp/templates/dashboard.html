@@ -8,10 +8,13 @@
   <div class="page-body">
     <div class="dash-toolbar">
       <p class="muted">Last analyzation: <em id="last-analyzed">—</em></p>
-      <button class="btn btn-ghost btn-sm" id="filter-btn">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        Filter
-      </button>
+      <div class="dash-toolbar-actions">
+        {% include "_results_switch.html" %}
+        <button class="btn btn-ghost btn-sm" id="filter-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Filter
+        </button>
+      </div>
     </div>
 
     <div class="stat-grid">

@@ -29,7 +29,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-from .skills_schema import (SKILL_CSVS, UNIVERSAL_COLUMNS, normalize_record, split_skills,
+from .skills_schema import (SKILL_CSVS, UNIVERSAL_COLUMNS, normalize_record,
                             write_skill_csvs)
 
 PIPELINE_DIR = Path(__file__).resolve().parent
@@ -253,34 +253,19 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
 
     kind: 'hard' | 'soft'. top: how many skills. source / level: optional filters.
     months: 0 = every month with data, otherwise only the latest N months.
-    A skill is counted once per job posting that mentions it."""
+    A skill is counted once per job posting that mentions it. Postings and skill
+    names come from job_roles.it_postings() -- the same IT/CS postings and
+    standardized names the homepage, student dashboard and gap analysis use."""
+    from .. import gap_analysis, job_roles
+
     kind = "soft" if kind == "soft" else "hard"
     top = max(1, min(int(top), 30))
-    loaded = load_table("extracted")
-    if loaded is None:
+    everything = job_roles.it_postings()
+    if everything is None:
         return {"exists": False}
-    columns, rows = loaded
-    idx = {c: i for i, c in enumerate(columns)}
-
-    def get(r, c):
-        i = idx.get(c)
-        return r[i].strip() if i is not None and i < len(r) else ""
-
-    sources = sorted({get(r, "source") for r in rows if get(r, "source")})
-    levels = sorted({get(r, "experience_level") for r in rows if get(r, "experience_level")})
-    chosen = [r for r in rows
-              if (not source or get(r, "source") == source)
-              and (not level or (get(r, "experience_level") or "Not specified") == level)]
-
-    col = f"{kind}_skills"
-    jobs = []        # (month or None, {key: display})
-    for r in chosen:
-        m = _MONTH_RE.match(get(r, "date"))
-        month = f"{m.group(1)}-{m.group(2)}" if m else None
-        skills = {}
-        for sk in split_skills(get(r, col)):
-            skills.setdefault(sk.lower(), sk)
-        jobs.append((month, skills))
+    sources = sorted({p["source"] for p in everything if p["source"]})
+    levels = sorted({p["level"] for p in everything if p["level"]})
+    jobs = [(p["month"], p[kind]) for p in job_roles.it_postings(source, level)]
 
     dated = sorted({m for m, _ in jobs if m})
     month_list = _month_range(dated[0], dated[-1]) if dated else []
@@ -290,14 +275,7 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
     in_window = [(m, s) for m, s in jobs if (m in window)] if month_list else []
 
     def tally(items):
-        counts, forms = {}, {}
-        for _, sk in items:
-            for k, disp in sk.items():
-                counts[k] = counts.get(k, 0) + 1
-                forms.setdefault(k, {}).setdefault(disp, 0)
-                forms[k][disp] += 1
-        label = {k: max(f.items(), key=lambda kv: (kv[1], kv[0]))[0] for k, f in forms.items()}
-        return counts, label
+        return gap_analysis._tally(sk for _, sk in items)
 
     counts, label = tally(jobs)
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], label[kv[0]].lower()))
@@ -319,7 +297,7 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
         "kind": kind,
         "updated": _file_info(extracted_csv()).get("modified"),
         "sources": sources,
-        "levels": levels + (["Not specified"] if any(not get(r, "experience_level") for r in rows) else []),
+        "levels": levels + (["Not specified"] if any(not p["level"] for p in everything) else []),
         "stats": {
             "postings": total_jobs,
             "unique_skills": len(counts),

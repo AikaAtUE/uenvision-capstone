@@ -375,19 +375,22 @@ def student_eligible_terms(program, year_level, slot=None):
     """
     A student in year level N during a given semester slot is taking that
     year's term for the slot (yNs1 / yNs2 / yNsum) — that's their "current
-    semester", required. Their "previous semester" (also required) is whatever
-    term immediately precedes it in THEIR program's sequence, which is why this
-    is program-aware: during the 1st Semester a BSIT 3rd year's previous term
-    is their 2nd-year Summer, while a BSCS 3rd year's is 2nd Year/2nd Semester.
-    Every term before that is offered as optional ("earlier").
+    semester", required. Their "previous semester" (also required) is the
+    regular semester (1st or 2nd) that comes right before it in THEIR program's
+    sequence, never a Summer. If their program has a Summer term between that
+    semester and now, it's included too ("previous_summer"): during the 1st
+    Semester a BSIT 3rd year reports 2nd Year/2nd Semester plus their 2nd-year
+    Summer, while a BSCS 3rd year only reports 2nd Year/2nd Semester. Every term
+    before the previous semester is offered as optional ("earlier").
 
     Nobody is offered a term that hasn't happened yet, so during the 1st
     Semester 1st and 4th years (and everyone else) can't answer for their
     current year's 2nd Semester. During Summer, a student whose program has no
     summer term in their year reports the 2nd Semester they just finished.
 
-    Returns (current_term, previous_term_or_None, earlier_terms), or
-    (None, None, []) if the program/year combination doesn't exist.
+    Returns (current_term, previous_term_or_None, previous_summer_terms,
+    earlier_terms), or (None, None, [], []) if the program/year combination
+    doesn't exist.
     """
     slot = slot or current_period()["slot"]
     seq = term_sequence(program)
@@ -396,11 +399,14 @@ def student_eligible_terms(program, year_level, slot=None):
     if current_key not in keys and slot == "summer":
         current_key = f"y{year_level}s2"
     if current_key not in keys:
-        return None, None, []
+        return None, None, [], []
     idx = keys.index(current_key)
-    previous_term = seq[idx - 1] if idx > 0 else None
-    earlier = seq[:idx - 1] if idx > 1 else []
-    return seq[idx], previous_term, earlier
+    prev_idx = idx - 1
+    while prev_idx >= 0 and seq[prev_idx]["slot"] == "summer":
+        prev_idx -= 1
+    if prev_idx < 0:
+        return seq[idx], None, [], []
+    return seq[idx], seq[prev_idx], seq[prev_idx + 1:idx], seq[:prev_idx]
 
 
 def _term_payload(program, term):
@@ -412,7 +418,8 @@ def _term_payload(program, term):
 
 
 def build_student_eligibility(slot=None):
-    """{program: {str(year): {"current": {...}, "previous": {...} or None, "earlier": [...]}}}
+    """{program: {str(year): {"current": {...}, "previous": {...} or None,
+    "previous_summer": [...], "earlier": [...]}}}
     — the full, ready-to-serialize structure the student survey page needs, with
     subjects embedded so the front-end doesn't need a second lookup."""
     slot = slot or current_period()["slot"]
@@ -420,12 +427,13 @@ def build_student_eligibility(slot=None):
     for program in PROGRAMS:
         out[program] = {}
         for year in YEAR_LEVELS:
-            current_term, previous_term, earlier = student_eligible_terms(program, year, slot)
+            current_term, previous_term, previous_summer, earlier = student_eligible_terms(program, year, slot)
             if current_term is None:
                 continue
             out[program][str(year)] = {
                 "current": _term_payload(program, current_term),
                 "previous": None if previous_term is None else _term_payload(program, previous_term),
+                "previous_summer": [_term_payload(program, t) for t in previous_summer],
                 "earlier": [_term_payload(program, t) for t in earlier],
             }
     return out

@@ -21,6 +21,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     class Role(models.TextChoices):
         ADMINISTRATOR = "administrator", "Administrator"
+        # An administrator in every way, except that their own survey answers are
+        # saved as dummy (test) data, like a dummy account's. For testing the live site.
+        DEVELOPER = "developer", "Developer"
         FACULTY = "faculty", "Faculty"
         STUDENT = "student", "Student"
         ALUMNI = "alumni", "Alumni"
@@ -64,7 +67,17 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     @property
     def is_administrator(self):
-        return self.role == self.Role.ADMINISTRATOR
+        """Administrators and developers: full access to every admin page."""
+        return self.role in (self.Role.ADMINISTRATOR, self.Role.DEVELOPER)
+
+    @property
+    def is_developer(self):
+        return self.role == self.Role.DEVELOPER
+
+    @property
+    def answers_are_dummy(self):
+        """Survey answers from this account go to the dummy (test) data set."""
+        return self.is_dummy or self.is_developer
 
     @property
     def is_learner(self):

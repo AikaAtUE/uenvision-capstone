@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 
 def _admins():
-    return CustomUser.objects.filter(role=CustomUser.Role.ADMINISTRATOR, is_active=True)
+    return CustomUser.objects.filter(role__in=(CustomUser.Role.ADMINISTRATOR, CustomUser.Role.DEVELOPER), is_active=True)
 
 
 def notify_faculty_signup(request, new_user):

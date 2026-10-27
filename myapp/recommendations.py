@@ -27,15 +27,26 @@ reason — and ungrounded results can be outdated or, rarely, invented. Every
 row this writes is marked "verified: no" (or "no (ungrounded)") because
 nothing here has been checked by a human yet; this is a starting list to
 review, not something to hand to students unreviewed.
+
+Because the free tier usually ends up on that ungrounded fallback, every link
+Gemini returns is also opened from the server before it is saved (see
+verify_resource below): a link that 404s, points at a domain that doesn't
+exist, bounces to the site's homepage/search, or opens a page that doesn't
+mention the course's name is dropped. That catches the made-up courses without
+spending any extra Gemini quota. Some sites (Udemy, mostly) block automated
+checks; those links are kept but not marked "link checked".
 """
 import base64
 import csv
+import html
 import json
 import random
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlparse
 
 from django.conf import settings
 
@@ -47,6 +58,8 @@ MAX_RESOURCES = 6
 RPM = 5                  # same free-tier assumption as extract_skills_gemini.py
 MAX_RETRIES = 2          # short on purpose -- this runs inside an HTTP request
 MODEL = "gemini-3.5-flash-lite"
+VERIFY_TIMEOUT = (5, 8)  # (connect, read) seconds for opening each suggested link
+VERIFY_MAX_BYTES = 400_000
 _grounding_unavailable = False   # set once search grounding hits a quota error (free tier)
 
 # One CSV per audience: professors get resources to learn/teach a skill, students and
@@ -57,6 +70,10 @@ RECS_FILES = {
 }
 RECS_FILENAME = RECS_FILES["professor"]
 RECS_COLUMNS = ["skill", "type", "name", "provider", "link", "photo", "verified", "context", "generated_at"]
+# "verified" column values written by verify_resource(). Older rows say "no" /
+# "no (ungrounded)" -- they were saved before links were checked.
+LINK_CHECKED = "link checked"
+LINK_UNCHECKABLE = "site blocked the link check"
 MAX_SKILLS_PER_STUDENT_RUN = 5
 
 # A small neutral "course" icon, inlined as a data: URI so the CSV/UI never
@@ -168,7 +185,10 @@ _SYSTEM_PROMPT_BODY = (
     "If you have web search available, use it to find REAL "
     "courses, certifications, official documentation, or well-known video series -- "
     "never invent a course or a URL; if you are not certain a resource is real, leave "
-    "it out instead. Prefer reputable providers (Coursera, edX, Udemy, freeCodeCamp, "
+    "it out instead. Every link is opened automatically and resources whose page "
+    "doesn't exist or doesn't show that exact name are thrown away, so give the "
+    "resource's own page (not a homepage or search page) and its exact title as "
+    "shown on that page. Prefer reputable providers (Coursera, edX, Udemy, freeCodeCamp, "
     "official vendor documentation, well-known YouTube channels). Mix free and paid "
     "options where possible. Respond with ONLY a JSON object, no commentary, no "
     "markdown fences, matching exactly this shape:\n"
@@ -226,6 +246,155 @@ def classify_error(e: Exception) -> str:
     if code in (400, 404):
         return "fatal"
     return "retry"
+
+
+# ---------------------------------------------------------------------------
+# Link check: does the course Gemini named actually exist?
+# ---------------------------------------------------------------------------
+_BROWSER_HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+# Words that say nothing about WHICH course a page is, so they don't count when
+# matching the course name against the page.
+_NAME_STOPWORDS = {
+    "a", "an", "and", "the", "of", "for", "to", "in", "on", "with", "by", "from", "your", "you",
+    "course", "courses", "complete", "full", "introduction", "intro", "beginner", "beginners",
+    "guide", "tutorial", "tutorials", "learn", "learning", "official", "documentation", "docs",
+    "free", "series", "video", "videos", "specialization", "certificate", "certification",
+    "professional", "program", "training", "bootcamp", "masterclass", "path", "track", "lesson",
+    "part", "edition", "section", "specifically", "covering", "basics", "fundamentals",
+}
+_NOT_FOUND_MARKERS = ("page not found", "404 not found", "error 404", "this page doesn't exist",
+                      "this page does not exist", "page you requested could not be found",
+                      "video unavailable", "this video isn't available")
+_NOT_FOUND_PATH_HINTS = ("/404", "not-found", "notfound", "/search", "/error")
+
+
+def _name_tokens(name: str) -> list:
+    words = re.findall(r"[a-z0-9][a-z0-9+#.]*", name.lower())
+    out = []
+    for w in words:
+        w = w.rstrip(".")
+        if not w or w in _NAME_STOPWORDS or re.fullmatch(r"(19|20)\d\d", w):
+            continue
+        if len(w) >= 3 or re.search(r"[0-9+#]", w):
+            out.append(w)
+    return list(dict.fromkeys(out))
+
+
+def _page_mentions(page_text: str, name: str) -> bool:
+    """True when at least half of the course name's meaningful words appear on the page."""
+    tokens = _name_tokens(name)
+    if not tokens:
+        return True   # nothing specific to look for (e.g. "Python Tutorial" minus stopwords)
+    hits = sum(1 for t in tokens if t in page_text)
+    return hits * 2 >= len(tokens)
+
+
+def _youtube_verdict(url: str, name: str):
+    """YouTube answers 200 even for made-up video ids, so ask its oEmbed endpoint
+    instead and compare the real video title with the name Gemini gave.
+    -> "ok" / "dead", or None when oEmbed can't tell (private, embedding off, outage)."""
+    import requests
+    try:
+        r = requests.get("https://www.youtube.com/oembed", params={"url": url, "format": "json"},
+                         headers=_BROWSER_HEADERS, timeout=VERIFY_TIMEOUT)
+    except requests.RequestException:
+        return None
+    if r.status_code in (400, 404):
+        return "dead"
+    if r.status_code != 200:
+        return None
+    try:
+        info = r.json()
+    except ValueError:
+        return None
+    text = f"{info.get('title', '')} {info.get('author_name', '')}".lower()
+    return "ok" if _page_mentions(text, name) else "dead"
+
+
+def verify_resource(link: str, name: str) -> str:
+    """Opens one suggested link -> "ok" (exists and is about that course),
+    "dead" (doesn't exist / wrong page -- drop it), or "unknown" (the site
+    wouldn't let a script look, e.g. a bot wall; keep it, unconfirmed)."""
+    import requests
+
+    parsed = urlparse(link)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return "dead"
+    orig_path = parsed.path.rstrip("/")
+    if not orig_path and not parsed.query:
+        return "dead"   # a bare homepage isn't a course -- Gemini does this when it has no real link
+
+    host = parsed.netloc.lower()
+    if host.endswith("youtube.com") or host.endswith("youtu.be"):
+        if "watch" in parsed.path or host.endswith("youtu.be") or "/playlist" in parsed.path:
+            verdict = _youtube_verdict(link, name)
+            if verdict is not None:
+                return verdict
+
+    try:
+        with requests.get(link, headers=_BROWSER_HEADERS, timeout=VERIFY_TIMEOUT,
+                          allow_redirects=True, stream=True) as r:
+            status, final_url = r.status_code, r.url
+            ctype = r.headers.get("Content-Type", "")
+            body = b""
+            if status < 400 and "html" in ctype:
+                for chunk in r.iter_content(32_768):
+                    body += chunk
+                    if len(body) >= VERIFY_MAX_BYTES:
+                        break
+            encoding = r.encoding or "utf-8"
+    except requests.exceptions.ConnectionError as e:
+        # no such domain / refused -> made up; anything else (TLS, reset) -> can't tell
+        low = str(e).lower()
+        if any(w in low for w in ("name or service not known", "nodename nor servname", "getaddrinfo failed",
+                                  "no address associated", "failed to resolve", "nameresolution",
+                                  "connection refused")):
+            return "dead"
+        return "unknown"
+    except requests.RequestException:
+        return "unknown"   # timeout or similar -- the site may be fine, just slow
+
+    if status in (404, 410):
+        return "dead"
+    if status >= 400:
+        return "unknown"   # 401/403/429/5xx: bot walls and outages, not proof it's fake
+
+    final = urlparse(final_url)
+    final_path = final.path.rstrip("/").lower()
+    if orig_path and not final_path:
+        return "dead"   # redirected to the site's homepage: the course page isn't there
+    if any(h in final_path for h in _NOT_FOUND_PATH_HINTS) and not any(h in orig_path.lower() for h in _NOT_FOUND_PATH_HINTS):
+        return "dead"   # redirected to a search / "not found" page
+
+    if not body:
+        return "ok"   # a PDF or other non-HTML file that loaded fine
+    text = html.unescape(body.decode(encoding, errors="replace")).lower()
+    title = re.search(r"<title[^>]*>(.*?)</title>", text, re.S)
+    title = title.group(1) if title else ""
+    if any(m in title for m in _NOT_FOUND_MARKERS) or (len(text) < 20_000 and any(m in text for m in _NOT_FOUND_MARKERS)):
+        return "dead"
+    return "ok" if _page_mentions(text, name) else "dead"
+
+
+def _check_links(resources: list) -> list:
+    """Runs verify_resource on every resource at once (it's all waiting on the
+    network) and returns only the ones that weren't proven fake, with their
+    "verified" column filled in."""
+    with ThreadPoolExecutor(max_workers=max(1, len(resources))) as pool:
+        verdicts = list(pool.map(lambda r: verify_resource(r["link"], r["name"]), resources))
+    kept = []
+    for r, verdict in zip(resources, verdicts):
+        if verdict == "dead":
+            continue
+        kept.append({**r, "verified": LINK_CHECKED if verdict == "ok" else LINK_UNCHECKABLE})
+    # confirmed links first
+    kept.sort(key=lambda r: r["verified"] != LINK_CHECKED)
+    return kept
 
 
 def _call_gemini(client, model: str, skill: str, audience: str = "professor", context: str = "") -> list:
@@ -290,6 +459,10 @@ def _call_gemini(client, model: str, skill: str, audience: str = "professor", co
         })
     if not out:
         raise RecommendationError("The model's resources were missing a name or link.")
+    out = _check_links(out)
+    if not out:
+        # every link was made up -- RecommendationError makes the caller ask Gemini again
+        raise RecommendationError("None of the suggested links led to a real course page.")
     return out
 
 

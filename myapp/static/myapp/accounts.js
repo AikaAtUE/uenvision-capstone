@@ -79,10 +79,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!sel.disabled && after !== before) {
       const label = sel.options[sel.selectedIndex].text;
       extra = ` Their role changes from ${editingRow.dataset.typeLabel} to ${label}.`;
-      const wasDummy = before.startsWith('dummy_'), isDummy = after.startsWith('dummy_');
+      // dummy types and Developer both save their survey answers as dummy (test) data
+      const dummyAnswers = t => t.startsWith('dummy_') || t === 'developer';
+      const wasDummy = dummyAnswers(before), isDummy = dummyAnswers(after);
       if (isDummy && !wasDummy) extra += ' Their survey answers will move to dummy (test) data and stop counting in the real results.';
       if (!isDummy && wasDummy) extra += ' Their survey answers will move back into the real results.';
       if (after === 'administrator') extra += ' Administrators can manage every account and all data.';
+      if (after === 'developer') extra += ' Developers can manage every account and all data, like an administrator.';
     }
     confirmThen(`Save these changes to ${name}?${extra}`, 'Yes, save', false, () => $('edit-form').submit());
   });

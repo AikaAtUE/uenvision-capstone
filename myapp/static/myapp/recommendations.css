@@ -39,6 +39,7 @@
 .rec-card-name{font-weight:600; font-size:.88rem; color:var(--ink); text-decoration:none; overflow-wrap:anywhere;}
 .rec-card-name:hover{color:var(--red); text-decoration:underline;}
 .rec-card-provider{font-size:.76rem;}
+.rec-card-check{font-size:.72rem; font-weight:600; color:#1d6b41;}
 
 .rec-download{margin-top:18px;}
 
