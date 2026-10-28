@@ -22,7 +22,7 @@ class SurveyAndLogoutTests(TestCase):
         return self.client.post(self.url, data=json.dumps(payload), content_type="application/json")
 
     def sus_row(self, value=5):
-        row = {f"q{n}": value for n in range(1, 11)}
+        row = {f"q{n}": value for n in range(1, 7)}
         row.update({"respondent_role": "Student", "program": "BSIT", "sus_score": 999, "comments": None})
         return row
 
@@ -33,12 +33,41 @@ class SurveyAndLogoutTests(TestCase):
 
     def test_sus_saved_and_score_recomputed_on_server(self):
         self.client.force_login(self.user)
-        # all 5s: odd items give 4 each (5 x 4 = 20), even items give 0 -> 20 x 2.5 = 50
+        # all-positive SUS: every item gives (answer - 1); all 5s -> 100, all 3s -> 50
         resp = self.post({"type": "sus", "rows": [self.sus_row(5)]})
         self.assertEqual(resp.status_code, 200)
         saved = SurveyResponse.objects.get()
         self.assertEqual(saved.user, self.user)
-        self.assertEqual(saved.data["sus_score"], 50.0)  # client's 999 is ignored
+        self.assertEqual(saved.data["sus_score"], 100.0)  # client's 999 is ignored
+        self.assertEqual(saved.data["sus_version"], 3)
+        self.assertEqual(self.post({"type": "sus", "rows": [self.sus_row(3)]}).status_code, 200)
+        self.assertEqual(SurveyResponse.objects.order_by("-pk").first().data["sus_score"], 50.0)
+
+    def test_survey_js_asks_as_many_sus_questions_as_the_server_expects(self):
+        import re
+        from pathlib import Path
+        from .views import SUS_QUESTION_COUNT
+        js = (Path(__file__).parent / "static" / "myapp" / "survey.js").read_text(encoding="utf-8")
+        block = re.search(r"var SUS_QUESTIONS = \[(.*?)\];", js, re.S).group(1)
+        self.assertEqual(len(re.findall(r"^\s*'", block, re.M)), SUS_QUESTION_COUNT)
+
+    def test_name_and_role_come_from_the_account(self):
+        self.client.force_login(self.user)
+        row = self.sus_row()  # the form says "Student"; the account is Faculty
+        self.post({"type": "sus", "rows": [row]})
+        saved = SurveyResponse.objects.get()
+        self.assertEqual(saved.data["respondent_role"], "Faculty")
+        self.assertEqual(saved.data["respondent_name"], "Jose Rizal")
+        self.post({"type": "uat", "rows": [{"tester_name": "Someone else", "login_worked": "Yes"}]})
+        uat = SurveyResponse.objects.get(survey_type="uat")
+        self.assertEqual((uat.data["tester_name"], uat.data["tester_role"]), ("Jose Rizal", "Faculty"))
+
+    def test_feedback_forms_do_not_ask_for_name_role_or_partial(self):
+        self.client.force_login(self.user)
+        html = self.client.get(reverse("feedback")).content.decode()
+        for gone in ('id="sus-role"', 'id="uat-name"', 'id="uat-role"', 'id="uat-satisfaction"', 'id="functional-tester"'):
+            self.assertNotIn(gone, html)
+        self.assertIn("Answering as <strong>Jose Rizal</strong> (Faculty)", html)
 
     def test_sus_rejects_out_of_range_answer(self):
         self.client.force_login(self.user)
@@ -419,6 +448,14 @@ class PublicSiteTests(IsolatedDataMixin, TestCase):
         self.assertEqual(body["role"]["key"], "data-analyst")
         self.assertIn("overall_pct", body["role"]["skills"][0])
         self.assertEqual(self.client.get(reverse("home"), {"role": "data-analyst"}).status_code, 200)
+
+    def test_charts_say_where_the_numbers_come_from(self):
+        r = self.client.get(reverse("home"), {"role": "data-analyst"})
+        if not r.context["stats"].get("exists"):
+            self.skipTest("no extracted_skills.csv")
+        overall = r.context["stats"]["overall"]["postings"]
+        self.assertContains(r, f"According to {overall} IT/CS job posting")
+        self.assertContains(r, "Data Analyst job posting")
 
     def test_role_for(self):
         from .job_roles import role_for
@@ -1771,3 +1808,29 @@ class TemporaryPasswordEmailTests(TestCase):
         password = _temporary_password(resp)
         self.faculty.refresh_from_db()
         self.assertTrue(self.faculty.check_password(password))
+
+
+class HelpPageTests(TestCase):
+    def page_for(self, role, **extra):
+        user = CustomUser.objects.create_user(email=f"{role}@ue.edu.ph", password="x" * 12, first_name="A",
+                                              last_name="B", role=role, **extra)
+        self.client.force_login(user)
+        return self.client.get(reverse("help"))
+
+    def test_each_role_sees_its_own_steps(self):
+        r = self.page_for("student")
+        self.assertEqual(r.status_code, 200)  # students may open it
+        self.assertContains(r, "Students and alumni")
+        self.assertNotContains(r, "Administrators</h2>")
+        r = self.page_for("faculty")
+        self.assertContains(r, "Faculty</h2>")
+        self.assertNotContains(r, "Students and alumni")
+        r = self.page_for("administrator")
+        self.assertContains(r, "Administrators</h2>")
+        r = self.page_for("developer")
+        for title in ("Students and alumni", "Faculty</h2>", "Administrators</h2>"):
+            self.assertContains(r, title)
+
+    def test_linked_from_the_sidebar(self):
+        r = self.page_for("faculty")
+        self.assertContains(r, f'href="{reverse("help")}"')

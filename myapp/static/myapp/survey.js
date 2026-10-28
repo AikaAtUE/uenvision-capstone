@@ -35,18 +35,17 @@
   }
 
   /* ---------- survey content (same as the old script.js) ---------- */
-  // Standard 10-item System Usability Scale (Brooke, 1986).
+  // Usability questions adapted from the System Usability Scale: all-positive (Sauro &
+  // Lewis, 2011), in plain English, with statements that asked the same thing dropped
+  // per the adviser's comments. Every item scores (answer - 1). Keep this list in the
+  // same order as SUS_QUESTION_COUNT in views.py expects.
   var SUS_QUESTIONS = [
-    'I think that I would like to use this system frequently.',
-    'I found the system unnecessarily complex.',
-    'I thought the system was easy to use.',
-    'I think that I would need the support of a technical person to be able to use this system.',
-    'I found the various functions in this system were well integrated.',
-    'I thought there was too much inconsistency in this system.',
-    'I would imagine that most people would learn to use this system very quickly.',
-    'I found the system very cumbersome to use.',
-    'I felt very confident using the system.',
-    'I needed to learn a lot of things before I could get going with this system.'
+    'I would like to use UEnvision again.',
+    'UEnvision is easy to use.',
+    'I can use UEnvision without help from a technical person.',
+    'The parts of UEnvision work well together.',
+    'Most people would learn UEnvision quickly.',
+    'I felt confident using UEnvision.'
   ];
 
   var UAT_CHECKS = [
@@ -134,10 +133,10 @@
   }
 
   function computeSusScore(answers) {
-    // Odd items: (answer - 1). Even items: (5 - answer). Sum x 2.5 = 0-100.
+    // All items are positive: each scores (answer - 1), scaled to 0-100.
     var total = 0;
-    answers.forEach(function (value, idx) { total += ((idx + 1) % 2 === 1) ? (value - 1) : (5 - value); });
-    return Math.round(total * 2.5 * 100) / 100;
+    answers.forEach(function (value) { total += value - 1; });
+    return Math.round(total / (4 * answers.length) * 100 * 100) / 100;
   }
 
   function initSusForm() {
@@ -147,19 +146,17 @@
       e.preventDefault();
       setFormError('sus-error', '');
       var answers = [];
-      for (var n = 1; n <= 10; n++) {
+      for (var n = 1; n <= SUS_QUESTIONS.length; n++) {
         var checked = qs('input[name="sus-q' + n + '"]:checked');
         if (!checked) { setFormError('sus-error', 'Please answer every statement before submitting.'); return; }
         answers.push(Number(checked.value));
       }
       var payload = {
-        respondent_role: qs('#sus-role').value,
         program: qs('#sus-program').value,
-        q1: answers[0], q2: answers[1], q3: answers[2], q4: answers[3], q5: answers[4],
-        q6: answers[5], q7: answers[6], q8: answers[7], q9: answers[8], q10: answers[9],
         sus_score: computeSusScore(answers),
         comments: qs('#sus-comments').value.trim() || null
       };
+      answers.forEach(function (value, i) { payload['q' + (i + 1)] = value; });
       saveSurveyResponse('sus', 'sus_responses', payload, form).then(function (result) {
         form.reset();
         showToast(result.usedFallback ? FALLBACK_MSG : 'Thanks! Your SUS evaluation was submitted.');
@@ -176,7 +173,7 @@
       return '<div class="uat-check-row">' +
         '<p class="uat-check-label">' + escapeHtml(check.label) + '</p>' +
         '<div class="uat-check-options">' +
-          ['Yes', 'Partial', 'No'].map(function (opt) {
+          ['Yes', 'No'].map(function (opt) {
             return '<label class="checkbox uat-radio"><input type="radio" name="uat-' + check.id + '" value="' + opt + '" required><span>' + opt + '</span></label>';
           }).join('') +
         '</div></div>';
@@ -189,8 +186,6 @@
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('uat-error', '');
-      var name = qs('#uat-name').value.trim();
-      if (!name) { setFormError('uat-error', 'Please enter your name.'); return; }
       var results = {};
       for (var i = 0; i < UAT_CHECKS.length; i++) {
         var check = UAT_CHECKS[i];
@@ -199,8 +194,6 @@
         results[check.id] = checked.value;
       }
       var payload = {
-        tester_name: name,
-        tester_role: qs('#uat-role').value,
         program: qs('#uat-program').value,
         test_date: qs('#uat-date').value || null,
         login_worked: results.login,
@@ -208,7 +201,6 @@
         filter_worked: results.filter,
         export_worked: results.export,
         settings_worked: results.settings,
-        satisfaction: Number(qs('#uat-satisfaction').value),
         comments: qs('#uat-comments').value.trim() || null
       };
       saveSurveyResponse('uat', 'uat_responses', payload, form).then(function (result) {
@@ -220,43 +212,67 @@
   }
 
   /* ---------- Functional test case sheet ---------- */
-  function functionalRowHtml(row) {
+  // Each test case is a card. The given cases show Feature / Steps / Expected result as
+  // plain text (they are not meant to be edited); only cases the tester adds have boxes.
+  function functionalCaseHtml(row) {
     functionalRowCount += 1;
     var idx = functionalRowCount;
-    return '<tr data-row="' + idx + '">' +
-      '<td>TC-' + String(idx).padStart(2, '0') + '</td>' +
-      '<td><input type="text" class="ft-feature" value="' + escapeHtml(row.feature || '') + '"></td>' +
-      '<td><input type="text" class="ft-steps" value="' + escapeHtml(row.steps || '') + '"></td>' +
-      '<td><input type="text" class="ft-expected" value="' + escapeHtml(row.expected || '') + '"></td>' +
-      '<td><input type="text" class="ft-actual" placeholder="What actually happened"></td>' +
-      '<td><select class="ft-status"><option value="Pass">Pass</option><option value="Fail">Fail</option><option value="Blocked">Blocked</option></select></td>' +
-      '<td><input type="text" class="ft-notes" placeholder="Optional"></td>' +
-      '<td><button type="button" class="link-inline link-inline--sm ft-remove" aria-label="Remove row">Remove</button></td>' +
-    '</tr>';
+    var id = 'TC-' + String(idx).padStart(2, '0');
+    var custom = !row.feature;
+    var head = custom
+      ? '<input type="text" class="ft-feature" placeholder="Feature being tested" aria-label="Feature">'
+      : '<span class="ft-feature-text">' + escapeHtml(row.feature) + '</span>';
+    var steps = custom
+      ? '<textarea class="ft-steps" rows="2" placeholder="What the tester does" aria-label="Steps"></textarea>'
+      : '<p class="ft-text ft-steps-text">' + escapeHtml(row.steps) + '</p>';
+    var expected = custom
+      ? '<textarea class="ft-expected" rows="2" placeholder="What should happen" aria-label="Expected result"></textarea>'
+      : '<p class="ft-text ft-expected-text">' + escapeHtml(row.expected) + '</p>';
+    var status = ['Pass', 'Fail', 'Blocked'].map(function (opt, i) {
+      return '<label class="checkbox uat-radio"><input type="radio" name="ft-status-' + idx + '" value="' + opt + '"' +
+        (i === 0 ? ' checked' : '') + '><span>' + opt + '</span></label>';
+    }).join('');
+    return '<div class="ft-case" data-row="' + idx + '">' +
+      '<div class="ft-case-head"><span class="ft-id">' + id + '</span>' + head +
+        (custom ? '<button type="button" class="link-inline link-inline--sm ft-remove">Remove</button>' : '') + '</div>' +
+      '<div class="ft-grid">' +
+        '<div class="ft-cell"><p class="ft-label">Steps</p>' + steps + '</div>' +
+        '<div class="ft-cell"><p class="ft-label">Expected result</p>' + expected + '</div>' +
+      '</div>' +
+      '<label class="field ft-field"><span>What actually happened</span><textarea class="ft-actual" rows="2"></textarea></label>' +
+      '<div class="ft-status-row"><span class="ft-label">Result</span><div class="uat-check-options">' + status + '</div></div>' +
+      '<label class="field ft-field"><span>Notes (optional)</span><input type="text" class="ft-notes"></label>' +
+    '</div>';
   }
   function addFunctionalRow(row) {
-    var tbody = qs('#functional-rows');
-    if (tbody) tbody.insertAdjacentHTML('beforeend', functionalRowHtml(row || {}));
+    var list = qs('#functional-rows');
+    if (list) list.insertAdjacentHTML('beforeend', functionalCaseHtml(row || {}));
   }
   function renderFunctionalTable() {
-    var tbody = qs('#functional-rows');
-    if (!tbody || tbody.childElementCount) return;
+    var list = qs('#functional-rows');
+    if (!list || list.childElementCount) return;
     functionalRowCount = 0;
     FUNCTIONAL_DEFAULT_ROWS.forEach(addFunctionalRow);
   }
-  function collectFunctionalRows(testerName) {
+  function fieldText(card, inputSel, textSel) {
+    var input = qs(inputSel, card);
+    if (input) return input.value.trim();
+    var text = qs(textSel, card);
+    return text ? text.textContent.trim() : '';
+  }
+  function collectFunctionalRows() {
     var submissionId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
-    return qsa('#functional-rows tr').map(function (tr) {
+    return qsa('#functional-rows .ft-case').map(function (card) {
+      var checked = qs('input[type=radio]:checked', card);
       return {
         submission_id: submissionId,
-        tester_name: testerName,
-        test_case_id: tr.children[0].textContent.trim(),
-        feature: qs('.ft-feature', tr).value.trim(),
-        steps: qs('.ft-steps', tr).value.trim(),
-        expected_result: qs('.ft-expected', tr).value.trim(),
-        actual_result: qs('.ft-actual', tr).value.trim(),
-        status: qs('.ft-status', tr).value,
-        notes: qs('.ft-notes', tr).value.trim() || null
+        test_case_id: qs('.ft-id', card).textContent.trim(),
+        feature: fieldText(card, '.ft-feature', '.ft-feature-text'),
+        steps: fieldText(card, '.ft-steps', '.ft-steps-text'),
+        expected_result: fieldText(card, '.ft-expected', '.ft-expected-text'),
+        actual_result: qs('.ft-actual', card).value.trim(),
+        status: checked ? checked.value : 'Pass',
+        notes: qs('.ft-notes', card).value.trim() || null
       };
     });
   }
@@ -269,20 +285,21 @@
 
     qs('#functional-rows').addEventListener('click', function (e) {
       if (e.target.classList.contains('ft-remove')) {
-        var tr = e.target.closest('tr');
-        if (tr && qsa('#functional-rows tr').length > 1) tr.remove();
-        else showToast('Keep at least one test case, or use Back to cancel.', true);
+        var card = e.target.closest('.ft-case');
+        if (card) card.remove();
       }
     });
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('functional-error', '');
-      var tester = qs('#functional-tester').value.trim();
-      if (!tester) { setFormError('functional-error', 'Please enter the tester’s name.'); return; }
-      var rows = collectFunctionalRows(tester);
+      var rows = collectFunctionalRows();
+      if (rows.some(function (r) { return !r.feature || !r.steps || !r.expected_result; })) {
+        setFormError('functional-error', 'Please fill in the feature, steps and expected result of every test case you added.');
+        return;
+      }
       if (rows.some(function (r) { return !r.actual_result; })) {
-        setFormError('functional-error', 'Please fill in the actual result for every test case.');
+        setFormError('functional-error', 'Please write what actually happened for every test case.');
         return;
       }
       saveSurveyResponse('functional', 'functional_test_results', rows, form).then(function (result) {

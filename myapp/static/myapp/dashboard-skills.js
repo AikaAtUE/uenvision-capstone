@@ -29,6 +29,38 @@
   }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
 
+  /* ---------------- "According to" source lines ---------------- */
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  function sourceName(d) {
+    const picked = ctl.source.value ? [ctl.source.value] : (d.sources || []);
+    return picked.length ? picked.map(cap).join(', ') : 'online job boards';
+  }
+  function postingsText(n, d) {
+    return n.toLocaleString() + ' job posting' + (n === 1 ? '' : 's') + ' from ' + sourceName(d) +
+      (ctl.level.value ? ' (' + ctl.level.value + ' level)' : '');
+  }
+  function setSource(id, text) { const e = $(id); if (e) e.textContent = text; }
+  function setSources(d) {
+    const extracted = d.kind === 'soft' ? 'soft skills' : 'hard skills';
+    const months = d.months || [];
+    const period = months.length ? ', ' + monthLabel(months[0]) + ' to ' + monthLabel(months[months.length - 1]) : '';
+    setSource('src-top', 'According to ' + postingsText(d.stats.postings, d) + ', with ' + extracted +
+      ' extracted from each posting.');
+    setSource('src-trend', months.length
+      ? 'According to ' + postingsText(d.postings_per_month.reduce((a, b) => a + b, 0), d) + period + '.'
+      : '');
+    const gap = d.gap;
+    if (gap && gap.exists && gap.has_survey_data) {
+      const byType = gap.survey_responses_by_type || {};
+      setSource('src-gap', 'According to ' + postingsText(gap.postings_considered, d) + ' and ' +
+        gap.survey_responses + ' curriculum survey answer' + (gap.survey_responses === 1 ? '' : 's') + ' (' +
+        ['student', 'alumni', 'professor'].map(t => (byType[t] || 0) + ' ' + t).join(', ') + ')' +
+        (ctl.program.value ? ' from ' + ctl.program.value : '') + '.');
+    } else {
+      setSource('src-gap', '');
+    }
+  }
+
   /* ---------------- stat cards ---------------- */
   function setStats(d) {
     const st = d.stats;
@@ -287,6 +319,7 @@
     const p = document.createElement('p'); p.className = 'empty-note'; p.textContent = msg; box.appendChild(p);
     const svg = $('trend-svg'); clear(svg); svg.setAttribute('viewBox', '0 0 800 60'); svg.appendChild(el('text', { x: 4, y: 30 }, msg));
     clear($('trend-key'));
+    ['src-top', 'src-trend', 'src-gap'].forEach(i => setSource(i, ''));
     $('gap-empty-note').hidden = false; $('gap-empty-note').textContent = msg; $('gap-content').hidden = true;
   }
 
@@ -305,7 +338,7 @@
         if (!j.exists) { showEmpty('No extracted skills yet. An administrator can create them on Data → Extract Skills.'); return; }
         data = j;
         if (!filtersBuilt) buildFilters(j);
-        setStats(j); drawBars(j); drawTrend(j); drawGaps(j);
+        setStats(j); drawBars(j); drawTrend(j); drawGaps(j); setSources(j);
       })
       .catch(() => { if (my === reqId) errEl.textContent = 'Could not reach the server. Try again.'; });
   }

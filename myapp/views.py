@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 
 from functools import wraps
 
+from django.conf import settings as django_settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -362,6 +363,14 @@ def feedback_view(request):
 
 
 @login_required
+def help_view(request):
+    # Developers test every role, so they see every section.
+    idle_minutes = getattr(django_settings, "IDLE_TIMEOUT_SECONDS", 1800) // 60
+    return render(request, "help.html", {"active_page": "help", "show_all": request.user.is_developer,
+                                         "idle_minutes": idle_minutes})
+
+
+@login_required
 def about_view(request):
     return render(request, "about.html", {"active_page": "about"})
 
@@ -680,12 +689,16 @@ def account_delete_view(request, pk):
 # Feedback surveys (SUS / UAT / functional test sheet) — called by survey.js
 # ---------------------------------------------------------------------------
 MAX_SURVEY_ROWS = 200
+# 3 = the 6-statement, all-positive, plain-English SUS (every item scores answer - 1).
+# Responses saved before it used the 10-item SUS (no "sus_version" = standard alternating,
+# 2 = all-positive), so keep the versions apart when averaging.
+SUS_VERSION = 3
+SUS_QUESTION_COUNT = 6  # must match SUS_QUESTIONS in survey.js
 
 
 def _compute_sus_score(answers):
-    """Odd items score (answer - 1), even items score (5 - answer); sum x 2.5 = 0-100."""
-    total = sum((a - 1) if i % 2 == 0 else (5 - a) for i, a in enumerate(answers))
-    return round(total * 2.5, 2)
+    """All-positive SUS: every item scores (answer - 1), scaled to 0-100."""
+    return round(sum(a - 1 for a in answers) / (4 * len(answers)) * 100, 2)
 
 
 @require_POST
@@ -714,10 +727,19 @@ def survey_submit_view(request):
 
     if kind == SurveyResponse.SUS:
         for row in rows:
-            answers = [row.get(f"q{n}") for n in range(1, 11)]
+            answers = [row.get(f"q{n}") for n in range(1, SUS_QUESTION_COUNT + 1)]
             if not all(isinstance(a, int) and not isinstance(a, bool) and 1 <= a <= 5 for a in answers):
                 return JsonResponse({"ok": False, "error": "SUS answers must be 1-5."}, status=400)
             row["sus_score"] = _compute_sus_score(answers)  # never trust the client's score
+            row["sus_version"] = SUS_VERSION
+
+    # Who answered comes from the account, not from the form.
+    name, role = request.user.get_full_name(), request.user.role_label
+    for row in rows:
+        if kind == SurveyResponse.SUS:
+            row["respondent_name"], row["respondent_role"] = name, role
+        else:
+            row["tester_name"], row["tester_role"] = name, role
 
     SurveyResponse.objects.bulk_create(
         [SurveyResponse(survey_type=kind, user=request.user, data=row, is_dummy=request.user.answers_are_dummy) for row in rows]

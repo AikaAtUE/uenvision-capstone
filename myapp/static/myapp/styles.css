@@ -435,21 +435,32 @@ img.sidebar-logo--mark { display: none; width: 34px; }
 .uat-radio input:focus-visible + span { outline: 2px solid var(--red, #c8202f); outline-offset: 2px; }
 
 /* Functional test sheet */
-.functional-table-wrap { overflow-x: auto; margin: 6px 0 12px; }
-#functional-table { min-width: 900px; }
-#functional-table td { vertical-align: top; padding: 6px; }
-#functional-table td input, #functional-table td textarea, #functional-table td select {
-  width: 100%; font: inherit; font-size: .88rem; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff;
+.survey-answering { margin: 0 0 14px; }
+.ft-list { display: grid; gap: 12px; margin: 6px 0 14px; }
+.ft-case { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; background: #fff; }
+.ft-case-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ft-id { font-weight: 700; color: var(--red, #c8202f); white-space: nowrap; }
+.ft-feature-text { font-weight: 600; font-size: 1.02rem; }
+.ft-case-head .ft-feature, .ft-cell textarea {
+  font-family: inherit; font-size: .95rem; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff;
 }
-#functional-table td input[type=text] { min-width: 105px; }
-#functional-table td .ft-status { min-width: 92px; }
-#functional-table td .ft-remove { width: auto; min-width: 0; white-space: nowrap; }
-#functional-table td:first-child { white-space: nowrap; font-weight: 600; padding-top: 12px; }
+.ft-case-head .ft-feature { flex: 1; font-weight: 600; }
+.ft-cell textarea { resize: vertical; }
+.ft-case-head .ft-remove { margin-left: auto; }
+.ft-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+.ft-cell { background: var(--bg-soft, #f6f7f9); border-radius: 8px; padding: 10px 12px; }
+.ft-cell textarea { width: 100%; }
+.ft-label { margin: 0 0 4px; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.ft-text { margin: 0; line-height: 1.5; }
+.ft-field { margin-bottom: 10px; }
+.ft-status-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.ft-status-row .ft-label { margin: 0; }
 #functional-add-row { margin: 0 10px 16px 0; }
 
 @media (max-width: 640px) {
   .survey-row-2 { grid-template-columns: 1fr; }
   .uat-check-row { flex-direction: column; align-items: flex-start; }
+  .ft-grid { grid-template-columns: 1fr; }
   .likert-end { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .likert-option span { transition: none; } }
@@ -580,3 +591,13 @@ img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }
   .notif-panel{position:fixed; top:64px; left:8px; right:8px; width:auto; max-height:calc(100vh - 80px);}
   .content:has(> .notif-bell) .page-header{padding-right:20px;}
 }
+
+/* How to use page */
+.help-card { max-width: 820px; }
+.help-lede { margin: 0 0 18px; line-height: 1.55; }
+.help-steps { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 10px; line-height: 1.55; }
+.help-gap { margin-top: 24px; }
+
+/* "According to ..." line under each chart */
+.chart-source { margin: 10px 0 0; font-size: .85rem; color: var(--muted); font-style: italic; }
+.chart-source:empty { display: none; }

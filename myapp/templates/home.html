@@ -28,7 +28,7 @@
     {% if stats.role %}
     <section class="panel">
       <h2 class="pub-h2">Top skills for {{ stats.role.label }}</h2>
-      <p class="muted pub-sub">From {{ stats.role.postings }} posting{{ stats.role.postings|pluralize }}. The grey number is the same skill's share across all IT/CS postings.</p>
+      <p class="muted pub-sub">Share of {{ stats.role.label }} postings that mention each skill. The grey number is the same skill's share across all IT/CS postings.</p>
       <ol class="pub-bars">
         {% for s in stats.role.skills %}
         <li>
@@ -38,11 +38,12 @@
         </li>
         {% endfor %}
       </ol>
+      <p class="chart-source">According to {{ stats.role.postings }} {{ stats.role.label }} job posting{{ stats.role.postings|pluralize }} from {{ stats.source_label }}.</p>
     </section>
     {% endif %}
     <section class="panel">
       <h2 class="pub-h2">Top skills across all IT/CS roles</h2>
-      <p class="muted pub-sub">From {{ stats.overall.postings }} job postings. Share of postings that mention each skill.</p>
+      <p class="muted pub-sub">Share of postings that mention each skill.</p>
       <ol class="pub-bars">
         {% for s in stats.overall.skills %}
         <li>
@@ -52,6 +53,7 @@
         </li>
         {% endfor %}
       </ol>
+      <p class="chart-source">According to {{ stats.overall.postings }} IT/CS job posting{{ stats.overall.postings|pluralize }} from {{ stats.source_label }}.</p>
     </section>
   </div>
   <p class="muted pub-foot">Job postings are collected from public job boards (Kalibrr) for academic research at the University of the East – CCSS. Role groups come from job titles, so small roles are based on only a few postings.</p>

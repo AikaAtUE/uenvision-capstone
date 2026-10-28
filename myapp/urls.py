@@ -49,6 +49,7 @@ urlpatterns = [
     path("feedback/", views.feedback_view, name="feedback"),
     path("feedback/submit/", views.survey_submit_view, name="survey_submit"),
     path("about/", views.about_view, name="about"),
+    path("help/", views.help_view, name="help"),
     path("settings/", views.settings_view, name="settings"),
     path("settings/change-password/", views.change_password_view, name="change_password"),
     path("accounts/", views.accounts_view, name="accounts"),

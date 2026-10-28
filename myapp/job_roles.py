@@ -135,7 +135,7 @@ def _top(postings, top):
 def skill_stats(role="", top=10):
     """Top hard skills across all IT-role postings, and (if `role` is given) for that
     role, each role skill with its overall % for comparison.
-    -> {"exists", "roles": [{key, label, postings}], "overall": {...}, "role": {...} or None}"""
+    -> {"exists", "roles": [{key, label, postings}], "overall": {...}, "role": {...} or None, "source_label"}"""
     it = it_postings()
     if it is None:
         return {"exists": False}
@@ -149,6 +149,8 @@ def skill_stats(role="", top=10):
         "roles": roles,
         "overall": {"postings": len(it), "skills": overall_top},
         "role": None,
+        # Shown as "According to N job postings from <source_label>" under the charts.
+        "source_label": ", ".join(sorted({str(p["source"]).capitalize() for p in it if p["source"]})) or "online job boards",
     }
     if role in ROLE_LABELS:
         role_postings = [p for p in it if p["role"] == role]

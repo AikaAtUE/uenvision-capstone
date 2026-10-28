@@ -77,6 +77,12 @@
           </span>
           <span>About</span>
         </a>
+        <a class="nav-item {% if active_page == 'help' %}is-active{% endif %}" href="{% url 'help' %}">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1.2" fill="currentColor"/></svg>
+          </span>
+          <span>How to use</span>
+        </a>
         {% if user.is_administrator %}
         <a class="nav-item {% if active_page == 'console' %}is-active{% endif %}" href="{% url 'console' %}">
           <span class="nav-icon" aria-hidden="true">

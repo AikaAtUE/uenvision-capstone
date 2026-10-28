@@ -1,0 +1,50 @@
+{% extends "app_base.html" %}
+{% block title %}How to use UEnvision{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-help">
+  <header class="page-header"><h1>How to use UEnvision</h1></header>
+  <div class="page-body">
+    <div class="panel help-card">
+      <p class="help-lede">UEnvision reads IT and Computer Science job postings, finds the skills employers ask for most, and compares them with what UE's BSIT and BSCS subjects teach. Below are the steps for your account{% if show_all %}, plus every other role{% endif %}.</p>
+
+      {% if user.is_learner or show_all %}
+      <h2 class="section-title">Students and alumni</h2>
+      <ol class="help-steps">
+        <li><strong>Answer the curriculum survey.</strong> List the subjects you took and the skills you learned in each, with your level. If you haven't, <em>My skill gap</em> shows a <em>Take the survey</em> button.</li>
+        <li><strong>Pick the job you're aiming for.</strong> On <em>My skill gap</em>, choose a role under <em>Job role I'm aiming for</em>. Leave it on <em>Any IT/CS role</em> to compare with the overall top skills.</li>
+        <li><strong>Read your results.</strong> <em>Job readiness</em> is how many of the top skills you have at Intermediate or better. <em>Skills to build</em> lists the top skills you're missing.</li>
+        <li><strong>Find learning resources.</strong> Tick the skills you want, then press <em>Find resources for selected skills</em>. Check a course before paying for it.</li>
+        <li><strong>Keep it up to date.</strong> Use <em>My subjects &amp; skills</em> to add subjects or raise a skill level as you improve.</li>
+      </ol>
+      {% endif %}
+
+      {% if not user.is_learner or show_all %}
+      <h2 class="section-title help-gap">Faculty</h2>
+      <ol class="help-steps">
+        <li><strong>See the job market on the Dashboard.</strong> Choose hard or soft skills, how many top skills to show, and the source or job level. The three tabs show the top skills, how they change month to month, and the skill gap.</li>
+        <li><strong>Answer the Professor Survey.</strong> Go to <em>Data &gt; Professor Survey</em> and list the subjects you teach and how each skill is covered (Introduced, Practiced or Applied).</li>
+        <li><strong>Get recommendations.</strong> On <em>Recommendations</em>, pick one of your subjects (or all subjects) to see in-demand skills it doesn't cover yet, then find training resources for them.</li>
+        <li><strong>Look at or export the data.</strong> <em>Data &gt; View Data</em> shows the job postings and skills; <em>Export CSV</em> downloads the table.</li>
+      </ol>
+      {% endif %}
+
+      {% if user.is_administrator or show_all %}
+      <h2 class="section-title help-gap">Administrators</h2>
+      <ol class="help-steps">
+        <li><strong>Approve faculty.</strong> New faculty sign-ups wait in <em>Accounts</em> until you press <em>Approve</em>. The bell shows new sign-ups.</li>
+        <li><strong>Manage accounts.</strong> Add, edit, reset the password of, or remove an account from <em>Accounts</em>.</li>
+        <li><strong>Update the job data.</strong> <em>Data &gt; Scrape Data</em> collects new postings, then <em>Data &gt; Extract Skills</em> pulls the skills out of them. <em>Import Data</em> uploads a CSV instead.</li>
+        <li><strong>Review survey answers.</strong> <em>Data &gt; Survey Responses</em> lets you search, view and delete curriculum survey answers.</li>
+      </ol>
+      {% endif %}
+
+      <h2 class="section-title help-gap">Everyone</h2>
+      <ul class="help-steps">
+        <li><strong>Feedback:</strong> rate how easy UEnvision is to use. Your name and role are taken from your account.</li>
+        <li><strong>Settings:</strong> change your name, email or password.</li>
+        {% if idle_minutes %}<li>You're logged out after {{ idle_minutes }} minutes without activity.</li>{% endif %}
+      </ul>
+    </div>
+  </div>
+</section>
+{% endblock %}

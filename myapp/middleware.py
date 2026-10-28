@@ -14,7 +14,7 @@ LEARNER_URL_NAMES = {
     "home", "role_skills", "check_gap", "skill_search", "skill_add", "register", "login", "logout",
     "student_dashboard", "student_role", "student_generate", "my_skills", "my_skills_save",
     "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
-    "feedback", "survey_submit", "about", "settings", "change_password", "session_ping",
+    "feedback", "survey_submit", "about", "help", "settings", "change_password", "session_ping",
     "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
 }
 
