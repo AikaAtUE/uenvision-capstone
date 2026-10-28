@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
@@ -8,7 +10,17 @@ from .managers import CustomUserManager
 # signup, new accounts). Passwords are stored hashed, so this can only be
 # enforced when a password is set, never on the stored value.
 MIN_PASSWORD_LENGTH = 8
-DEFAULT_PASSWORD = "default123"  # what "Reset password" sets (Accounts page)
+# Passwords that used to be handed out by "Reset password" / blank new accounts, or shown
+# on the login page as a demo account. Accounts still using one must pick a new password
+# (migration 0010 flags them).
+OLD_SHARED_PASSWORDS = ("default123", "rizal123")
+_TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"  # no 0/O, 1/l/I
+
+
+def make_temporary_password(length=12):
+    """A one-time password for "Reset password" and new accounts made on the Accounts
+    page. The administrator passes it on, and the user must change it after logging in."""
+    return "".join(secrets.choice(_TEMP_PASSWORD_CHARS) for _ in range(length))
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
@@ -52,6 +64,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # Administrators only: also email me when there's something to review
     # (e.g. a new faculty sign-up). Off unless they turn it on in Settings.
     notify_by_email = models.BooleanField(default=False)
+    # Set when an administrator reset the password or created the account with a temporary
+    # one (and for accounts still on an old shared password): the user can
+    # only open Settings until they choose their own password (ForcePasswordChangeMiddleware).
+    must_change_password = models.BooleanField(default=False)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

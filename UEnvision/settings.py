@@ -74,6 +74,7 @@ MIDDLEWARE = [
     'myapp.middleware.IdleTimeoutMiddleware',
     'myapp.middleware.LearnerAccessMiddleware',
     'myapp.middleware.PendingApprovalMiddleware',
+    'myapp.middleware.ForcePasswordChangeMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -172,6 +173,9 @@ if not DEBUG:
 # and the login cookie is dropped when the browser is closed.
 # ---------------------------------------------------------------------------
 IDLE_TIMEOUT_SECONDS = 30 * 60
+# Flash messages live in the session (server side), not in a cookie: "Reset password"
+# shows the new temporary password in one.
+MESSAGE_STORAGE = 'django.contrib.messages.storage.session.SessionStorage'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # ---------------------------------------------------------------------------
@@ -204,6 +208,15 @@ LOGGING = {
     'disable_existing_loggers': False,
     'handlers': {'console': {'class': 'logging.StreamHandler'}},
     'root': {'handlers': ['console'], 'level': 'WARNING'},
+}
+
+# Cache (failed-login counts, "wait a minute" limits on emails). Kept in the database so the
+# three gunicorn workers share it; migration 0011 makes the table (`manage.py migrate`).
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'uenvision_cache',
+    }
 }
 
 # Default primary key field type

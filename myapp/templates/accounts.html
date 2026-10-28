@@ -86,8 +86,8 @@
       <label class="field"><span>Role</span>
         <select name="role">{% for value, label in roles %}<option value="{{ value }}"{% if value == 'faculty' %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
       <label class="field"><span>Password</span>
-        <input type="password" name="password" minlength="{{ min_password_length }}" autocomplete="new-password" placeholder="Leave blank to use {{ default_password }}">
-        <small class="field-hint">Leave blank to use the default password ({{ default_password }}); otherwise at least {{ min_password_length }} characters.</small></label>
+        <input type="password" name="password" minlength="{{ min_password_length }}" autocomplete="new-password" placeholder="Leave blank to make a temporary password">
+        <small class="field-hint">Leave blank to email them a one-time temporary password (they choose their own when they first log in); otherwise at least {{ min_password_length }} characters.</small></label>
       <div class="modal-actions">
         <button type="submit" class="btn btn-navy">Create account</button>
         <button type="button" class="btn btn-cancel" data-close="add-backdrop">Cancel</button>

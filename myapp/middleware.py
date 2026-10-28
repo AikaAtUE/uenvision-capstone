@@ -107,3 +107,28 @@ class PendingApprovalMiddleware:
                     return JsonResponse({"ok": False, "error": "Your account is waiting for approval."}, status=403)
                 return redirect("pending_approval")
         return self.get_response(request)
+
+
+# What a user with a temporary password (set by an administrator) can open until they choose their own.
+PASSWORD_CHANGE_URL_NAMES = {
+    "settings", "change_password", "logout", "login", "session_ping", "verify_email", "resend_verification",
+    "forgot_password", "reset_password", "reset_password_confirm",
+}
+
+
+class ForcePasswordChangeMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated and getattr(user, "must_change_password", False):
+            try:
+                match = resolve(request.path_info)
+            except Resolver404:
+                match = None
+            if match is not None and match.url_name not in PASSWORD_CHANGE_URL_NAMES:
+                if _wants_json(request):
+                    return JsonResponse({"ok": False, "error": "Please choose a new password first."}, status=403)
+                return redirect("settings")
+        return self.get_response(request)

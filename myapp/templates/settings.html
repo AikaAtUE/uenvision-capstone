@@ -5,6 +5,7 @@
   <header class="page-header"><h1>Settings</h1></header>
   <div class="page-body">
     {% include "_messages.html" %}
+    {% if user.must_change_password %}<p class="flash flash--error" role="status">You're using a temporary password. Choose your own password below to keep using UEnvision.</p>{% endif %}
     <h2 class="section-title">Account settings</h2>
     <p class="form-msg" id="settings-msg"></p>
     <dl class="settings-list">

@@ -3,7 +3,11 @@ import json
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import CustomUser, SurveyResponse, DEFAULT_PASSWORD
+import re
+
+from django.contrib.messages import get_messages
+
+from .models import CustomUser, SurveyResponse
 
 
 class SurveyAndLogoutTests(TestCase):
@@ -146,9 +150,12 @@ class AccountsPageTests(TestCase):
         self.client.force_login(self.admin)
         url = reverse("account_create")
         base = {"last_name": "Cruz", "first_name": "Juan", "email": "juan@ue.edu.ph", "role": "faculty"}
-        self.client.post(url, base)
+        resp = self.client.post(url, base)
         u = CustomUser.objects.get(email="juan@ue.edu.ph")
-        self.assertTrue(u.check_password(DEFAULT_PASSWORD))
+        temp = _temporary_password(resp)
+        self.assertTrue(u.check_password(temp))
+        self.assertTrue(u.must_change_password)
+        self.assertFalse(u.check_password("default123"))
         self.assertEqual(u.role, "faculty")
         # duplicate email (case-insensitive), bad role, short password
         self.client.post(url, {**base, "email": "JUAN@ue.edu.ph"})
@@ -160,6 +167,7 @@ class AccountsPageTests(TestCase):
         boss = CustomUser.objects.get(email="boss@ue.edu.ph")
         self.assertTrue(boss.is_administrator)
         self.assertTrue(boss.check_password("mypassword1"))
+        self.assertFalse(boss.must_change_password)  # a password the administrator typed is kept as is
 
     def test_edit_name_and_email(self):
         self.client.force_login(self.admin)
@@ -176,14 +184,22 @@ class AccountsPageTests(TestCase):
 
     def test_reset_password(self):
         self.client.force_login(self.admin)
+        resp = self.client.post(reverse("account_reset_password", args=[self.faculty.pk]))
+        self.faculty.refresh_from_db()
+        temp = _temporary_password(resp)
+        self.assertTrue(self.faculty.check_password(temp))
+        self.assertTrue(self.faculty.must_change_password)
+        # a different one every time
         self.client.post(reverse("account_reset_password", args=[self.faculty.pk]))
         self.faculty.refresh_from_db()
-        self.assertTrue(self.faculty.check_password(DEFAULT_PASSWORD))
+        self.assertFalse(self.faculty.check_password(temp))
 
     def test_reset_own_password_keeps_session(self):
         self.client.force_login(self.admin)
         self.client.post(reverse("account_reset_password", args=[self.admin.pk]))
-        self.assertEqual(self.client.get(reverse("accounts")).status_code, 200)
+        # still logged in, but sent to Settings to choose a new password first
+        self.assertRedirects(self.client.get(reverse("accounts")), reverse("settings"))
+        self.assertEqual(self.client.get(reverse("settings")).status_code, 200)
 
     def test_delete(self):
         self.client.force_login(self.admin)
@@ -1544,3 +1560,203 @@ class DeveloperRoleTests(TestCase):
         self.client.force_login(self.admin)
         self.assertNotContains(self.client.get(reverse("dashboard")), "results-switch")
         self.assertEqual(self.client.post(reverse("developer_results"), {"results": "dummy"}).status_code, 403)
+
+
+def _temporary_password(response):
+    """The temporary password from the success message after Create account / Reset password."""
+    for m in get_messages(response.wsgi_request):
+        found = re.search(r"Temporary password: (\S+)", str(m))
+        if found:
+            return found.group(1)
+    raise AssertionError("no temporary password in the messages")
+
+
+class TemporaryPasswordTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            "temp@ue.edu.ph", "Tmp4Xk9pQ2wz", first_name="Tem", last_name="Porary", must_change_password=True)
+
+    def login(self):
+        return self.client.post(reverse("login"), {"email": "temp@ue.edu.ph", "password": "Tmp4Xk9pQ2wz"})
+
+    def test_login_goes_to_settings_and_other_pages_are_blocked(self):
+        self.assertRedirects(self.login(), reverse("settings"))
+        self.assertContains(self.client.get(reverse("settings")), "temporary password")
+        for name in ("dashboard", "recommendations", "data", "professor_survey"):
+            self.assertRedirects(self.client.get(reverse(name)), reverse("settings"), msg_prefix=name)
+        resp = self.client.get(reverse("dashboard_skills"), HTTP_ACCEPT="application/json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_changing_password_lifts_the_block(self):
+        self.login()
+        resp = self.client.post(reverse("change_password"), {
+            "current_password": "Tmp4Xk9pQ2wz", "new_password": "my-own-pass-1", "confirm_password": "my-own-pass-1"})
+        self.assertRedirects(resp, reverse("dashboard"))
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.must_change_password)
+        self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+
+    def test_learner_with_temporary_password(self):
+        self.user.role = CustomUser.Role.STUDENT
+        self.user.save()
+        self.assertRedirects(self.login(), reverse("settings"))
+        self.assertRedirects(self.client.get(reverse("student_dashboard")), reverse("settings"))
+
+    def test_forgot_password_reset_clears_it(self):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        url = reverse("reset_password_confirm", args=[uid, default_token_generator.make_token(self.user)])
+        self.client.post(url, {"password": "brand-new-pass", "password2": "brand-new-pass"})
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.must_change_password)
+
+    def test_login_page_has_no_demo_account(self):
+        with self.settings(DEBUG=True):
+            self.assertNotContains(self.client.get(reverse("login")), "rizal123")
+
+
+class SharedPasswordMigrationTests(TestCase):
+    def test_flags_accounts_still_using_an_old_shared_password(self):
+        import importlib
+
+        from django.apps import apps
+
+        migration = importlib.import_module("myapp.migrations.0010_must_change_password")
+        old = CustomUser.objects.create_user("old@ue.edu.ph", "default123", first_name="O", last_name="Ld")
+        demo = CustomUser.objects.create_user("demo@ue.edu.ph", "rizal123", first_name="D", last_name="Emo")
+        fine = CustomUser.objects.create_user("fine@ue.edu.ph", "something-else-9", first_name="F", last_name="Ine")
+        migration.flag_shared_passwords(apps, None)
+        flags = dict(CustomUser.objects.values_list("email", "must_change_password"))
+        self.assertEqual(flags, {old.email: True, demo.email: True, fine.email: False})
+
+
+class LoginLimitTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(
+            "limit@ue.edu.ph", "right-password1", first_name="Li", last_name="Mit")
+
+    def attempt(self, email="limit@ue.edu.ph", password="wrong-password", ip="10.0.0.1"):
+        return self.client.post(reverse("login"), {"email": email, "password": password}, REMOTE_ADDR=ip)
+
+    def test_five_wrong_passwords_pause_that_email(self):
+        for _ in range(5):
+            self.assertEqual(self.attempt().status_code, 200)
+        resp = self.attempt(password="right-password1")
+        self.assertEqual(resp.status_code, 429)
+        self.assertContains(resp, "Too many login attempts. Try again in 15 minutes", status_code=429)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        # from another computer too (it's the account that is paused)
+        self.assertEqual(self.attempt(password="right-password1", ip="10.0.0.2").status_code, 429)
+        # other accounts are fine
+        CustomUser.objects.create_user("other@ue.edu.ph", "other-password1", first_name="O", last_name="T")
+        self.assertRedirects(self.attempt("other@ue.edu.ph", "other-password1"), reverse("dashboard"))
+
+    def test_pause_ends_after_the_window(self):
+        from unittest import mock
+
+        from . import login_limits
+
+        for _ in range(5):
+            self.attempt()
+        later = login_limits.time.time() + login_limits.WINDOW_SECONDS + 1
+        with mock.patch.object(login_limits.time, "time", return_value=later):
+            self.assertRedirects(self.attempt(password="right-password1"), reverse("dashboard"))
+
+    def test_successful_login_resets_the_count(self):
+        for _ in range(4):
+            self.attempt()
+        self.assertRedirects(self.attempt(password="right-password1"), reverse("dashboard"))
+        self.client.logout()
+        for _ in range(4):
+            self.assertEqual(self.attempt().status_code, 200)
+
+    def test_same_message_for_emails_without_an_account(self):
+        for _ in range(5):
+            self.attempt("nobody@ue.edu.ph")
+        self.assertContains(self.attempt("nobody@ue.edu.ph"), "Too many login attempts", status_code=429)
+
+    def test_twenty_failures_from_one_computer_pause_it(self):
+        for i in range(20):
+            self.attempt(f"guess{i}@ue.edu.ph")
+        self.assertEqual(self.attempt(password="right-password1").status_code, 429)
+        self.assertRedirects(self.attempt(password="right-password1", ip="10.0.0.9"), reverse("dashboard"))
+
+    def test_nginx_real_ip_header_is_used(self):
+        for i in range(20):
+            self.client.post(reverse("login"), {"email": f"g{i}@ue.edu.ph", "password": "x"},
+                             REMOTE_ADDR="127.0.0.1", HTTP_X_REAL_IP="203.0.113.5")
+        blocked = self.client.post(reverse("login"), {"email": "limit@ue.edu.ph", "password": "right-password1"},
+                                   REMOTE_ADDR="127.0.0.1", HTTP_X_REAL_IP="203.0.113.5")
+        self.assertEqual(blocked.status_code, 429)
+        ok = self.client.post(reverse("login"), {"email": "limit@ue.edu.ph", "password": "right-password1"},
+                              REMOTE_ADDR="127.0.0.1", HTTP_X_REAL_IP="203.0.113.6")
+        self.assertRedirects(ok, reverse("dashboard"))
+
+    def test_password_reset_link_lifts_the_pause(self):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        for _ in range(5):
+            self.attempt()
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        url = reverse("reset_password_confirm", args=[uid, default_token_generator.make_token(self.user)])
+        self.client.post(url, {"password": "brand-new-pass", "password2": "brand-new-pass"})
+        self.assertRedirects(self.attempt(password="brand-new-pass"), reverse("dashboard"))
+
+    def test_admin_login_goes_through_the_limited_login_page(self):
+        resp = self.client.get("/admin/login/?next=/admin/")
+        self.assertRedirects(resp, reverse("login") + "?next=%2Fadmin%2F", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get("/admin/"), "/admin/login/?next=/admin/", fetch_redirect_response=False)
+
+
+class TemporaryPasswordEmailTests(TestCase):
+    def setUp(self):
+        self.admin = CustomUser.objects.create_user(
+            "admin@ue.edu.ph", "adminpass1", first_name="Ada", last_name="Min", role=CustomUser.Role.ADMINISTRATOR)
+        self.faculty = CustomUser.objects.create_user("fac@ue.edu.ph", "facpass123", first_name="Fay", last_name="Culty")
+        self.client.force_login(self.admin)
+
+    @override_settings(EMAIL_HOST="smtp.example.com", EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_reset_emails_the_temporary_password_and_hides_it_from_the_admin(self):
+        from django.core import mail
+
+        resp = self.client.post(reverse("account_reset_password", args=[self.faculty.pk]))
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertEqual(sent.to, ["fac@ue.edu.ph"])
+        password = re.search(r"Temporary password: (\S+)", sent.body).group(1)
+        self.faculty.refresh_from_db()
+        self.assertTrue(self.faculty.check_password(password))
+        self.assertIn(reverse("login"), sent.body)
+        shown = " ".join(str(m) for m in get_messages(resp.wsgi_request))
+        self.assertIn("emailed", shown)
+        self.assertNotIn(password, shown)
+
+    @override_settings(EMAIL_HOST="smtp.example.com", EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_new_account_with_blank_password_gets_an_email(self):
+        from django.core import mail
+
+        self.client.post(reverse("account_create"), {"last_name": "Cruz", "first_name": "Juan",
+                                                     "email": "juan@ue.edu.ph", "role": "faculty"})
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("created a UEnvision account", mail.outbox[0].body)
+        password = re.search(r"Temporary password: (\S+)", mail.outbox[0].body).group(1)
+        self.assertTrue(CustomUser.objects.get(email="juan@ue.edu.ph").check_password(password))
+        # a password the administrator typed isn't emailed
+        self.client.post(reverse("account_create"), {"last_name": "Cruz", "first_name": "Ana", "email": "ana@ue.edu.ph",
+                                                     "role": "faculty", "password": "typed-pass-1"})
+        self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(EMAIL_HOST="smtp.example.com")
+    def test_admin_sees_the_password_when_the_email_fails(self):
+        from unittest import mock
+
+        with mock.patch("myapp.notifications.send_mail", side_effect=OSError("smtp down")):
+            resp = self.client.post(reverse("account_reset_password", args=[self.faculty.pk]))
+        password = _temporary_password(resp)
+        self.faculty.refresh_from_db()
+        self.assertTrue(self.faculty.check_password(password))

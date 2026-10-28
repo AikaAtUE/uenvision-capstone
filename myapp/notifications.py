@@ -66,3 +66,26 @@ def unread_count(user):
     if not (user.is_authenticated and user.is_administrator):
         return 0
     return Notification.objects.filter(recipient=user, read_at__isnull=True).count()
+
+
+def send_temporary_password(request, user, password, new_account=False):
+    """Email a user the temporary password an administrator just made for them (Accounts page).
+    Returns False when it can't be emailed -- sending failed, or there's no mail server
+    configured (EMAIL_HOST empty, emails only go to the console) -- so the administrator
+    is shown the password to pass on instead."""
+    if not settings.EMAIL_HOST:
+        return False
+    ctx = {"user": user, "password": password, "new_account": new_account,
+           "url": request.build_absolute_uri(reverse("login"))}
+    try:
+        send_mail(
+            subject="Your UEnvision account" if new_account else "Your UEnvision password was reset",
+            message=render_to_string("emails/temporary_password.txt", ctx),
+            html_message=render_to_string("emails/temporary_password.html", ctx),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+        )
+    except Exception:
+        log.exception("Could not email the temporary password to %s", user.email)
+        return False
+    return True

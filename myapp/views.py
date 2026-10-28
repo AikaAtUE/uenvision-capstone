@@ -1,8 +1,8 @@
 import json
+from urllib.parse import urlencode
 
 from functools import wraps
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -19,11 +19,13 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import CustomUser, Notification, SurveyResponse, CurriculumSurveyResponse, MIN_PASSWORD_LENGTH, DEFAULT_PASSWORD
+from .models import (CustomUser, Notification, SurveyResponse, CurriculumSurveyResponse, MIN_PASSWORD_LENGTH,
+                     make_temporary_password)
 from .pipeline import manager as pipeline
 from . import curriculum_data
 from . import email_verification, notifications
 from . import gap_analysis
+from . import login_limits
 from . import ontology
 from . import recommendations
 
@@ -31,9 +33,12 @@ from . import recommendations
 
 def home_url_for(user):
     """Where a logged-in user lands: students/alumni get their own dashboard, and
-    faculty who signed up themselves wait on the approval page until approved."""
+    faculty who signed up themselves wait on the approval page until approved, and anyone
+    with a temporary password goes to Settings to choose their own."""
     if not getattr(user, "is_approved", True):
         return reverse("pending_approval")
+    if getattr(user, "must_change_password", False):
+        return reverse("settings")
     return reverse("student_dashboard") if getattr(user, "is_learner", False) else reverse("dashboard")
 
 
@@ -41,7 +46,14 @@ def login_view(request):
     if request.method == "POST":
         email = request.POST.get("email")
         password = request.POST.get("password")
+        wait = login_limits.blocked_for(request, email)
+        if wait:
+            return render(request, "login.html", {"error": login_limits.message(wait)}, status=429)
         user = authenticate(request, username=email, password=password)
+        if user is None:
+            login_limits.record_failure(request, email)
+        else:
+            login_limits.clear_email(email)
         if user is not None and not user.email_verified and email_verification.verification_required():
             return render(request, "verify_email.html", {"state": "unconfirmed", "email": user.email})
         if user is not None:
@@ -50,12 +62,10 @@ def login_view(request):
             if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
                 return redirect(next_url)
             return redirect(home_url_for(user))
-        return render(request, "login.html", {"error": "Invalid email or password.", "show_demo": settings.DEBUG})
+        return render(request, "login.html", {"error": "Invalid email or password."})
     if request.user.is_authenticated:
         return redirect(home_url_for(request.user))
-    # the demo-account hint is for local testing only, never on a deployed site
-    return render(request, "login.html", {"show_demo": settings.DEBUG,
-                                          "timed_out": request.GET.get("timeout") == "1"})
+    return render(request, "login.html", {"timed_out": request.GET.get("timeout") == "1"})
 
 
 def signup_view(request):
@@ -94,6 +104,15 @@ def signup_view(request):
         login(request, user)
         return redirect("pending_approval")
     return render(request, "signup.html")
+
+
+def admin_login_view(request):
+    """/admin/login/ goes through the normal login page, so it gets the same attempt limits."""
+    url = reverse("login")
+    next_url = request.GET.get("next") or reverse("admin:index")
+    if url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        url += "?" + urlencode({"next": next_url})
+    return redirect(url)
 
 
 def logout_view(request):
@@ -180,7 +199,9 @@ def reset_password_confirm_view(request, uidb64, token):
         return render(request, "reset_password.html", {**ctx, "error": "Passwords do not match."})
     user.set_password(new)
     user.email_verified = True  # they opened a link sent to this address
-    user.save(update_fields=["password", "email_verified"])
+    user.must_change_password = False  # they just chose their own
+    user.save(update_fields=["password", "email_verified", "must_change_password"])
+    login_limits.clear_email(user.email)  # a locked-out user who reset their password can log in right away
     return render(request, "reset_password.html", {"done": True})
 
 
@@ -366,10 +387,14 @@ def change_password_view(request):
     elif new == current:
         messages.error(request, "New password must be different from your current password.")
     else:
+        was_temporary = request.user.must_change_password
         request.user.set_password(new)
-        request.user.save(update_fields=["password"])
+        request.user.must_change_password = False
+        request.user.save(update_fields=["password", "must_change_password"])
         update_session_auth_hash(request, request.user)  # keep this session logged in
         messages.success(request, "Your password has been changed.")
+        if was_temporary:
+            return redirect(home_url_for(request.user))
     return redirect("settings")
 
 
@@ -474,7 +499,6 @@ def accounts_view(request):
         "total_count": CustomUser.objects.count(),
         "roles": ACCOUNT_TYPES,
         "min_password_length": MIN_PASSWORD_LENGTH,
-        "default_password": DEFAULT_PASSWORD,
     })
 
 
@@ -483,7 +507,8 @@ def accounts_view(request):
 def account_create_view(request):
     data, error = _clean_account_fields(request.POST)
     role = request.POST.get("role", CustomUser.Role.FACULTY)
-    password = request.POST.get("password", "") or DEFAULT_PASSWORD  # blank -> default
+    typed = request.POST.get("password", "")
+    password = typed or make_temporary_password()  # blank -> a one-time password shown below
     is_dummy = role in DUMMY_TYPES
     role = DUMMY_TYPES.get(role, role)
 
@@ -495,9 +520,17 @@ def account_create_view(request):
     if error:
         messages.error(request, error)
     else:
-        CustomUser.objects.create_user(password=password, role=role, is_dummy=is_dummy, **data)
-        note = " with the default password." if password == DEFAULT_PASSWORD else "."
-        messages.success(request, f"Account created for {data['email']}{note}")
+        user = CustomUser.objects.create_user(password=password, role=role, is_dummy=is_dummy,
+                                              must_change_password=not typed, **data)
+        if typed:
+            messages.success(request, f"Account created for {data['email']}.")
+        elif notifications.send_temporary_password(request, user, password, new_account=True):
+            messages.success(request, f"Account created for {data['email']}. A temporary password was emailed to "
+                                      "them; they will choose their own the first time they log in.")
+        else:
+            messages.success(request, f"Account created for {data['email']}, but the email couldn't be sent. "
+                                      f"Temporary password: {password} — give it to them yourself; it won't be "
+                                      "shown again. They will choose their own the first time they log in.")
     return redirect("accounts")
 
 
@@ -611,11 +644,22 @@ def notification_settings_view(request):
 @require_POST
 def account_reset_password_view(request, pk):
     target = get_object_or_404(CustomUser, pk=pk)
-    target.set_password(DEFAULT_PASSWORD)
-    target.save(update_fields=["password"])
+    password = make_temporary_password()
+    target.set_password(password)
+    target.must_change_password = True
+    target.save(update_fields=["password", "must_change_password"])
     if target.pk == request.user.pk:
         update_session_auth_hash(request, target)  # `target` holds the new hash; request.user is stale
-    messages.success(request, f"Password for {target.email} was reset to the default ({DEFAULT_PASSWORD}).")
+    if target.pk != request.user.pk and notifications.send_temporary_password(request, target, password):
+        messages.success(request, f"Password for {target.email} was reset and a temporary password was emailed to "
+                                  "them. They will choose their own when they log in.")
+    elif target.pk == request.user.pk:
+        messages.success(request, f"Your password was reset. Temporary password: {password} — choose your own "
+                                  "password below now.")
+    else:
+        messages.success(request, f"Password for {target.email} was reset, but the email couldn't be sent. "
+                                  f"Temporary password: {password} — give it to them yourself; it won't be shown "
+                                  "again. They will choose their own when they log in.")
     return redirect("accounts")
 
 

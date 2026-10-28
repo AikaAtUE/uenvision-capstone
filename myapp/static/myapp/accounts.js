@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
       confirmThen(`Approve ${label} as faculty? They'll get full access and an email saying so.`,
         'Yes, approve', false, () => submitAction(d.approveUrl));
     } else if (btn.dataset.action === 'reset'){
-      confirmThen(`Reset the password for ${label} to the default password? They will need to log in with it again.`,
+      confirmThen(`Reset the password for ${label}? A temporary password will be emailed to them, and they'll choose a new one when they log in.`,
         'Yes, reset', false, () => submitAction(d.resetUrl));
     } else if (btn.dataset.action === 'delete'){
       confirmThen(`Permanently remove the account for ${label}? This cannot be undone.`,

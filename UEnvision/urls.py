@@ -17,7 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from myapp import views
+
 urlpatterns = [
+    # before admin.site.urls so the admin's own login form (no attempt limits) is never used
+    path('admin/login/', views.admin_login_view, name='admin_login'),
     path('admin/', admin.site.urls),
     path('', include('myapp.urls'))
 ]
