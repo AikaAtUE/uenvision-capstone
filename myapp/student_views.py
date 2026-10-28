@@ -176,7 +176,6 @@ def _my_skills(user):
     """{skill_key: {"skill", "weight", "level"}} from the user's current record (latest
     survey response, possibly edited on My subjects & skills); a skill keeps the
     highest level reported for it."""
-    index = gap_analysis._ontology_index()
     mine = {}
     latest = latest_response(user)
     for data in ([latest.data] if latest else []):
@@ -186,7 +185,7 @@ def _my_skills(user):
                 entries.extend(subj.get("skills") or [])
         entries.extend((data or {}).get("overall_skills") or [])
         for name, level in gap_analysis._skill_entries(entries):
-            hit = gap_analysis._standardize(name, index)
+            hit = gap_analysis._standardize(name)
             if not hit:
                 continue
             w = gap_analysis.level_weight(level)

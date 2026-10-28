@@ -12,7 +12,7 @@ role statistics. Add or reorder patterns in ROLES to change the grouping.
 postings() / it_postings() are also the ONE place results read job postings from:
 the homepage, the student/alumni dashboard, the Dashboard's charts and stat cards,
 the skill gap analysis and the Recommendations page all count the same IT/CS
-postings with the same (ontology-standardized) skill names, so a skill's share is
+postings with the same skill names (as written in the data set), so a skill's share is
 the same number wherever it is shown.
 """
 import re
@@ -64,8 +64,9 @@ def postings():
     """-> one dict per extracted posting, cached until data/extracted_skills.csv changes:
     {"role": role key or None, "source", "level" ("" if not given), "month" ("YYYY-MM" or None),
      "hard": {skill_key: display}, "soft": {skill_key: display}}.
-    Skill names go through the same ontology standardization as the survey answers
-    (gap_analysis._standardize), so "REST APIs" / "RESTful API" count as one skill."""
+    Skill names are counted as written in the data set, the same way as the survey
+    answers (gap_analysis._standardize): "REST APIs" and "RESTful APIs" are two skills,
+    "Jira" and "JIRA" are one."""
     from . import gap_analysis
 
     path = pipeline.extracted_csv()
@@ -85,12 +86,10 @@ def postings():
         i = idx.get(c)
         return r[i].strip() if i is not None and i < len(r) else ""
 
-    index = gap_analysis._ontology_index()
-
     def skills(raw):
         out = {}
         for name in split_skills(raw):
-            hit = gap_analysis._standardize(name, index)
+            hit = gap_analysis._standardize(name)
             if hit:
                 out.setdefault(hit[0], hit[1])
         return out

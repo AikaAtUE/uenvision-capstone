@@ -234,7 +234,6 @@ class IsolatedDataMixin:
         self._override.enable()
         skills_catalog._ENTRIES = None
         skills_catalog._CURATED_DONE = False
-        gap_analysis._INDEX_CACHE = None
         job_roles._CACHE.update(key=None, value=None)
         ontology.subject_skill_map.cache_clear()
 
@@ -245,7 +244,6 @@ class IsolatedDataMixin:
         shutil.rmtree(self._tmp, ignore_errors=True)
         skills_catalog._ENTRIES = None
         skills_catalog._CURATED_DONE = False
-        gap_analysis._INDEX_CACHE = None
         job_roles._CACHE.update(key=None, value=None)
         ontology.subject_skill_map.cache_clear()
         super().tearDown()
@@ -448,6 +446,12 @@ class PublicSiteTests(IsolatedDataMixin, TestCase):
         for s in home["overall"]["skills"]:
             if s["skill"] in gap_rows:
                 self.assertEqual(gap_rows[s["skill"]], s["pct"])
+
+    def test_skills_are_counted_as_written_in_the_data_set(self):
+        from .gap_analysis import _standardize
+        self.assertEqual(_standardize("JIRA")[0], _standardize(" Jira ")[0])
+        self.assertNotEqual(_standardize("REST APIs")[0], _standardize("RESTful APIs")[0])
+        self.assertEqual(_standardize("REST APIs")[1], "REST APIs")
 
 
 class StudentFlowTests(IsolatedDataMixin, TestCase):

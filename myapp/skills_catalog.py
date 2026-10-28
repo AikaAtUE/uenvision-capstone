@@ -35,8 +35,6 @@ def custom_csv():
 def _invalidate():
     global _ENTRIES
     _ENTRIES = None
-    from . import gap_analysis   # its exact-match index includes custom_skills.csv as well
-    gap_analysis._INDEX_CACHE = None
 
 
 def _entries():

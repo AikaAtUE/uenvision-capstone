@@ -18,18 +18,13 @@ Scope, deliberately kept narrow for this first pass:
   learned, which is a different (and interesting, but separate) signal from "what
   was actually covered in a subject" — mixing them in would conflate the two.
 
-* Skill-name standardization uses only EXACT (normalized) matches against the MIND
-  Tech Skills Ontology, via the same SkillIndex already used by the scrape/extract
-  pipeline (skill_standardizer.py) — never fuzzy matching. Fuzzy matching was tested
-  against the real 228-posting dataset and found unreliable even at high scores
-  (e.g. "Scrum" -> "Customer Relationship Management" at 75, "Change Management" ->
-  "Multi-channel Management" at 91) — good enough to *suggest*, not good enough to
-  silently merge two different skills into one gap number. A skill with no exact
-  ontology match is still counted (under its own cleaned wording, normalized so
-  "SQL" / "sql" / "  SQL " all collapse together) rather than dropped, so totals
-  stay accurate; it just won't line up with a differently-worded academic mention.
-  Running the real Gemini-based standardizer (standardize_skills_gemini.py) over
-  the industry data first would improve this — that's a separate, API-quota-spending
+* Skill names are counted as written in the data sets (extracted_skills.csv /
+  hard_skills.csv) — not mapped onto ontology names and never fuzzy matched — so the
+  numbers match what you'd get by counting hard_skills.csv. Only capitalization,
+  spacing and punctuation are ignored ("SQL" / "sql" / "  SQL " collapse together);
+  differently-worded mentions ("REST APIs" / "RESTful APIs") stay separate skills.
+  Running the Gemini-based standardizer (standardize_skills_gemini.py) over the
+  industry data first would merge those — that's a separate, API-quota-spending
   step, so it's not done automatically here.
 
 * Depth weighting. A survey mention isn't a yes/no any more: each skill carries the
@@ -50,10 +45,9 @@ Scope, deliberately kept narrow for this first pass:
 """
 import math
 
-from django.conf import settings
 
 from .models import CurriculumSurveyResponse
-from .pipeline.skill_standardizer import SkillIndex, clean_display, load_index, norm
+from .pipeline.skill_standardizer import clean_display, norm
 
 MAX_LISTED = 12  # how many under-taught / well-covered skills the UI shows
 MAX_SUBJECT_SKILLS = 8  # per-subject lists in the breakdown
@@ -73,36 +67,15 @@ def level_weight(level) -> float:
     return LEVEL_WEIGHTS.get(str(level or "").strip().lower(), 1.0)
 
 
-def _ontology_dir():
-    return settings.DATA_DIR / "ontology"
-
-
-_INDEX_CACHE = None
-
-
-def _ontology_index() -> SkillIndex:
-    """Loaded once per process, same pattern as ontology.py's own cache. The
-    ontology file never changes at runtime, and custom_skills.csv only grows via
-    the (separate) Gemini standardization step, not from anything in this module."""
-    global _INDEX_CACHE
-    if _INDEX_CACHE is None:
-        d = _ontology_dir()
-        _INDEX_CACHE = load_index(d / "mind_tech_ontology.csv", d / "custom_skills.csv")
-    return _INDEX_CACHE
-
-
-def _standardize(raw: str, index: SkillIndex):
+def _standardize(raw: str):
     """-> (group_key, display_name) or None for a blank skill.
-    group_key is what mentions are tallied under: the ontology's own standard name
-    when there's exactly one unambiguous exact match, otherwise the mention's own
-    normalized wording (so near-duplicates like "React.js" / "react js" still
-    collapse together even without an ontology hit)."""
+    Skills are counted by their name as written in the data sets (extracted_skills.csv /
+    hard_skills.csv), not mapped onto ontology names, so a skill's count is what you'd
+    get by counting that name in hard_skills.csv. Only capitalization, spacing and
+    punctuation are ignored ("Jira" / "JIRA", "Unit testing" / "Unit Testing")."""
     display = clean_display(raw)
     if not display:
         return None
-    hits = index.exact(display)
-    if len(hits) == 1:
-        display = hits[0]
     key = norm(display) or display.lower()
     return key, display
 
@@ -162,7 +135,6 @@ def _academic_responses(program: str = "", dummy: bool = False):
     dummy (test) accounts -- the two are never mixed."""
     from . import curriculum_data
 
-    index = _ontology_index()
     by_code = curriculum_data.subject_by_code()
     out = []
     by_type = {"student": 0, "alumni": 0, "professor": 0}
@@ -188,7 +160,7 @@ def _academic_responses(program: str = "", dummy: bool = False):
 
         def add(entries, subject_key=None):
             for raw, lvl in _skill_entries(entries):
-                hit = _standardize(raw, index)
+                hit = _standardize(raw)
                 if not hit:
                     continue
                 k, disp = hit
@@ -232,7 +204,6 @@ def _by_subject(responses, industry_pct, industry_label, under_taught_keys, prog
     under-taught skill. industry_pct: {key: % of postings} for every industry skill."""
     from . import curriculum_data, ontology
 
-    index = _ontology_index()
     suggestions = ontology.subject_skill_map()
     lookup = curriculum_data.subject_by_code()
 
@@ -266,7 +237,7 @@ def _by_subject(responses, industry_pct, industry_label, under_taught_keys, prog
             })
         missing = []
         for name in suggestions.get(code, []):
-            hit = _standardize(name, index)
+            hit = _standardize(name)
             if hit and hit[0] in under_taught_keys and hit[0] not in subj_reported:
                 missing.append({"skill": industry_label.get(hit[0], hit[1]), "industry_pct": industry_pct[hit[0]]})
         if not covered and not missing:
@@ -400,7 +371,6 @@ def subject_targets(code: str, limit: int = 12, info: dict | None = None, dummy:
         return {"exists": False, "error": "No job-market data yet."}
     counts, label = _tally(industry_jobs)
     total = len(industry_jobs)
-    index = _ontology_index()
 
     responses, _ = _academic_responses(dummy=dummy)
     depth_here = {}
@@ -410,7 +380,7 @@ def subject_targets(code: str, limit: int = 12, info: dict | None = None, dummy:
 
     rows, seen = [], set()
     for name in skills_catalog.suggestions_for(info["name"]):
-        hit = _standardize(name, index)
+        hit = _standardize(name)
         if not hit or hit[0] in seen:
             continue
         k = hit[0]
