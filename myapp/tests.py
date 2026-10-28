@@ -453,6 +453,13 @@ class PublicSiteTests(IsolatedDataMixin, TestCase):
         self.assertNotEqual(_standardize("REST APIs")[0], _standardize("RESTful APIs")[0])
         self.assertEqual(_standardize("REST APIs")[1], "REST APIs")
 
+    def test_tech_company_industries_are_merged(self):
+        from .pipeline.skills_schema import TECH_INDUSTRY, normalize_record
+        for name in ("IT and Software", "Information Technology / IT", "Computer Software / Engineering", "Internet"):
+            self.assertEqual(normalize_record({"company_industry": name})["company_industry"], TECH_INDUSTRY)
+        self.assertEqual(normalize_record({"company_industry": "Financial Services "})["company_industry"], "Financial Services")
+        self.assertEqual(normalize_record({"company_industry": "Insurance"})["company_industry"], "Insurance")
+
 
 class StudentFlowTests(IsolatedDataMixin, TestCase):
     def submit(self, url_name="student_survey_submit", **extra):

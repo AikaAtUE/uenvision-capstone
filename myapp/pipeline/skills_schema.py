@@ -60,6 +60,24 @@ def _blank(v):
     return v is None or (isinstance(v, str) and not v.strip())
 
 
+# company_industry is copied as-is from the job site (never from Gemini), so the same
+# kind of company shows up under different names. Every tech industry is stored as one.
+TECH_INDUSTRY = "Information Technology / IT"
+TECH_INDUSTRY_NAMES = {
+    "information technology / it", "it and software", "computer software / engineering",
+    "internet", "graphic design / web design", "learning software and content creation",
+    "digital marketing and tech innovation services",
+}
+
+
+def normalize_industry(v):
+    """Trim the company's own industry text and merge the tech variants into TECH_INDUSTRY."""
+    if not isinstance(v, str):
+        return v
+    v = " ".join(v.split())
+    return TECH_INDUSTRY if v.lower() in TECH_INDUSTRY_NAMES else v
+
+
 def _truthy(v):
     return v is True or (isinstance(v, str) and v.strip().lower() in ("true", "1", "yes"))
 
@@ -73,6 +91,8 @@ def normalize_record(rec: dict) -> dict:
         k = ALIASES.get(k, k)
         if k not in out or _blank(out[k]):
             out[k] = v
+    if "company_industry" in out:
+        out["company_industry"] = normalize_industry(out["company_industry"])
     if _blank(out.get("work_mode")):
         if _truthy(out.get("is_work_from_home")):
             out["work_mode"] = "Work from home"
