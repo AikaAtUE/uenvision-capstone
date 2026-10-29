@@ -210,3 +210,10 @@
 .cs-privacy--accepted[open] summary { margin-bottom: 8px; }
 .ps-save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 14px;
   background: #fff; padding: 12px 0; border-top: 1px solid #eee; margin-top: 8px; }
+
+/* Unfinished answers restored from this browser (logged-in, first-time surveys) */
+.cs-draft-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px;
+  background: #eaf3ff; border-color: #b9d3f2; color: #1d3d66; }
+.cs-draft-reset { background: none; border: none; padding: 0; font: inherit; font-weight: 600; cursor: pointer; }
+.cs-draft-status { font-size: .82rem; margin: 8px 0 0; }
+.cs-draft-status:empty { display: none; }

@@ -28,7 +28,7 @@ class SurveyAndLogoutTests(TestCase):
 
     def sus_row(self, value=5):
         row = {f"q{n}": value for n in range(1, 7)}
-        row.update({"respondent_role": "Student", "program": "BSIT", "sus_score": 999, "comments": None})
+        row.update({"respondent_role": "Student", "sus_score": 999, "comments": None})
         return row
 
     def test_requires_login(self):
@@ -73,6 +73,21 @@ class SurveyAndLogoutTests(TestCase):
         for gone in ('id="sus-role"', 'id="uat-name"', 'id="uat-role"', 'id="uat-satisfaction"', 'id="functional-tester"'):
             self.assertNotIn(gone, html)
         self.assertIn("Answering as <strong>Jose Rizal</strong> (Faculty)", html)
+
+    def test_uat_date_is_the_day_it_was_completed(self):
+        from django.utils import timezone
+        from .views import PH_TIME
+        self.client.force_login(self.user)
+        self.post({"type": "uat", "rows": [{"test_date": "2001-01-01", "login_worked": "Yes"}]})
+        uat = SurveyResponse.objects.get(survey_type="uat")
+        today = timezone.localdate(timezone=PH_TIME).isoformat()
+        self.assertEqual(uat.data["test_date"], today)  # the form's date is ignored
+
+    def test_feedback_forms_do_not_ask_for_program_or_test_date(self):
+        self.client.force_login(self.user)
+        html = self.client.get(reverse("feedback")).content.decode()
+        for gone in ('id="sus-program"', 'id="uat-program"', 'id="uat-date"'):
+            self.assertNotIn(gone, html)
 
     def test_sus_rejects_out_of_range_answer(self):
         self.client.force_login(self.user)
@@ -2131,6 +2146,26 @@ class TechJobColumnsTests(IsolatedDataMixin, TestCase):
         self.assertNotIn("Cisco", [b["skill"] for b in cs["bars"]])
         self.assertEqual(cs["gap"]["postings_considered"], 3)
 
+    def test_dashboard_bars_split_by_source(self):
+        import csv
+        from django.conf import settings
+        path = settings.DATA_DIR / "extracted_skills.csv"
+        with open(path, encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.reader(f))
+        rows[2][2] = rows[5][2] = "trabajo"     # network admin + talent wrangler come from Trabajo
+        with open(path, "w", encoding="utf-8-sig", newline="") as f:
+            csv.writer(f).writerows(rows)
+        from .pipeline import manager as pipeline
+        dash = pipeline.skills_dashboard("hard", 10)
+        self.assertEqual(dash["bar_sources"], ["kalibrr", "trabajo"])
+        bars = {b["skill"]: b for b in dash["bars"]}
+        self.assertEqual(bars["Python"]["by_source"], [{"source": "kalibrr", "count": 2}])
+        self.assertEqual(bars["Cisco"]["by_source"], [{"source": "trabajo", "count": 1}])
+        for b in dash["bars"]:
+            self.assertEqual(sum(p["count"] for p in b["by_source"]), b["count"])
+        only = pipeline.skills_dashboard("hard", 10, source="trabajo")
+        self.assertEqual(only["bar_sources"], ["trabajo"])
+
 
 class TrabajoDedupeTests(TestCase):
     """Trabajo repeats one ad per city / feed under new job_ids; only Trabajo data is merged."""
@@ -2275,3 +2310,98 @@ class ViewDataSortFilterClearTests(IsolatedDataMixin, TestCase):
         self.assertEqual(self.client.get(reverse("data_clear_source", args=["kalibrr"])).status_code, 405)
         self.assertEqual(self.client.post(reverse("data_clear_source", args=["indeed"])).status_code, 404)
         self.assertEqual(len(self.ids()), 4)
+
+
+class KeepFormInputsTests(IsolatedDataMixin, TestCase):
+    """A failed login/sign-up keeps what was typed (never the login password), and
+    the login page can be posted with fetch() so it doesn't reload."""
+
+    def setUp(self):
+        super().setUp()
+        self.user = CustomUser.objects.create_user("keep@ue.edu.ph", "right-password1",
+                                                   first_name="Ke", last_name="Ep")
+
+    def test_failed_login_keeps_the_email_but_not_the_password(self):
+        r = self.client.post(reverse("login"), {"email": "keep@ue.edu.ph", "password": "wrong-password"})
+        self.assertContains(r, "Invalid email or password.")
+        self.assertContains(r, 'value="keep@ue.edu.ph"')
+        self.assertNotContains(r, "wrong-password")
+
+    def test_login_with_fetch_answers_in_json(self):
+        ajax = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+        r = self.client.post(reverse("login"), {"email": "keep@ue.edu.ph", "password": "wrong"}, **ajax)
+        self.assertEqual(r.json(), {"ok": False, "error": "Invalid email or password."})
+        self.assertNotIn("_auth_user_id", self.client.session)
+        r = self.client.post(reverse("login") + "?next=/settings/",
+                             {"email": "keep@ue.edu.ph", "password": "right-password1"}, **ajax)
+        self.assertEqual(r.json(), {"ok": True, "redirect": "/settings/"})
+        self.assertIn("_auth_user_id", self.client.session)
+        self.client.logout()
+        r = self.client.post(reverse("login"), {"email": "keep@ue.edu.ph", "password": "right-password1",
+                                                "next": "https://evil.example/"}, **ajax)
+        self.assertEqual(r.json()["redirect"], reverse("dashboard"))
+
+    def test_paused_login_with_fetch(self):
+        ajax = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
+        for _ in range(5):
+            self.client.post(reverse("login"), {"email": "keep@ue.edu.ph", "password": "wrong"}, **ajax)
+        r = self.client.post(reverse("login"), {"email": "keep@ue.edu.ph", "password": "right-password1"}, **ajax)
+        self.assertEqual(r.status_code, 429)
+        self.assertIn("Too many login attempts", r.json()["error"])
+
+    def test_failed_signup_keeps_every_field(self):
+        r = self.client.post(reverse("signup"), {
+            "last_name": "Cruz", "first_name": "Ana", "middle_name": "Reyes", "email": "keep@ue.edu.ph",
+            "password": "long-enough1", "password2": "long-enough1"})
+        self.assertContains(r, "An account with this email already exists.")
+        for value in ("Cruz", "Ana", "Reyes", "keep@ue.edu.ph", "long-enough1"):
+            self.assertContains(r, f'value="{value}"')
+
+    def test_signup_and_register_show_the_password_requirement(self):
+        r = self.client.get(reverse("signup"))
+        self.assertContains(r, 'data-min-length="8">At least 8 characters</li>')
+        self.assertContains(r, 'minlength="8"')
+
+    def test_failed_register_keeps_the_typed_values(self):
+        payload = {"consent": True, "personal_info": {"name": "Juan Dela Cruz", "ue_email": "juan@ue.edu.ph",
+                   "course": "BSIT", "student_number": "2023-1", "year_level": 1}, "has_previous": False,
+                   "subjects": [{"code": "CCP 1101", "term": "current", "skills": []}]}
+        reg = self.client.post(reverse("student_survey_submit"), data=json.dumps(payload),
+                               content_type="application/json").json()["register_url"]
+        token = reg.split("t=", 1)[1]
+        r = self.client.post(reverse("register"), {"t": token, "email": "juan@ue.edu.ph",
+                                                   "password": "secret123", "password2": "secret124"})
+        self.assertContains(r, "Passwords do not match.")
+        self.assertContains(r, 'value="juan@ue.edu.ph"')
+        self.assertContains(r, 'value="secret123"')
+        self.assertContains(r, 'data-min-length="8">At least 8 characters</li>')
+
+
+class SurveyDraftKeyTests(IsolatedDataMixin, TestCase):
+    """curriculum-survey.js keeps unfinished answers only when the page gives it a
+    draft key: logged-in users answering for the first time."""
+
+    def boot(self, url_name):
+        r = self.client.get(reverse(url_name))
+        m = re.search(r'<script type="application/json" id="cs-bootstrap">(.*?)</script>', r.content.decode(), re.S)
+        return json.loads(m.group(1))
+
+    def test_no_drafts_when_logged_out(self):
+        self.assertIsNone(self.boot("student_survey")["draftKey"])
+        self.assertIsNone(self.boot("alumni_survey")["draftKey"])
+
+    def test_logged_in_learners_get_a_key_of_their_own(self):
+        user = CustomUser.objects.create_user(email="s@ue.edu.ph", password="secret123", first_name="S",
+                                              last_name="T", role=CustomUser.Role.STUDENT)
+        self.client.force_login(user)
+        self.assertEqual(self.boot("student_survey")["draftKey"], f"ue_survey_draft:student:{user.pk}")
+        self.assertEqual(self.boot("alumni_survey")["draftKey"], f"ue_survey_draft:alumni:{user.pk}")
+
+    def test_professor_draft_only_before_the_first_answer(self):
+        prof = CustomUser.objects.create_user(email="p@ue.edu.ph", password="secret123", first_name="P",
+                                              last_name="C", role=CustomUser.Role.FACULTY)
+        self.client.force_login(prof)
+        self.assertEqual(self.boot("professor_survey")["draftKey"], f"ue_survey_draft:professor:{prof.pk}")
+        self.client.post(reverse("professor_survey_submit"), content_type="application/json", data=json.dumps(
+            {"consent": True, "subjects": [{"code": "CCP 1101", "skills": [{"name": "Python", "level": "applied"}]}]}))
+        self.assertIsNone(self.boot("professor_survey")["draftKey"])   # editing the saved record: no draft

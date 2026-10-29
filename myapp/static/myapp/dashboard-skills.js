@@ -94,25 +94,66 @@
   }
 
   /* ---------------- bar chart ---------------- */
+  // Each bar is split by job board; Trabajo and Kalibrr keep the same colour on every filter.
+  const SOURCE_COLORS = { trabajo: '#c8202f', kalibrr: '#16233f' };
+  const sourceLabel = s => (s ? cap(s) : 'Other');
+  function sourceColor(s, i) { return SOURCE_COLORS[s] || COLORS[(i + 2) % COLORS.length]; }
+
+  function drawSourceKey(sources) {
+    const key = $('bar-source-key');
+    if (!key) return;
+    clear(key);
+    key.hidden = !sources.length;
+    const dot = $('bar-legend').previousElementSibling;   // the single-colour dot doesn't apply to split bars
+    if (dot && dot.classList.contains('dot')) dot.style.display = sources.length ? 'none' : '';
+    sources.forEach((s, i) => {
+      const item = document.createElement('span'); item.className = 'source-key-item';
+      const sw = document.createElement('i'); sw.style.background = sourceColor(s, i);
+      item.append(sw, document.createTextNode(sourceLabel(s)));
+      key.appendChild(item);
+    });
+  }
+
   function drawBars(d) {
     const box = $('bar-chart');
     clear(box);
     $('bar-legend').textContent = 'Number of job postings that mention the skill (' + (d.kind === 'soft' ? 'soft' : 'hard') + ' skills)';
+    const sources = d.bar_sources || [];
+    drawSourceKey(d.bars.length ? sources : []);
     if (!d.bars.length) {
       const p = document.createElement('p'); p.className = 'empty-note'; p.textContent = 'No skills match these filters.'; box.appendChild(p);
       return;
     }
     const max = d.bars[0].count || 1;
     d.bars.forEach(b => {
-      const row = document.createElement('div'); row.className = 'bar-row';
+      const split = b.by_source || [];
+      const row = document.createElement('div'); row.className = 'bar-row bar-row--split';
       const label = document.createElement('span'); label.className = 'bar-label'; label.textContent = b.skill; label.title = b.skill;
       const track = document.createElement('span'); track.className = 'bar-track';
-      const fill = document.createElement('span'); fill.className = 'bar-fill'; fill.style.width = (b.count / max * 100).toFixed(1) + '%';
+      const fill = document.createElement('span'); fill.className = 'bar-fill bar-fill--split'; fill.style.width = (b.count / max * 100).toFixed(1) + '%';
+      split.forEach(part => {
+        const seg = document.createElement('span'); seg.className = 'bar-seg';
+        seg.style.width = (part.count / (b.count || 1) * 100).toFixed(2) + '%';
+        seg.style.background = sourceColor(part.source, sources.indexOf(part.source));
+        seg.title = sourceLabel(part.source) + ': ' + part.count;
+        fill.appendChild(seg);
+      });
       track.appendChild(fill);
       const val = document.createElement('span'); val.className = 'bar-value';
       val.textContent = b.count + ' ';
       const sm = document.createElement('small'); sm.textContent = '(' + b.pct + '%)'; val.appendChild(sm);
+      const by = document.createElement('span'); by.className = 'bar-split';
+      sources.forEach((s, i) => {
+        const part = split.find(x => x.source === s);
+        const item = document.createElement('span');
+        const sw = document.createElement('i'); sw.style.background = sourceColor(s, i);
+        item.append(sw, document.createTextNode(sourceLabel(s) + ' ' + (part ? part.count : 0)));
+        by.appendChild(item);
+      });
+      row.title = b.skill + ': ' + b.count + ' posting' + (b.count === 1 ? '' : 's') +
+        (split.length ? ' (' + split.map(x => sourceLabel(x.source) + ' ' + x.count).join(', ') + ')' : '');
       row.append(label, track, val);
+      if (sources.length > 1) row.appendChild(by);
       box.appendChild(row);
     });
   }

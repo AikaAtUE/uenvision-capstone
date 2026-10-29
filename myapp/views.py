@@ -2,6 +2,7 @@ import json
 from urllib.parse import urlencode
 
 from functools import wraps
+from datetime import timedelta, timezone as dt_timezone
 
 from django.conf import settings as django_settings
 from django.contrib import messages
@@ -44,9 +45,19 @@ def login_view(request):
     if request.method == "POST":
         email = request.POST.get("email")
         password = request.POST.get("password")
+        # login.html posts with fetch() so a failed attempt doesn't reload the page;
+        # without JavaScript the form posts normally and the page is re-rendered.
+        wants_json = request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+        def failed(error, status=200):
+            if wants_json:
+                return JsonResponse({"ok": False, "error": error}, status=status)
+            # keep the typed email (never the password) so they only retype the password
+            return render(request, "login.html", {"error": error, "email": email or ""}, status=status)
+
         wait = login_limits.blocked_for(request, email)
         if wait:
-            return render(request, "login.html", {"error": login_limits.message(wait)}, status=429)
+            return failed(login_limits.message(wait), status=429)
         user = authenticate(request, username=email, password=password)
         if user is None:
             login_limits.record_failure(request, email)
@@ -57,10 +68,12 @@ def login_view(request):
         if user is not None:
             login(request, user)
             next_url = request.POST.get("next") or request.GET.get("next")
-            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-                return redirect(next_url)
-            return redirect(home_url_for(user))
-        return render(request, "login.html", {"error": "Invalid email or password."})
+            if not (next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()})):
+                next_url = home_url_for(user)
+            if wants_json:
+                return JsonResponse({"ok": True, "redirect": next_url})
+            return redirect(next_url)
+        return failed("Invalid email or password.")
     if request.user.is_authenticated:
         return redirect(home_url_for(request.user))
     return render(request, "login.html", {"timed_out": request.GET.get("timeout") == "1"})
@@ -75,14 +88,19 @@ def signup_view(request):
         password = request.POST.get("password")
         password2 = request.POST.get("password2")
 
+        def failed(error):
+            # everything they typed stays in the form, so only the problem needs fixing
+            return render(request, "signup.html", {"error": error, "form": request.POST,
+                                                   "min_password_length": MIN_PASSWORD_LENGTH})
+
         if password != password2:
-            return render(request, "signup.html", {"error": "Passwords do not match."})
+            return failed("Passwords do not match.")
 
         if len(password or "") < MIN_PASSWORD_LENGTH:
-            return render(request, "signup.html", {"error": f"Password must be at least {MIN_PASSWORD_LENGTH} characters."})
+            return failed(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
 
         if CustomUser.objects.filter(email=email).exists():
-            return render(request, "signup.html", {"error": "An account with this email already exists."})
+            return failed("An account with this email already exists.")
 
         user = CustomUser.objects.create_user(
             email=email,
@@ -99,7 +117,7 @@ def signup_view(request):
         notifications.notify_faculty_signup(request, user)
         login(request, user)
         return redirect(home_url_for(user))
-    return render(request, "signup.html")
+    return render(request, "signup.html", {"min_password_length": MIN_PASSWORD_LENGTH})
 
 
 def admin_login_view(request):
@@ -759,6 +777,7 @@ MAX_SURVEY_ROWS = 200
 # 2 = all-positive), so keep the versions apart when averaging.
 SUS_VERSION = 3
 SUS_QUESTION_COUNT = 6  # must match SUS_QUESTIONS in survey.js
+PH_TIME = dt_timezone(timedelta(hours=8), "PHT")  # no DST; avoids needing tzdata on Windows
 
 
 def _compute_sus_score(answers):
@@ -805,6 +824,9 @@ def survey_submit_view(request):
             row["respondent_name"], row["respondent_role"] = name, role
         else:
             row["tester_name"], row["tester_role"] = name, role
+        if kind == SurveyResponse.UAT:
+            # The day it was completed, in Philippine time (the server clock is UTC).
+            row["test_date"] = timezone.localdate(timezone=PH_TIME).isoformat()
 
     SurveyResponse.objects.bulk_create(
         [SurveyResponse(survey_type=kind, user=request.user, data=row, is_dummy=request.user.answers_are_dummy) for row in rows]
@@ -1277,9 +1299,19 @@ def _safe_json(obj):
     return mark_safe(json.dumps(obj).replace("</", "<\\/"))
 
 
+def _survey_draft_key(request, survey):
+    """localStorage key under which curriculum-survey.js keeps unfinished answers
+    (cleared once submitted). Only for logged-in users, so a draft is never shown
+    to someone else using the same browser; None turns drafts off."""
+    if not request.user.is_authenticated:
+        return None
+    return f"ue_survey_draft:{survey}:{request.user.pk}"
+
+
 def student_survey_view(request):
     period = curriculum_data.current_period()
     bootstrap = {
+        "draftKey": _survey_draft_key(request, "student"),
         "programLabels": curriculum_data.PROGRAM_LABELS,
         "yearLevels": curriculum_data.YEAR_LEVELS,
         "currentSemLabel": period["current_label"],
@@ -1304,6 +1336,7 @@ def alumni_survey_view(request):
         for program in curriculum_data.PROGRAMS
     }
     bootstrap = {
+        "draftKey": _survey_draft_key(request, "alumni"),
         "programLabels": curriculum_data.PROGRAM_LABELS,
         "termsByProgram": terms_by_program,
         "subjectsByProgramTerm": curriculum_data.SUBJECTS,
@@ -1340,6 +1373,8 @@ def professor_survey_view(request):
                   for subj in data.get("subjects") or [] if isinstance(subj, dict) and subj.get("code")]
     consent_at = data.get("consent_at") or (current.created_at.isoformat() if current and data.get("consent") else None)
     bootstrap = {
+        # drafts only for a first answer: editing a saved record keeps its "Unsaved changes" warning
+        "draftKey": _survey_draft_key(request, "professor") if current is None else None,
         "currentSemLabel": period["current_label"],
         "previousSemLabel": period["previous_sem_label"],
         "previousSummerLabel": period["previous_summer_label"],

@@ -19,13 +19,14 @@
       {% csrf_token %}
       <input type="hidden" name="t" value="{{ token }}">
       <label class="field"><span>Confirm your UE email</span>
-        <input type="email" name="email" autocomplete="username" placeholder="{{ email }}" required>
+        <input type="email" name="email" value="{{ form.email|default:'' }}" autocomplete="username" placeholder="{{ email }}" required>
         <span class="field-hint">Type the email you used in the survey: {{ email }}</span></label>
       <label class="field"><span>Password</span>
-        <input type="password" name="password" autocomplete="new-password" minlength="{{ min_password_length }}" required>
-        <span class="field-hint">At least {{ min_password_length }} characters.</span></label>
+        <input type="password" name="password" value="{{ form.password|default:'' }}" autocomplete="new-password" minlength="{{ min_password_length }}" required
+               data-password-rules aria-describedby="register-password-rules"></label>
+      <ul class="pw-rules" id="register-password-rules" aria-live="polite"><li data-min-length="{{ min_password_length }}">At least {{ min_password_length }} characters</li></ul>
       <label class="field"><span>Confirm password</span>
-        <input type="password" name="password2" autocomplete="new-password" required></label>
+        <input type="password" name="password2" value="{{ form.password2|default:'' }}" autocomplete="new-password" required></label>
       {% if error %}<p class="form-msg is-error" role="alert">{{ error }}</p>{% endif %}
       <button type="submit" class="btn btn-red btn-block">Create account and see my results</button>
     </form>

@@ -152,7 +152,6 @@
         answers.push(Number(checked.value));
       }
       var payload = {
-        program: qs('#sus-program').value,
         sus_score: computeSusScore(answers),
         comments: qs('#sus-comments').value.trim() || null
       };
@@ -194,8 +193,6 @@
         results[check.id] = checked.value;
       }
       var payload = {
-        program: qs('#uat-program').value,
-        test_date: qs('#uat-date').value || null,
         login_worked: results.login,
         dashboard_worked: results.dashboard,
         filter_worked: results.filter,

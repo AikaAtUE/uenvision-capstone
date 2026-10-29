@@ -85,16 +85,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ======================================================================
      LOGIN PAGE
-     Handled by Django now (login_view). The form submits normally
-     (method="post", action="{% url 'login' %}") so this file no longer
-     intercepts it or checks credentials client-side.
+     Django (login_view) checks the credentials. The form is posted with
+     fetch() so a failed attempt shows its message without reloading the page:
+     the email stays, only the password is cleared. On success the page goes
+     where login_view says. Without JavaScript the form still posts normally.
   ====================================================================== */
+  const loginForm = document.getElementById('login-form');
+  if (loginForm && window.fetch && window.FormData){
+    const loginMsg = document.getElementById('login-msg');
+    const loginPassword = document.getElementById('login-password');
+    const loginBtn = loginForm.querySelector('button[type=submit]');
+    loginForm.addEventListener('submit', e => {
+      e.preventDefault();
+      if (loginBtn.disabled) return;
+      loginBtn.disabled = true;
+      fetch(loginForm.action, {
+        method: 'POST',
+        body: new FormData(loginForm),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }
+      }).then(r => r.json()).then(body => {
+        if (body && body.ok && body.redirect){ window.location.href = body.redirect; return; }
+        loginBtn.disabled = false;
+        const timeout = document.getElementById('login-timeout');
+        if (timeout) timeout.remove();
+        setMsg(loginMsg, (body && body.error) || 'Could not log in. Please try again.', 'error');
+        loginPassword.value = '';
+        loginPassword.focus();
+      }).catch(() => {
+        // network trouble or an unexpected reply: fall back to a normal post
+        loginForm.submit();
+      });
+    });
+  }
 
   /* ======================================================================
-     SIGN UP PAGE
-     Handled by Django now (signup_view). The form submits normally
-     so this file no longer intercepts it or creates accounts client-side.
+     SIGN UP / CREATE ACCOUNT: live password requirements
+     Each requirement under a [data-password-rules] password box gets a
+     checkmark as soon as the typed password meets it (only a minimum length
+     for now), so the account isn't refused for a too-short password.
   ====================================================================== */
+  document.querySelectorAll('input[data-password-rules]').forEach(input => {
+    const list = document.getElementById(input.getAttribute('aria-describedby'));
+    if (!list) return;
+    const rules = Array.from(list.querySelectorAll('li[data-min-length]'));
+    const check = () => rules.forEach(li => {
+      li.classList.toggle('is-met', input.value.length >= Number(li.dataset.minLength));
+    });
+    input.addEventListener('input', check);
+    check();
+  });
 
   /* Forgot / reset password are handled by Django now (forgot_password_view,
      reset_password_view): the reset link is emailed to the user. */

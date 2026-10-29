@@ -148,7 +148,8 @@ def register_view(request):
     elif password != password2:
         error = "Passwords do not match."
     if error:
-        return render(request, "register.html", {**ctx, "error": error})
+        # what they typed stays in the form, so only the problem needs fixing
+        return render(request, "register.html", {**ctx, "error": error, "form": request.POST})
 
     first, last = _split_name(info.get("name"))
     role = (CustomUser.Role.ALUMNI if response.respondent_type == CurriculumSurveyResponse.ALUMNI

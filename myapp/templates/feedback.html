@@ -39,13 +39,6 @@
         <form id="sus-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
-          <div class="survey-row-2">
-            <label class="field"><span>Program</span>
-              <select id="sus-program">
-                <option>BSIT</option><option>BSCS</option><option>N/A</option>
-              </select>
-            </label>
-          </div>
 
           <div class="likert-list" id="sus-questions"></div>
 
@@ -65,14 +58,6 @@
         <form id="uat-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
-          <div class="survey-row-2">
-            <label class="field"><span>Program</span>
-              <select id="uat-program">
-                <option>BSIT</option><option>BSCS</option><option>N/A</option>
-              </select>
-            </label>
-            <label class="field"><span>Test date</span><input type="date" id="uat-date"></label>
-          </div>
 
           <div class="uat-checks" id="uat-checks"></div>
 

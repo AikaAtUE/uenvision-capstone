@@ -112,6 +112,125 @@
     window.scrollTo(0, 0);
   }
 
+  /* ---------- unfinished answers (like Google Forms) ----------
+     A logged-in user answering a survey for the first time gets their answers
+     kept in this browser as they go, under BOOT.draftKey (views.py sets it only
+     then, so editing a saved record never uses it). Opening the survey again
+     fills them back in; submitting clears them.
+     snapshot() returns the answers as plain JSON; restore(answers) puts them
+     back on the page. Returns { clear } for the submit handler. */
+  var DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+  function surveyDraft(form, snapshot, restore) {
+    var key = BOOT.draftKey;
+    if (!key) return { clear: function () {} };
+    var timer = null, restoring = false, stopped = false;
+
+    var status = document.createElement('p');
+    status.className = 'muted cs-draft-status';
+    status.setAttribute('role', 'status');
+    var submitBtn = qs('button[type=submit]', form);
+    var anchor = submitBtn && submitBtn.parentNode !== form ? submitBtn.parentNode : submitBtn;
+    if (anchor) anchor.insertAdjacentElement('afterend', status);
+
+    function save() {
+      clearTimeout(timer); timer = null;
+      if (restoring || stopped) return;
+      try {
+        localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), answers: snapshot() }));
+        status.textContent = 'Your answers are saved on this device until you submit.';
+      } catch (e) { /* storage full or blocked: the survey still works, just without a draft */ }
+    }
+    function saveSoon() {
+      if (restoring || stopped) return;
+      clearTimeout(timer);
+      timer = setTimeout(save, 400);
+    }
+
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { saved = null; }
+    if (saved && saved.answers && Date.now() - (saved.savedAt || 0) < DRAFT_MAX_AGE_MS) {
+      restoring = true;
+      try { restore(saved.answers); } catch (e) { /* a draft from an older version of the survey */ }
+      restoring = false;
+      var note = document.createElement('div');
+      note.className = 'cs-banner cs-draft-banner';
+      note.innerHTML = '<span>We filled in the answers you started earlier. Pick up where you left off.</span>' +
+        '<button type="button" class="link-inline cs-draft-reset">Start over</button>';
+      form.insertBefore(note, form.firstChild);
+      qs('.cs-draft-reset', note).addEventListener('click', function () {
+        if (!window.confirm('Clear the answers you started and begin again?')) return;
+        stopped = true;
+        try { localStorage.removeItem(key); } catch (e) {}
+        window.location.reload();
+      });
+      status.textContent = 'Your answers are saved on this device until you submit.';
+    } else if (saved) {
+      try { localStorage.removeItem(key); } catch (e) {}
+    }
+
+    // Typing and picking fire input/change on the form; adding or removing a skill
+    // fires change on its picker, which bubbles up here too.
+    form.addEventListener('input', saveSoon);
+    form.addEventListener('change', saveSoon);
+    window.addEventListener('pagehide', function () { if (timer) save(); });
+
+    return {
+      clear: function () {
+        stopped = true;
+        clearTimeout(timer);
+        try { localStorage.removeItem(key); } catch (e) {}
+        status.textContent = '';
+      }
+    };
+  }
+
+  // Plain fields by id: text/select value, or checked for a checkbox.
+  function readFields(ids) {
+    var out = {};
+    ids.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) out[id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    return out;
+  }
+  // Fires change on each one so the page reacts as if it was picked by hand
+  // (e.g. choosing the course lists its subjects).
+  function writeFields(values, ids) {
+    ids.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el || !values || !(id in values)) return;
+      if (el.type === 'checkbox') el.checked = !!values[id]; else el.value = values[id];
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+  function readRadios(form, names) {
+    var out = {};
+    names.forEach(function (name) {
+      var r = qs('input[name="' + name + '"]:checked', form);
+      out[name] = r ? r.value : '';
+    });
+    return out;
+  }
+  function writeRadios(form, values, names) {
+    names.forEach(function (name) {
+      var r = values && values[name] && qs('input[name="' + name + '"][value="' + values[name] + '"]', form);
+      if (!r) return;
+      r.checked = true;
+      r.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+  // Checks a subject box as if clicked, so its "skills per subject" block appears.
+  function pickSubject(box) {
+    box.checked = true;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+    var details = box.closest('details');
+    if (details) details.open = true;
+  }
+  function addSkills(api, skills) {
+    if (api) (skills || []).forEach(function (s) { if (s && s.name) api.add(String(s.name), String(s.level || '')); });
+  }
+
   /* ---------- skill picker (shared by all three surveys) ----------
      A tag input: one text box per subject. Focusing it lists the skills
      suggested for the subject; typing filters those and searches the skills
@@ -277,7 +396,7 @@
         closeResults();
       } else if (e.key === 'Backspace' && !input.value) {
         var last = chips.lastElementChild;
-        if (last) last.remove();
+        if (last) { last.remove(); container.dispatchEvent(new Event('change', { bubbles: true })); }
       }
     });
     // mousedown (not click) so the input doesn't blur and close the list first
@@ -304,6 +423,8 @@
     });
 
     return {
+      // fills in a skill without moving focus (restoring a draft)
+      add: function (name, level) { addChip(name, level, true); },
       collect: function () {
         return qsa('.cs-chip', chips).map(function (chip) {
           var sel = qs('.cs-chip-level', chip);
@@ -607,6 +728,27 @@
     programSel.addEventListener('change', renderSubjectGroups);
     yearSel.addEventListener('change', renderSubjectGroups);
 
+    var FIELDS = ['student-name', 'student-email', 'student-program', 'student-number', 'student-year', 'student-consent'];
+    var draft = surveyDraft(form, function () {
+      return {
+        fields: readFields(FIELDS),
+        subjects: Object.keys(pickers).map(function (code) {
+          var box = qsa('.cs-subject-pick:checked', form).filter(function (c) { return c.value === code; })[0];
+          return { code: code, termKey: box ? box.getAttribute('data-term-key') : '', skills: pickers[code].api.collect() };
+        })
+      };
+    }, function (d) {
+      writeFields(d.fields, FIELDS);   // course + year level list the subjects
+      (d.subjects || []).forEach(function (s) {
+        var box = qsa('.cs-subject-pick', form).filter(function (c) {
+          return c.value === s.code && c.getAttribute('data-term-key') === s.termKey;
+        })[0];
+        if (!box) return;   // no longer offered (a new semester started)
+        pickSubject(box);
+        addSkills(pickers[s.code] && pickers[s.code].api, s.skills);
+      });
+    });
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('student-error', '');
@@ -657,6 +799,7 @@
       };
 
       submitPayload(BOOT.submitUrl, form, payload, function (body) {
+        if (body && body.ok) draft.clear();
         showLearnerDone(form, body);
       }, function (msg) { setFormError('student-error', msg); });
     });
@@ -788,6 +931,7 @@
       var list = document.getElementById(listId);
       var values = [];
       function render() {
+        list.dispatchEvent(new Event('change', { bubbles: true }));
         list.innerHTML = values.map(function (v, i) {
           return '<span class="checkbox" style="display:inline-flex;margin:2px 4px 2px 0;padding:4px 10px;border-radius:999px;border:1px solid #d5d3cc;">' +
             escapeHtml(v) + ' <button type="button" data-i="' + i + '" style="margin-left:6px;border:none;background:none;cursor:pointer;">&times;</button></span>';
@@ -804,7 +948,10 @@
         var i = e.target.getAttribute('data-i');
         if (i != null) { values.splice(Number(i), 1); render(); }
       });
-      return { get: function () { return values.slice(); } };
+      return {
+        get: function () { return values.slice(); },
+        set: function (list) { values = (list || []).map(String); render(); }
+      };
     }
     var skillsToLearnTags = tagInput('alumni-skills-to-learn-input', 'alumni-skills-to-learn-list');
     var upskillTags = tagInput('alumni-upskilling-input', 'alumni-upskilling-list');
@@ -884,6 +1031,7 @@
       };
 
       submitPayload(BOOT.submitUrl, form, payload, function (body) {
+        if (body && body.ok) draft.clear();
         showLearnerDone(form, body);
       }, function (msg) { setFormError('alumni-error', msg); });
     });
@@ -901,6 +1049,36 @@
       var names = [];
       codes.forEach(function (code) { skillsFor(program, code).forEach(function (n) { if (names.indexOf(n) === -1) names.push(n); }); });
       window.__alumniAppliedPicker = buildSkillPicker(wrap, names.slice(0, 24), [{ value: 'applied', label: 'Applied' }], 'alumni-applied');
+    });
+
+    var FIELDS = ['alumni-name', 'alumni-email', 'alumni-program', 'alumni-number', 'alumni-year-graduated', 'alumni-consent'];
+    var MORE_FIELDS = ['alumni-role', 'alumni-jobs-applied', 'alumni-rejection-reason'];
+    var RADIOS = ['alumni-employed', 'alumni-first-job', 'alumni-upskilling'];
+    var draft = surveyDraft(form, function () {
+      return {
+        fields: readFields(FIELDS.concat(['alumni-term'], MORE_FIELDS)),
+        radios: readRadios(form, RADIOS),
+        subjects: Object.keys(pickers).map(function (code) { return { code: code, skills: pickers[code].api.collect() }; }),
+        overall: overallPicker ? overallPicker.collect() : [],
+        applied: window.__alumniAppliedPicker ? window.__alumniAppliedPicker.collect() : [],
+        toLearn: skillsToLearnTags.get(),
+        upskilling: upskillTags.get()
+      };
+    }, function (d) {
+      writeFields(d.fields, FIELDS);              // the course lists its terms + overall skills
+      writeFields(d.fields, ['alumni-term']);     // the last semester lists its subjects
+      (d.subjects || []).forEach(function (s) {
+        var box = qsa('.cs-subject-pick', subjectsWrap).filter(function (c) { return c.value === s.code; })[0];
+        if (!box) return;
+        pickSubject(box);
+        addSkills(pickers[s.code] && pickers[s.code].api, s.skills);
+      });
+      addSkills(overallPicker, d.overall);
+      writeRadios(form, d.radios, RADIOS);
+      writeFields(d.fields, MORE_FIELDS);
+      addSkills(window.__alumniAppliedPicker, d.applied);
+      skillsToLearnTags.set(d.toLearn);
+      upskillTags.set(d.upskilling);
     });
   })();
 
@@ -1035,21 +1213,38 @@
     renderPool('professor-previous-subjects', 'previous_semester');
     renderPool('professor-summer-subjects', 'previous_summer');
 
-    // pre-fill the saved record
-    (BOOT.record || []).forEach(function (s) {
-      if (s.custom) {
-        addCustom({ code: s.code, name: s.name, programs: s.programs || [] }, s.skills);
-      } else if (poolOf[s.code]) {
-        var box = qsa('.cs-subject-pick', form).filter(function (c) { return c.value === s.code; })[0];
-        if (box) box.checked = true;
-        var hit = poolOf[s.code];
-        addBlock(s.code, hit.subj.name, s.skills, { programs: hit.subj.programs, termLabel: hit.subj.term_label, bucket: hit.poolKey });
-      } else {
-        // reported before, but not offered in this or last semester: kept until removed
-        addBlock(s.code, s.name, s.skills, { tag: '<span class="cs-added-tag">From your record</span>', removable: true });
-      }
+    // pre-fill the saved record (or, on a first answer, the unfinished draft)
+    function fillSubjects(list, fromDraft) {
+      (list || []).forEach(function (s) {
+        if (s.custom) {
+          addCustom({ code: s.code, name: s.name, programs: s.programs || [] }, s.skills);
+        } else if (poolOf[s.code]) {
+          var box = qsa('.cs-subject-pick', form).filter(function (c) { return c.value === s.code; })[0];
+          if (box) box.checked = true;
+          var hit = poolOf[s.code];
+          addBlock(s.code, hit.subj.name, s.skills, { programs: hit.subj.programs, termLabel: hit.subj.term_label, bucket: hit.poolKey });
+        } else if (!fromDraft) {
+          // reported before, but not offered in this or last semester: kept until removed
+          addBlock(s.code, s.name, s.skills, { tag: '<span class="cs-added-tag">From your record</span>', removable: true });
+        }
+      });
+      updatePickedCount();
+    }
+    fillSubjects(BOOT.record, false);
+
+    var draft = surveyDraft(form, function () {
+      var consentBox = document.getElementById('professor-consent');
+      return {
+        consent: !!(consentBox && consentBox.checked),
+        subjects: qsa('.cs-subject-block', blocksWrap).map(function (b) {
+          var p = pickers[b.getAttribute('data-code')];
+          return { code: p.code, name: p.name, custom: p.custom, programs: p.programs, skills: p.api.collect() };
+        })
+      };
+    }, function (d) {
+      if (d.consent) writeFields({ 'professor-consent': true }, ['professor-consent']);
+      fillSubjects(d.subjects, true);
     });
-    updatePickedCount();
 
     window.addEventListener('beforeunload', function (e) {
       if (!dirty) return;
@@ -1089,6 +1284,7 @@
         if (saveBtn) saveBtn.textContent = editing ? 'Save changes' : 'Submit survey';
         if (!body || body.ok !== true) return;   // offline fallback: nothing saved on the server
         dirty = false;
+        draft.clear();
         if (body.created) {
           showToast('Thank you! Your subjects and skills were saved. You can edit them here any time.');
           setTimeout(function () { window.location.reload(); }, 1200);

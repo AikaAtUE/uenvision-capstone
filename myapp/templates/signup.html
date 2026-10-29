@@ -9,13 +9,14 @@
     </div>
     <form class="auth-form" id="signup-form" method="post" action="{% url 'signup' %}">
       {% csrf_token %}
-      <label class="field"><span>Last name</span><input type="text" id="signup-lastname" autocomplete="family-name" name="last_name" required></label>
-      <label class="field"><span>First name</span><input type="text" id="signup-firstname" autocomplete="given-name" name="first_name" required></label>
-      <label class="field"><span>Middle name</span><input type="text" id="signup-middlename" autocomplete="additional-name" name="middle_name"></label>
-      <label class="field"><span>UE email</span><input type="email" id="signup-email" autocomplete="email" name="email" placeholder="juan.delacruz@ue.edu.ph" required></label>
-      <label class="field"><span>Password</span><input type="password" id="signup-password" autocomplete="new-password" name="password" required></label>
-      <label class="field"><span>Re-enter password</span><input type="password" id="signup-password2" autocomplete="new-password" name="password2" required></label>
-      <p class="form-msg" id="signup-msg">{% if error %}{{ error }}{% endif %}</p>
+      <label class="field"><span>Last name</span><input type="text" id="signup-lastname" value="{{ form.last_name|default:'' }}" autocomplete="family-name" name="last_name" required></label>
+      <label class="field"><span>First name</span><input type="text" id="signup-firstname" value="{{ form.first_name|default:'' }}" autocomplete="given-name" name="first_name" required></label>
+      <label class="field"><span>Middle name</span><input type="text" id="signup-middlename" value="{{ form.middle_name|default:'' }}" autocomplete="additional-name" name="middle_name"></label>
+      <label class="field"><span>UE email</span><input type="email" id="signup-email" value="{{ form.email|default:'' }}" autocomplete="email" name="email" placeholder="juan.delacruz@ue.edu.ph" required></label>
+      <label class="field"><span>Password</span><input type="password" id="signup-password" value="{{ form.password|default:'' }}" autocomplete="new-password" name="password" minlength="{{ min_password_length }}" required data-password-rules aria-describedby="signup-password-rules"></label>
+      <ul class="pw-rules" id="signup-password-rules" aria-live="polite"><li data-min-length="{{ min_password_length }}">At least {{ min_password_length }} characters</li></ul>
+      <label class="field"><span>Re-enter password</span><input type="password" id="signup-password2" value="{{ form.password2|default:'' }}" autocomplete="new-password" name="password2" required></label>
+      <p class="form-msg is-error" id="signup-msg" role="alert">{% if error %}{{ error }}{% endif %}</p>
       <button type="submit" class="btn btn-navy btn-block">Create account</button>
       <p class="auth-foot">Already have an account? <a class="link-inline" href="{% url 'login' %}">Log in</a></p>
     </form>

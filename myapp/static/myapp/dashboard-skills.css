@@ -10,6 +10,17 @@
 .bars--wide .bar-label{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .bars--wide .bar-value{white-space:nowrap;}
 .bars--wide .bar-value small{color:var(--muted-2);}
+/* Top-skills bars split by job board (Trabajo / Kalibrr) */
+.source-key{display:flex; flex-wrap:wrap; gap:6px 16px; margin:-8px 0 16px; font-size:.82rem; font-weight:600; color:var(--ink);}
+.source-key[hidden]{display:none;}
+.source-key-item,.bar-split span{display:inline-flex; align-items:center; gap:6px;}
+.source-key i,.bar-split i{width:10px; height:10px; border-radius:2px; flex:none;}
+.bars--wide .bar-fill.bar-fill--split{display:flex; background:none; overflow:hidden;}
+.bar-seg{display:block; height:100%; min-width:2px;}
+.bar-seg + .bar-seg{box-shadow:inset 1px 0 0 #fff;}
+.bars--wide .bar-row--split{row-gap:4px;}
+.bar-split{grid-column:2 / 4; display:flex; flex-wrap:wrap; gap:2px 14px; font-size:.76rem; color:var(--muted); margin-top:-2px;}
+.bar-split i{width:8px; height:8px;}
 .empty-note{padding:26px 4px; color:var(--muted);}
 
 .trend-wrap{position:relative;}
@@ -70,6 +81,8 @@
   .bars--wide .bar-label{grid-area:label;}
   .bars--wide .bar-value{grid-area:value;}
   .bars--wide .bar-track{grid-area:track; height:12px;}
+  .bars--wide .bar-row--split{grid-template-areas:"label value" "track track" "split split";}
+  .bar-split{grid-area:split; margin-top:0;}
   .gap-cols{grid-template-columns:1fr;}
   .gap-col .bars--wide .bar-row{grid-template-columns:1fr auto;}
 }

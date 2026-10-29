@@ -363,7 +363,8 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
         return {"exists": False}
     sources = sorted({p["source"] for p in everything if p["source"]})
     levels = sorted({p["level"] for p in everything if p["level"]})
-    jobs = [(p["month"], p[kind]) for p in job_roles.it_postings(source, level, program)]
+    chosen = job_roles.it_postings(source, level, program)
+    jobs = [(p["month"], p[kind]) for p in chosen]
 
     dated = sorted({m for m, _ in jobs if m})
     month_list = _month_range(dated[0], dated[-1]) if dated else []
@@ -378,7 +379,17 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
     counts, label = tally(jobs)
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], label[kv[0]].lower()))
     total_jobs = len(jobs)
-    bars = [{"skill": label[k], "count": c, "pct": round(c / total_jobs * 100, 1) if total_jobs else 0}
+    # Each bar's count split by the job board its postings came from (they add up to the
+    # bar's count: every posting has one source).
+    bar_keys = {k for k, _ in ranked[:top]}
+    by_source = {k: {} for k in bar_keys}
+    for p in chosen:
+        for k in p[kind]:
+            if k in bar_keys:
+                by_source[k][p["source"]] = by_source[k].get(p["source"], 0) + 1
+    bar_sources = sorted({s for split in by_source.values() for s in split}, key=lambda s: (not s, s))
+    bars = [{"skill": label[k], "count": c, "pct": round(c / total_jobs * 100, 1) if total_jobs else 0,
+             "by_source": [{"source": s, "count": by_source[k][s]} for s in bar_sources if by_source[k].get(s)]}
             for k, c in ranked[:top]]
 
     w_counts, w_label = tally(in_window)
@@ -404,6 +415,7 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
             "undated": sum(1 for m, _ in jobs if not m),
         },
         "bars": bars,
+        "bar_sources": bar_sources,
         "months": month_list,
         "postings_per_month": [per_month[m] for m in month_list],
         "series": [{"skill": w_label[k], "counts": [series[k][m] for m in month_list]} for k, _ in w_ranked],
