@@ -1100,7 +1100,7 @@ class IdleTimeoutTests(TestCase):
 
 @override_settings(REQUIRE_EMAIL_VERIFICATION=True)
 class EmailVerificationTests(TestCase):
-    """Self sign-ups must click the emailed link before they can log in."""
+    """Nobody has to confirm their email to use UEnvision. Students/alumni are reminded to; faculty aren't asked."""
 
     def setUp(self):
         from django.core.cache import cache
@@ -1115,49 +1115,93 @@ class EmailVerificationTests(TestCase):
         from django.core import mail
         return re.search(r"http://testserver(/verify-email/\S+/)", mail.outbox[-1].body).group(1)
 
-    def test_signup_sends_link_and_blocks_login_until_confirmed(self):
+    def unconfirmed_student(self, email="stu@ue.edu.ph"):
+        return CustomUser.objects.create_user(email=email, password="longenough1", first_name="S", last_name="T",
+                                              role=CustomUser.Role.STUDENT, email_verified=False)
+
+    def test_faculty_signup_needs_no_confirmation(self):
         from django.core import mail
         r = self.signup()
-        self.assertContains(r, "Check your email")
-        self.assertNotIn("_auth_user_id", self.client.session)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].to, ["new@ue.edu.ph"])
-        self.assertIn("noreply@uenvision.tech", mail.outbox[0].from_email)
-        self.assertFalse(CustomUser.objects.get(email="new@ue.edu.ph").email_verified)
+        self.assertRedirects(r, reverse("dashboard"), fetch_redirect_response=False)
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertTrue(CustomUser.objects.get(email="new@ue.edu.ph").email_verified)
+        self.assertFalse([m for m in mail.outbox if m.to == ["new@ue.edu.ph"]])
 
-        r = self.client.post(reverse("login"), {"email": "new@ue.edu.ph", "password": "longenough1"})
-        self.assertContains(r, "Confirm your email first")
-        self.assertNotIn("_auth_user_id", self.client.session)
-
+    def test_unconfirmed_student_can_log_in_and_confirm_later(self):
+        from django.core import mail
+        self.unconfirmed_student()
+        r = self.client.post(reverse("login"), {"email": "stu@ue.edu.ph", "password": "longenough1"})
+        self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)
+        page = self.client.get(reverse("student_dashboard"))
+        self.assertContains(page, "Please confirm your email.")
+        settings_page = self.client.get(reverse("settings"))
+        self.assertContains(settings_page, "Not confirmed")
+        self.assertContains(settings_page, "Send confirmation link")
+        r = self.client.post(reverse("send_my_verification"), {"next": reverse("student_dashboard")}, follow=True)
+        self.assertContains(r, "We sent a confirmation link to stu@ue.edu.ph")
+        self.assertEqual(mail.outbox[-1].to, ["stu@ue.edu.ph"])
         link = self.link_from_outbox()
         self.assertContains(self.client.get(link), "Email confirmed")
-        self.assertTrue(CustomUser.objects.get(email="new@ue.edu.ph").email_verified)
-        # the link only works once
-        self.assertContains(self.client.get(link), "This link doesn't work")
-
-        r = self.client.post(reverse("login"), {"email": "new@ue.edu.ph", "password": "longenough1"})
-        # faculty sign-ups still wait for an administrator after confirming
-        self.assertRedirects(r, reverse("pending_approval"), fetch_redirect_response=False)
+        self.assertTrue(CustomUser.objects.get(email="stu@ue.edu.ph").email_verified)
+        self.assertContains(self.client.get(link), "This link doesn't work")  # only works once
+        self.assertNotContains(self.client.get(reverse("student_dashboard")), "Please confirm your email.")
+        self.assertContains(self.client.get(reverse("settings")), "Confirmed")
 
     def test_bad_link_is_rejected(self):
-        self.signup()
+        self.unconfirmed_student()
+        self.client.post(reverse("login"), {"email": "stu@ue.edu.ph", "password": "longenough1"})
+        self.client.post(reverse("send_my_verification"))
         link = self.link_from_outbox()
         self.assertContains(self.client.get(link[:-3] + "xx/"), "This link doesn't work")
-        self.assertFalse(CustomUser.objects.get(email="new@ue.edu.ph").email_verified)
+        self.assertFalse(CustomUser.objects.get(email="stu@ue.edu.ph").email_verified)
 
     def test_resend_is_rate_limited_and_does_not_reveal_accounts(self):
         from django.core import mail
-        from django.core.cache import cache
-        self.signup()
-        r = self.client.post(reverse("resend_verification"), {"email": "new@ue.edu.ph"})
+        self.unconfirmed_student()
+        self.client.post(reverse("resend_verification"), {"email": "stu@ue.edu.ph"})
+        self.assertEqual(len(mail.outbox), 1)
+        r = self.client.post(reverse("resend_verification"), {"email": "stu@ue.edu.ph"})
         self.assertContains(r, "wait a minute")
         self.assertEqual(len(mail.outbox), 1)
-        cache.clear()
-        self.client.post(reverse("resend_verification"), {"email": "new@ue.edu.ph"})
-        self.assertEqual(len(mail.outbox), 2)
         r = self.client.post(reverse("resend_verification"), {"email": "nobody@ue.edu.ph"})
         self.assertContains(r, "If <strong>nobody@ue.edu.ph</strong> has an account")
-        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_student_changes_email_in_settings(self):
+        from django.core import mail
+        user = self.unconfirmed_student()
+        user.email_verified = True
+        user.save()
+        self.client.force_login(user)
+        self.assertContains(self.client.get(reverse("settings") + "?edit=1"), 'name="email" value="stu@ue.edu.ph"')
+        r = self.client.post(reverse("update_account"), {"first_name": "S", "last_name": "T", "email": "gmail@example.com"})
+        self.assertRedirects(r, reverse("settings") + "?edit=1", fetch_redirect_response=False)
+        user.refresh_from_db()
+        self.assertEqual(user.email, "stu@ue.edu.ph")
+        r = self.client.post(reverse("update_account"), {"first_name": "Sam", "middle_name": "Q", "last_name": "Tan",
+                                                         "email": "sam.tan@ue.edu.ph"}, follow=True)
+        self.assertContains(r, "We sent a confirmation link to sam.tan@ue.edu.ph")
+        user.refresh_from_db()
+        self.assertEqual((user.first_name, user.middle_name, user.last_name, user.email),
+                         ("Sam", "Q", "Tan", "sam.tan@ue.edu.ph"))
+        self.assertFalse(user.email_verified)
+        self.assertEqual(mail.outbox[-1].to, ["sam.tan@ue.edu.ph"])
+
+    def test_faculty_changes_email_without_confirming(self):
+        from django.core import mail
+        user = CustomUser.objects.create_user(email="fac@ue.edu.ph", password="longenough1", first_name="F",
+                                              last_name="C", role=CustomUser.Role.FACULTY)
+        CustomUser.objects.create_user(email="taken@ue.edu.ph", password="longenough1", first_name="T", last_name="K")
+        self.client.force_login(user)
+        r = self.client.post(reverse("update_account"), {"first_name": "F", "last_name": "C", "email": "taken@ue.edu.ph"},
+                             follow=True)
+        self.assertContains(r, "An account with this email already exists.")
+        self.client.post(reverse("update_account"), {"first_name": "F", "last_name": "C", "email": "fac2@gmail.com"})
+        user.refresh_from_db()
+        self.assertEqual(user.email, "fac2@gmail.com")
+        self.assertTrue(user.email_verified)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertNotContains(self.client.get(reverse("settings")), "Not confirmed")
 
     def test_existing_and_admin_made_accounts_need_no_confirmation(self):
         user = CustomUser.objects.create_user(email="old@ue.edu.ph", password="secret123",
@@ -1169,13 +1213,13 @@ class EmailVerificationTests(TestCase):
     @override_settings(REQUIRE_EMAIL_VERIFICATION=False)
     def test_without_email_settings_signup_logs_in_directly(self):
         r = self.signup("direct@ue.edu.ph")
-        self.assertRedirects(r, reverse("pending_approval"), fetch_redirect_response=False)
+        self.assertRedirects(r, reverse("dashboard"), fetch_redirect_response=False)
         self.assertTrue(CustomUser.objects.get(email="direct@ue.edu.ph").email_verified)
 
 
 @override_settings(REQUIRE_EMAIL_VERIFICATION=True)
 class StudentRegisterVerificationTests(StudentFlowTests):
-    """Students/alumni registering after the survey also confirm their email first."""
+    """Students/alumni registering after the survey get in right away and confirm their email later."""
 
     def test_survey_register_dashboard(self):
         from django.core import mail
@@ -1183,13 +1227,13 @@ class StudentRegisterVerificationTests(StudentFlowTests):
         token = reg.split("t=", 1)[1]
         r = self.client.post(reverse("register"), {"t": token, "email": "juan@ue.edu.ph",
                                                    "password": "secret123", "password2": "secret123"})
-        self.assertContains(r, "Check your email")
-        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)
+        self.assertIn("_auth_user_id", self.client.session)
         self.assertEqual(mail.outbox[-1].to, ["juan@ue.edu.ph"])
+        self.assertContains(self.client.get(reverse("student_dashboard")), "Please confirm your email.")
         link = mail.outbox[-1].body.split("http://testserver", 1)[1].split()[0]
         self.assertContains(self.client.get(link), "Email confirmed")
-        r = self.client.post(reverse("login"), {"email": "juan@ue.edu.ph", "password": "secret123"})
-        self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)
+        self.assertNotContains(self.client.get(reverse("student_dashboard")), "Please confirm your email.")
 
 
 class DummyAccountTests(IsolatedDataMixin, TestCase):
@@ -1454,17 +1498,17 @@ class FacultyApprovalTests(TestCase):
         self.client.force_login(prof)
         self.assertEqual(self.client.get(url).status_code, 403)
 
-    def test_signup_waits_for_approval_and_admins_are_notified(self):
+    def test_signup_can_use_app_right_away_and_admins_are_notified(self):
         from django.core import mail
         from .models import Notification
         r = self.signup()
-        self.assertRedirects(r, reverse("pending_approval"), fetch_redirect_response=False)
+        self.assertRedirects(r, reverse("dashboard"), fetch_redirect_response=False)
         prof = CustomUser.objects.get(email="prof@ue.edu.ph")
         self.assertFalse(prof.is_approved)
-        # blocked from the app until approved
-        self.assertRedirects(self.client.get(reverse("dashboard")), reverse("pending_approval"), fetch_redirect_response=False)
-        self.assertRedirects(self.client.get(reverse("data")), reverse("pending_approval"), fetch_redirect_response=False)
-        self.assertContains(self.client.get(reverse("pending_approval")), "Waiting for approval")
+        self.assertTrue(prof.email_verified)
+        # not blocked while waiting for approval
+        self.assertEqual(self.client.get(reverse("data")).status_code, 200)
+        self.assertRedirects(self.client.get(reverse("pending_approval")), reverse("dashboard"), fetch_redirect_response=False)
         # both admins get a notification; only the one who opted in gets an email
         self.assertEqual(Notification.objects.filter(subject_user=prof).count(), 2)
         self.assertEqual([m.to for m in mail.outbox], [["adm2@ue.edu.ph"]])
@@ -1473,19 +1517,41 @@ class FacultyApprovalTests(TestCase):
         self.client.force_login(self.admin)
         page = self.client.get(reverse("accounts"))
         self.assertContains(page, '<span class="notif-bell-count" id="notif-bell-count">1</span>', html=True)
-        self.assertContains(page, "1 faculty sign-up</strong> waiting for approval")
+        self.assertContains(page, "1 faculty sign-up</strong> not approved yet")
         self.assertContains(page, "Prof Santos (prof@ue.edu.ph) signed up")          # in the bell's dropdown
         self.assertEqual(self.client.post(reverse("notifications_read")).json(), {"ok": True})  # dropdown opened
         self.assertNotContains(self.client.get(reverse("accounts")), "notif-bell-count")
         self.assertContains(self.client.get(reverse("notifications")), "Prof Santos (prof@ue.edu.ph) signed up")
 
+        sent = len(mail.outbox)
         self.client.post(reverse("account_approve", args=[prof.pk]))
         prof.refresh_from_db()
         self.assertTrue(prof.is_approved)
-        self.assertEqual(mail.outbox[-1].to, ["prof@ue.edu.ph"])
+        self.assertEqual(len(mail.outbox), sent)  # they already use UEnvision, so no "approved" email
         self.assertFalse(Notification.objects.filter(subject_user=prof, read_at__isnull=True).exists())
         self.client.force_login(prof)
         self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+
+    def test_removing_an_unapproved_signup_also_removes_their_answers(self):
+        from .models import CurriculumSurveyResponse
+        self.signup()
+        prof = CustomUser.objects.get(email="prof@ue.edu.ph")
+        CurriculumSurveyResponse.objects.create(respondent_type=CurriculumSurveyResponse.PROFESSOR, user=prof, data={})
+        SurveyResponse.objects.create(survey_type=SurveyResponse.SUS, user=prof, data={})
+        approved = CustomUser.objects.create_user(email="fac@ue.edu.ph", password="secret123", first_name="F",
+                                                  last_name="C", role=CustomUser.Role.FACULTY)
+        kept = CurriculumSurveyResponse.objects.create(respondent_type=CurriculumSurveyResponse.PROFESSOR,
+                                                       user=approved, data={})
+        self.client.force_login(self.admin)
+        self.assertContains(self.client.post(reverse("account_delete", args=[prof.pk]), follow=True),
+                            "and its survey answers were removed")
+        self.assertFalse(CustomUser.objects.filter(email="prof@ue.edu.ph").exists())
+        self.assertFalse(CurriculumSurveyResponse.objects.exclude(pk=kept.pk).exists())
+        self.assertEqual(SurveyResponse.objects.count(), 0)
+        # an approved account's answers are kept (unlinked) as before
+        self.client.post(reverse("account_delete", args=[approved.pk]))
+        kept.refresh_from_db()
+        self.assertIsNone(kept.user)
 
     def test_admin_made_and_student_accounts_need_no_approval(self):
         self.client.force_login(self.admin)
@@ -1957,3 +2023,110 @@ class PrivacyConsentTests(TestCase):
         page = self.client.get(reverse("professor_survey"))
         self.assertContains(page, 'id="professor-consent"')
         self.assertContains(page, 'data-mirror="professor-consent"')
+
+
+class DeleteDataFileTests(IsolatedDataMixin, TestCase):
+    """Data > View Data: administrators can delete some CSVs, never the raw scraped job postings."""
+
+    def setUp(self):
+        super().setUp()
+        from pathlib import Path
+        from django.conf import settings
+        self.dir = Path(settings.DATA_DIR)
+        (self.dir / ".state").mkdir(exist_ok=True)
+        for name in ("compiled_kalibrr.csv", "hard_skills.csv", "soft_skills.csv", ".state/extracted_skills.json"):
+            (self.dir / name).write_text("x\n", encoding="utf-8")
+        self.admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                                    last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+
+    def test_delete_extracted_also_removes_what_is_built_from_it(self):
+        self.client.force_login(self.admin)
+        page = self.client.get(reverse("data"))
+        self.assertContains(page, 'id="delete-file-form"')
+        self.assertContains(page, "data-delete-note=")
+        r = self.client.post(reverse("data_delete", args=["extracted"]), follow=True)
+        self.assertContains(r, "Deleted Extracted Skills.")
+        for name in ("extracted_skills.csv", "hard_skills.csv", "soft_skills.csv", ".state/extracted_skills.json"):
+            self.assertFalse((self.dir / name).exists(), name)
+        self.assertTrue((self.dir / "compiled_kalibrr.csv").exists())
+
+    def test_raw_job_postings_and_derived_files_cannot_be_deleted(self):
+        self.client.force_login(self.admin)
+        for key in ("kalibrr", "trabajo", "hard_skills", "soft_skills"):
+            r = self.client.post(reverse("data_delete", args=[key]), follow=True)
+            self.assertContains(r, "can&#x27;t be deleted here")
+        self.assertTrue((self.dir / "compiled_kalibrr.csv").exists())
+        self.assertTrue((self.dir / "hard_skills.csv").exists())
+
+    def test_only_administrators_and_only_post(self):
+        fac = CustomUser.objects.create_user(email="fac@ue.edu.ph", password="secret123", first_name="F",
+                                             last_name="C", role=CustomUser.Role.FACULTY)
+        self.client.force_login(fac)
+        self.assertEqual(self.client.post(reverse("data_delete", args=["extracted"])).status_code, 403)
+        self.assertNotContains(self.client.get(reverse("data")), 'id="delete-file-form"')
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(reverse("data_delete", args=["extracted"])).status_code, 405)
+        self.assertTrue((self.dir / "extracted_skills.csv").exists())
+
+
+class ExtractionColumnsTests(TestCase):
+    def test_extracted_csv_has_the_tech_job_columns(self):
+        from .pipeline.skills_schema import JOB_FLAG_COLUMNS, UNIVERSAL_COLUMNS, normalize_record
+        for col in ("COMPUTER SCIENCE", "INFORMATION TECHNOLOGY", "isTechJob"):
+            self.assertIn(col, UNIVERSAL_COLUMNS)
+        self.assertEqual(set(JOB_FLAG_COLUMNS.values()), {"COMPUTER SCIENCE", "INFORMATION TECHNOLOGY", "isTechJob"})
+        rec = normalize_record({"job_id": "1", "job_title": "Dev", "isTechJob": True})
+        self.assertIs(rec["isTechJob"], True)
+        self.assertIsNone(rec["COMPUTER SCIENCE"])   # blank until Gemini answers
+
+
+class TechJobColumnsTests(IsolatedDataMixin, TestCase):
+    """Homepage + Dashboard count postings by isTechJob, and narrow BSCS / BSIT by the
+    COMPUTER SCIENCE / INFORMATION TECHNOLOGY columns."""
+
+    def setUp(self):
+        super().setUp()
+        import csv
+        from django.conf import settings
+        rows = [
+            # job_name, function, hard_skills, CS, IT, isTechJob
+            ("ML Engineer", "", "Python; TensorFlow", "True", "False", "True"),
+            ("Network Administrator", "", "Cisco; Linux", "False", "True", "True"),
+            ("Full Stack Developer", "", "JavaScript; Python", "True", "True", "True"),
+            ("Accountant", "IT and Software", "Excel", "False", "False", "False"),   # IT function, but not tech
+            ("Talent Wrangler", "", "Kubernetes", "False", "True", "True"),         # no role group, still counted
+            ("Software Developer", "", "Java", "", "", ""),                         # not answered yet: old rules
+        ]
+        with open(settings.DATA_DIR / "extracted_skills.csv", "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["job_id", "job_name", "source", "function", "date", "hard_skills", "soft_skills",
+                        "experience_level", "COMPUTER SCIENCE", "INFORMATION TECHNOLOGY", "isTechJob"])
+            for i, (name, fn, hard, cs, it, tech) in enumerate(rows):
+                w.writerow([i, name, "kalibrr", fn, "2026-01-05", hard, "Teamwork", "Entry", cs, it, tech])
+
+    def test_only_tech_jobs_count_and_programs_narrow_them(self):
+        from . import job_roles
+        names = lambda prog="": sorted(p["role"] or "-" for p in job_roles.it_postings(program=prog))
+        self.assertEqual(len(job_roles.it_postings()), 5)          # the accountant is left out
+        self.assertEqual(len(job_roles.it_postings(program="BSCS")), 3)   # ML, full stack, unanswered
+        self.assertEqual(len(job_roles.it_postings(program="BSIT")), 4)   # network, full stack, wrangler, unanswered
+        self.assertIn("-", names())                                 # tech job without a role group still counts
+
+    def test_homepage_program_picker(self):
+        page = self.client.get(reverse("home"), {"program": "BSIT"})
+        self.assertContains(page, '<option value="BSIT" selected>Information Technology</option>', html=True)
+        self.assertContains(page, "Top skills across all Information Technology jobs")
+        self.assertContains(page, "According to 4 Information Technology job postings")
+        self.assertContains(self.client.get(reverse("home")), "According to 5 IT/CS job postings")
+        self.assertEqual(self.client.get(reverse("role_skills"), {"program": "BSCS"}).json()["overall"]["postings"], 3)
+
+    def test_dashboard_program_filter(self):
+        admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                               last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+        self.client.force_login(admin)
+        url = reverse("dashboard_skills")
+        self.assertEqual(self.client.get(url).json()["stats"]["postings"], 5)
+        cs = self.client.get(url, {"program": "BSCS"}).json()
+        self.assertEqual(cs["stats"]["postings"], 3)
+        self.assertNotIn("Cisco", [b["skill"] for b in cs["bars"]])
+        self.assertEqual(cs["gap"]["postings_considered"], 3)

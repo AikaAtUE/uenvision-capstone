@@ -9,6 +9,12 @@ title to the first role whose patterns match; titles that match no role (and the
 non-IT postings Kalibrr also returns, such as accountants) are left out of the
 role statistics. Add or reorder patterns in ROLES to change the grouping.
 
+Which postings count is decided by Gemini's answers in data/extracted_skills.csv:
+isTechJob (only tech jobs count), and COMPUTER SCIENCE / INFORMATION TECHNOLOGY (used
+when a page is narrowed to BSCS or BSIT). Rows extracted before those columns existed
+have them blank until the next extraction run; until then they fall back to the old
+title rules (role_for) and count for both programs.
+
 postings() / it_postings() are also the ONE place results read job postings from:
 the homepage, the student/alumni dashboard, the Dashboard's charts and stat cards,
 the skill gap analysis and the Recommendations page all count the same IT/CS
@@ -49,10 +55,25 @@ _IT_TITLE = re.compile(r"\b(it|software|developer|data|network|cloud|devops|qa|u
 
 _CACHE = {"key": None, "value": None}
 
+# Program filter -> the extracted_skills.csv column that says the posting fits it.
+PROGRAM_COLUMNS = {"BSCS": "COMPUTER SCIENCE", "BSIT": "INFORMATION TECHNOLOGY"}
+PROGRAM_NAMES = {"BSCS": "Computer Science", "BSIT": "Information Technology"}
 
-def role_for(title, function=""):
+
+def _flag(value):
+    """'True' / 'False' from the CSV -> True / False; blank (not answered yet) -> None."""
+    v = str(value or "").strip().lower()
+    if v in ("true", "1", "yes"):
+        return True
+    if v in ("false", "0", "no"):
+        return False
+    return None
+
+
+def role_for(title, function="", is_tech=False):
+    """is_tech: Gemini said it's a tech job, so the title only picks the role group."""
     title = str(title or "")
-    if function != IT_FUNCTION and not _IT_TITLE.search(title):
+    if not is_tech and function != IT_FUNCTION and not _IT_TITLE.search(title):
         return None
     for key, pats in _COMPILED:
         if any(p.search(title) for p in pats):
@@ -63,7 +84,8 @@ def role_for(title, function=""):
 def postings():
     """-> one dict per extracted posting, cached until data/extracted_skills.csv changes:
     {"role": role key or None, "source", "level" ("" if not given), "month" ("YYYY-MM" or None),
-     "hard": {skill_key: display}, "soft": {skill_key: display}}.
+     "tech" / "BSCS" / "BSIT": True / False / None (isTechJob, COMPUTER SCIENCE, INFORMATION
+     TECHNOLOGY; None = not answered yet), "hard": {skill_key: display}, "soft": {skill_key: display}}.
     Skill names are counted as written in the data set, the same way as the survey
     answers (gap_analysis._standardize): "REST APIs" and "RESTful APIs" are two skills,
     "Jira" and "JIRA" are one."""
@@ -97,8 +119,11 @@ def postings():
     out = []
     for r in rows:
         m = pipeline._MONTH_RE.match(get(r, "date"))
+        tech = _flag(get(r, "isTechJob"))
         out.append({
-            "role": role_for(get(r, "job_name"), get(r, "function")),
+            "role": role_for(get(r, "job_name"), get(r, "function"), is_tech=bool(tech)),
+            "tech": tech,
+            **{prog: _flag(get(r, col)) for prog, col in PROGRAM_COLUMNS.items()},
             "source": get(r, "source"),
             "level": get(r, "experience_level"),
             "month": f"{m.group(1)}-{m.group(2)}" if m else None,
@@ -109,15 +134,26 @@ def postings():
     return out
 
 
-def it_postings(source="", level=""):
-    """The postings every result counts: IT/CS-role postings only (non-IT postings that
-    the job boards also return, such as accountants or pharmacists, are left out),
-    optionally narrowed to one source / experience level ("Not specified" = blank).
+def is_counted(p):
+    """Gemini said it's a tech job (isTechJob). Not answered yet: the old title rules."""
+    return p["tech"] if p["tech"] is not None else bool(p["role"])
+
+
+def fits_program(p, program):
+    """program "" = both; "BSCS" / "BSIT" = Gemini said it fits (not answered yet counts for both)."""
+    return not program or p.get(program) is not False
+
+
+def it_postings(source="", level="", program=""):
+    """The postings every result counts: tech jobs only (non-tech postings that the job
+    boards also return, such as accountants or pharmacists, are left out), optionally
+    narrowed to one source / experience level ("Not specified" = blank) / program
+    ("BSCS" = COMPUTER SCIENCE is true, "BSIT" = INFORMATION TECHNOLOGY is true).
     -> list, or None when there's no extracted data yet."""
     all_postings = postings()
     if all_postings is None:
         return None
-    return [p for p in all_postings if p["role"]
+    return [p for p in all_postings if is_counted(p) and fits_program(p, program)
             and (not source or p["source"] == source)
             and (not level or (p["level"] or "Not specified") == level)]
 
@@ -132,11 +168,11 @@ def _top(postings, top):
     return [{"key": k, "skill": label[k], "count": c, "pct": pct[k]} for k, c in ranked[:top]], pct
 
 
-def skill_stats(role="", top=10):
-    """Top hard skills across all IT-role postings, and (if `role` is given) for that
-    role, each role skill with its overall % for comparison.
+def skill_stats(role="", top=10, program=""):
+    """Top hard skills across all IT/CS postings (only the ones that fit `program`, if given),
+    and (if `role` is given) for that role, each role skill with its overall % for comparison.
     -> {"exists", "roles": [{key, label, postings}], "overall": {...}, "role": {...} or None, "source_label"}"""
-    it = it_postings()
+    it = it_postings(program=program)
     if it is None:
         return {"exists": False}
     counts = {}
@@ -149,6 +185,7 @@ def skill_stats(role="", top=10):
         "roles": roles,
         "overall": {"postings": len(it), "skills": overall_top},
         "role": None,
+        "program": PROGRAM_NAMES.get(program, ""),
         # Shown as "According to N job postings from <source_label>" under the charts.
         "source_label": ", ".join(sorted({str(p["source"]).capitalize() for p in it if p["source"]})) or "online job boards",
     }

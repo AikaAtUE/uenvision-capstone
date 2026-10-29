@@ -35,8 +35,10 @@
     const picked = ctl.source.value ? [ctl.source.value] : (d.sources || []);
     return picked.length ? picked.map(cap).join(', ') : 'online job boards';
   }
+  const PROGRAM_NAMES = { BSCS: 'Computer Science', BSIT: 'Information Technology' };
   function postingsText(n, d) {
-    return n.toLocaleString() + ' job posting' + (n === 1 ? '' : 's') + ' from ' + sourceName(d) +
+    const prog = PROGRAM_NAMES[ctl.program.value];
+    return n.toLocaleString() + (prog ? ' ' + prog : '') + ' job posting' + (n === 1 ? '' : 's') + ' from ' + sourceName(d) +
       (ctl.level.value ? ' (' + ctl.level.value + ' level)' : '');
   }
   function setSource(id, text) { const e = $(id); if (e) e.textContent = text; }
@@ -352,12 +354,12 @@
   });
   [ctl.kind, ctl.source, ctl.level, ctl.months, ctl.program].forEach(c => c.addEventListener('change', () => { hidden.clear(); load(); }));
 
-  // The period picker only matters for the trend chart.
-  // ...and the program picker only for the gap analysis.
-  const monthsWrap = $('ctl-months-wrap'), programWrap = $('ctl-program-wrap');
+  // The period picker only matters for the trend chart. The program picker narrows every
+  // tab (job postings by the COMPUTER SCIENCE / INFORMATION TECHNOLOGY columns, and the
+  // gap analysis's survey answers too).
+  const monthsWrap = $('ctl-months-wrap');
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
     monthsWrap.hidden = t.dataset.tab !== 'skill-trends';
-    programWrap.hidden = t.dataset.tab !== 'skill-gaps';
   }));
 
   load();

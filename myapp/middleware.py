@@ -15,7 +15,7 @@ LEARNER_URL_NAMES = {
     "student_dashboard", "student_role", "student_generate", "my_skills", "my_skills_save",
     "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
     "feedback", "survey_submit", "feedback_later", "about", "help", "settings", "change_password", "session_ping",
-    "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+    "update_account", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
 }
 
 # Dummy (test) students can also open the overall Dashboard, which for them is
@@ -84,31 +84,6 @@ class IdleTimeoutMiddleware:
         return self.get_response(request)
 
 
-# What a faculty member who signed up themselves can open until an administrator approves them.
-PENDING_URL_NAMES = {
-    "pending_approval", "logout", "login", "session_ping", "verify_email", "resend_verification",
-    "forgot_password", "reset_password", "reset_password_confirm", "home", "about",
-}
-
-
-class PendingApprovalMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        user = getattr(request, "user", None)
-        if user is not None and user.is_authenticated and not getattr(user, "is_approved", True):
-            try:
-                match = resolve(request.path_info)
-            except Resolver404:
-                match = None
-            if match is not None and match.url_name not in PENDING_URL_NAMES:
-                if _wants_json(request):
-                    return JsonResponse({"ok": False, "error": "Your account is waiting for approval."}, status=403)
-                return redirect("pending_approval")
-        return self.get_response(request)
-
-
 # What a user with a temporary password (set by an administrator) can open until they choose their own.
 PASSWORD_CHANGE_URL_NAMES = {
     "settings", "change_password", "logout", "login", "session_ping", "verify_email", "resend_verification",
@@ -140,7 +115,7 @@ class ForcePasswordChangeMiddleware:
 PROFESSOR_SURVEY_URL_NAMES = {
     "professor_survey", "professor_survey_submit", "skill_search", "skill_add",
     "settings", "change_password", "logout", "login", "session_ping", "help", "about",
-    "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+    "update_account", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
 }
 
 

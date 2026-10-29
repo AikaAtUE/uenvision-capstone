@@ -27,7 +27,8 @@ from google.genai import errors, types
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 
-from skills_schema import ALIASES, SOURCE_CONFIG, UNIVERSAL_COLUMNS, normalize_record, write_skill_csvs
+from skills_schema import (ALIASES, JOB_FLAG_COLUMNS, SOURCE_CONFIG, UNIVERSAL_COLUMNS, normalize_record,
+                           write_skill_csvs)
 
 # ====================== DEFAULTS ======================
 # Every value can be overridden from the command line (see --help).
@@ -62,8 +63,37 @@ SKILL_COLS = ["hard_skills", "soft_skills", "certifications_or_licenses",
 
 
 # ---------- Structured output schema (no defaults: Gemini's schema dislikes them) ----------
+# The yes/no questions Gemini answers for every job: schema field -> CSV column (JOB_FLAG_COLUMNS).
+FLAG_DESCRIPTIONS = {
+    "is_tech_job": "true if this is a technology / IT job: the work itself is software, IT, data, networking, "
+                   "cybersecurity, cloud, QA, IT support or similar. false for non-tech work (sales, HR, "
+                   "accounting, customer service, marketing...), even at a tech company",
+    "computer_science": "true if a BS Computer Science graduate is a good fit: software engineering, "
+                        "programming, algorithms, data science, AI / machine learning, research and similar. "
+                        "false if is_tech_job is false",
+    "information_technology": "true if a BS Information Technology graduate is a good fit: systems and network "
+                              "administration, IT support, web development, databases, cloud, cybersecurity, "
+                              "QA and similar. false if is_tech_job is false",
+}
+
+
+class JobFlags(BaseModel):
+    job_id: str = Field(description="The job id exactly as given in the input")
+    is_tech_job: bool = Field(description=FLAG_DESCRIPTIONS["is_tech_job"])
+    computer_science: bool = Field(description=FLAG_DESCRIPTIONS["computer_science"])
+    information_technology: bool = Field(description=FLAG_DESCRIPTIONS["information_technology"])
+
+
+class BatchFlags(BaseModel):
+    results: List[JobFlags] = Field(
+        description="Exactly one entry per job in the input, in the same order")
+
+
 class JobSkills(BaseModel):
     job_id: str = Field(description="The job id exactly as given in the input")
+    is_tech_job: bool = Field(description=FLAG_DESCRIPTIONS["is_tech_job"])
+    computer_science: bool = Field(description=FLAG_DESCRIPTIONS["computer_science"])
+    information_technology: bool = Field(description=FLAG_DESCRIPTIONS["information_technology"])
     hard_skills: List[str] = Field(
         description="Technical skills, languages, frameworks, tools, databases, cloud platforms, "
                     "methodologies (e.g. Python, React, AWS, Agile, CI/CD)")
@@ -191,7 +221,17 @@ SYSTEM_PROMPT = (
     "Be precise and avoid generic phrases. Use the most common professional form of a skill "
     "(e.g. 'React' not 'React.js framework'). Do not invent skills that are not mentioned. "
     "Return exactly one result per job, copying each job_id exactly as given. "
-    "Never mix skills between different jobs."
+    "Never mix skills between different jobs. "
+    "Also answer, for each job, whether it is a tech job and whether it fits a BS Computer Science "
+    "and/or a BS Information Technology graduate (both can be true)."
+)
+
+# For jobs saved before the yes/no columns existed: only the yes/no answers, skills are left alone.
+FLAGS_PROMPT = (
+    "You are an expert technical recruiter. You will receive several job postings, "
+    "each wrapped in <job id=...> tags. For EACH job, answer whether it is a tech job and whether it "
+    "fits a BS Computer Science and/or a BS Information Technology graduate (both can be true). "
+    "Return exactly one result per job, copying each job_id exactly as given."
 )
 
 
@@ -232,7 +272,8 @@ def describe_response(resp) -> str:
         return f"(could not describe response: {ex})"
 
 
-def call_once(pool: KeyPool, throttle: Throttle, batch: List[dict]) -> Optional[dict]:
+def call_once(pool: KeyPool, throttle: Throttle, batch: List[dict],
+              schema=BatchExtraction, system: str = SYSTEM_PROMPT) -> Optional[dict]:
     """One batch -> {job_id: dict}, or None if it failed repeatedly (caller may split)."""
     prompt = build_prompt(batch)
     expected = [b["job_id"] for b in batch]
@@ -246,9 +287,9 @@ def call_once(pool: KeyPool, throttle: Throttle, batch: List[dict]) -> Optional[
                 model=MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
+                    system_instruction=system,
                     response_mime_type="application/json",
-                    response_schema=BatchExtraction,
+                    response_schema=schema,
                     max_output_tokens=MAX_OUTPUT_TOKENS,
                 ),
             )
@@ -257,7 +298,7 @@ def call_once(pool: KeyPool, throttle: Throttle, batch: List[dict]) -> Optional[
             parsed = getattr(resp, "parsed", None)
             if parsed is None:   # fall back to parsing the raw text
                 txt = re.sub(r"^```(?:json)?|```$", "", (resp.text or "").strip(), flags=re.M).strip()
-                parsed = BatchExtraction.model_validate_json(txt)
+                parsed = schema.model_validate_json(txt)
             if not parsed.results:
                 raise ValueError("model returned zero results")
 
@@ -295,18 +336,43 @@ def call_once(pool: KeyPool, throttle: Throttle, batch: List[dict]) -> Optional[
             time.sleep(wait)
 
 
-def extract_batch(pool: KeyPool, throttle: Throttle, batch: List[dict], depth: int = 0) -> dict:
+def extract_batch(pool: KeyPool, throttle: Throttle, batch: List[dict], depth: int = 0,
+                  schema=BatchExtraction, system: str = SYSTEM_PROMPT) -> dict:
     """Like call_once, but if a batch keeps failing it is split in half (up to 2 levels) and retried."""
-    res = call_once(pool, throttle, batch)
+    res = call_once(pool, throttle, batch, schema, system)
     if res is not None:
         return res
     if len(batch) == 1 or depth >= 2:
         return {}
     mid = len(batch) // 2
     print(f"[INFO] Splitting batch ({mid} + {len(batch) - mid})")
-    out = extract_batch(pool, throttle, batch[:mid], depth + 1)
-    out.update(extract_batch(pool, throttle, batch[mid:], depth + 1))
+    out = extract_batch(pool, throttle, batch[:mid], depth + 1, schema, system)
+    out.update(extract_batch(pool, throttle, batch[mid:], depth + 1, schema, system))
     return out
+
+
+def add_missing_flags(pool: KeyPool, throttle: Throttle, results: List[dict], source_rows: dict) -> int:
+    """Fill isTechJob / COMPUTER SCIENCE / INFORMATION TECHNOLOGY for saved jobs that don't have them yet
+    (saved before these columns existed, or with no description). Their skills are not touched.
+    source_rows: job_id -> row of the input CSV. Returns how many jobs got answers."""
+    todo = [r for r in results
+            if any(r.get(col) in (None, "") for col in JOB_FLAG_COLUMNS.values()) and str(r["job_id"]) in source_rows]
+    if not todo:
+        return 0
+    print(f"Answering the tech job / CS / IT questions for {len(todo)} job(s) saved without them ...")
+    filled = 0
+    for i in range(0, len(todo), BATCH_SIZE):
+        chunk = todo[i:i + BATCH_SIZE]
+        batch = [{"job_id": str(r["job_id"]), "title": to_py(source_rows[str(r["job_id"])].get(COL_TITLE)) or "",
+                  "text": prepare_job_text(source_rows[str(r["job_id"])])} for r in chunk]
+        got = extract_batch(pool, throttle, batch, schema=BatchFlags, system=FLAGS_PROMPT)
+        for r in chunk:
+            ans = got.get(str(r["job_id"]))
+            if ans:
+                r.update({col: ans[field] for field, col in JOB_FLAG_COLUMNS.items()})
+                filled += 1
+        save_outputs(results)
+    return filled
 
 
 # ---------- Output ----------
@@ -404,6 +470,7 @@ def main():
         df = df.drop_duplicates(subset=COL_ID, keep="first")
     if a.limit:
         df = df.head(a.limit)
+    all_rows = df.to_dict("records")
 
     results: List[dict] = []
     if Path(OUTPUT_JSON).exists():
@@ -411,7 +478,10 @@ def main():
         done = {str(r["job_id"]) for r in results}
         df = df[~df[COL_ID].astype(str).isin(done)]
         print(f"Resuming: {len(done)} done, {len(df)} remaining")
-    if df.empty:
+    source_rows = {str(to_py(r[COL_ID])): r for r in all_rows}
+    needs_flags = any(any(r.get(col) in (None, "") for col in JOB_FLAG_COLUMNS.values())
+                      and str(r["job_id"]) in source_rows for r in results)
+    if df.empty and not needs_flags:
         save_outputs(results)      # also rewrites the CSV with the current columns
         print("Nothing to do.")
         return
@@ -450,9 +520,11 @@ def main():
             for jid, (row, has_text) in meta.items():
                 if has_text and jid not in extracted:
                     continue
+                # No description: no skills, and the yes/no answers are filled in by add_missing_flags.
                 sk = extracted.get(jid) or {"hard_skills": [], "soft_skills": [],
                                             "certifications_or_licenses": [],
-                                            "experience_level": None, "education": None}
+                                            "experience_level": None, "education": None,
+                                            **{field: None for field in JOB_FLAG_COLUMNS}}
                 rec = {"job_id": to_py(row[COL_ID]),
                        RENAME.get(COL_TITLE, COL_TITLE): to_py(row.get(COL_TITLE))}
                 if a.source_label:
@@ -461,9 +533,13 @@ def main():
                     rec[RENAME.get(c, c)] = to_py(row.get(c))
                 for c in SKILL_COLS:
                     rec[c] = sk[c]
+                for field, col in JOB_FLAG_COLUMNS.items():
+                    rec[col] = sk[field]
                 results.append(normalize_record(rec))
 
             save_outputs(results)
+
+        add_missing_flags(pool, throttle, results, source_rows)
 
     except (AllKeysExhausted, FatalError) as e:
         save_outputs(results)

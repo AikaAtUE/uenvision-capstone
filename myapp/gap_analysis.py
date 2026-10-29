@@ -97,13 +97,13 @@ def _tally(mention_sets):
 # ---------------------------------------------------------------------------
 # Industry side
 # ---------------------------------------------------------------------------
-def _industry_mentions(source: str = "", level: str = ""):
+def _industry_mentions(source: str = "", level: str = "", program: str = ""):
     """-> (list of {key: display} per matching job posting, info dict). Reads the same
     IT/CS postings as the homepage and the Dashboard charts (job_roles.it_postings),
     so a skill's industry % here is the % shown everywhere else."""
     from . import job_roles
 
-    chosen = job_roles.it_postings(source, level)
+    chosen = job_roles.it_postings(source, level, program)
     if chosen is None:
         return [], {"exists": False}
     return [p["hard"] for p in chosen], {"exists": True, "total_rows": len(job_roles.it_postings()),
@@ -271,10 +271,11 @@ def compute(top: int = 10, source: str = "", level: str = "", program: str = "",
     gaps" stat cards and the Skill Gap Analysis tab. `top` / `source` / `level`
     match the same controls already used for the Top-in-demand-skills tab, so the
     two stay in sync — this always looks at hard skills only (see module docstring).
-    `program` ("BSIT"/"BSCS", blank = both) narrows the academic side; `dummy`
+    `program` ("BSIT"/"BSCS", blank = both) narrows both sides: the survey answers, and the
+    job postings to the ones Gemini marked INFORMATION TECHNOLOGY / COMPUTER SCIENCE; `dummy`
     uses dummy accounts' answers instead of the real ones."""
     top = max(1, min(int(top), 30))
-    industry_jobs, info = _industry_mentions(source, level)
+    industry_jobs, info = _industry_mentions(source, level, program)
     if not info["exists"]:
         return {"exists": False}
 

@@ -25,8 +25,13 @@
         {% if pending %}
         <p>Thanks! An administrator now needs to approve your faculty account. We'll email you as soon as it's approved.</p>
         {% else %}
-        <p>Your account is ready. You can log in now.</p>
+        {% if user.is_authenticated %}
+        <p>Thanks! Your email is confirmed.</p>
+        <a class="btn btn-navy btn-block" href="{% url 'login' %}">Back to UEnvision</a>
+        {% else %}
+        <p>Thanks! Your email is confirmed. You can log in now.</p>
         <a class="btn btn-navy btn-block" href="{% url 'login' %}">Log in</a>
+        {% endif %}
         {% endif %}
       {% elif state == "invalid" %}
         <h1 class="verify-title">This link doesn't work</h1>

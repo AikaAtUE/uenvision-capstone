@@ -1,4 +1,4 @@
-{{ new_user.get_full_name }} ({{ new_user.email }}) signed up for UEnvision as faculty and is waiting for your approval.
+{{ new_user.get_full_name }} ({{ new_user.email }}) signed up for UEnvision as faculty and can already use it. If they are UE faculty, approve them. If not, remove the account (their survey answers are removed too).
 
 Review it here: {{ url }}
 

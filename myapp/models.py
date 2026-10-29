@@ -57,8 +57,8 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # is_dummy, are left out of the real skill gap analysis, and the dashboards
     # they see are computed from dummy answers only.
     is_dummy = models.BooleanField(default=False)
-    # Faculty who sign up themselves wait for an administrator to approve them
-    # before they get past the "waiting for approval" page. Accounts an
+    # Faculty who sign up themselves can use UEnvision right away, but show as "not approved yet"
+    # on the Accounts page until an administrator approves (or removes) them. Accounts an
     # administrator creates (and every account from before this) are approved.
     is_approved = models.BooleanField(default=True)
     # Administrators only: also email me when there's something to review

@@ -39,7 +39,10 @@ STRONG_WEIGHT = 0.5   # Intermediate or better counts as "have it"; Beginner is 
 # ---------------------------------------------------------------------------
 def home_view(request):
     role = request.GET.get("role", "")
-    stats = job_roles.skill_stats(role, TOP_SKILLS)
+    program = request.GET.get("program", "")
+    if program not in job_roles.PROGRAM_COLUMNS:
+        program = ""
+    stats = job_roles.skill_stats(role, TOP_SKILLS, program)
     if stats.get("exists"):
         top = stats["overall"]["skills"][0]["count"] if stats["overall"]["skills"] else 1
         for s in stats["overall"]["skills"]:
@@ -48,7 +51,8 @@ def home_view(request):
             rtop = max([s["pct"] for s in stats["role"]["skills"]] or [1])
             for s in stats["role"]["skills"]:
                 s["bar"] = round(s["pct"] / rtop * 100)
-    return render(request, "home.html", {"stats": stats, "role": role})
+    return render(request, "home.html", {"stats": stats, "role": role, "program": program,
+                                         "programs": job_roles.PROGRAM_NAMES.items()})
 
 
 def role_skills_view(request):
@@ -57,7 +61,10 @@ def role_skills_view(request):
         top = max(1, min(int(request.GET.get("top", TOP_SKILLS)), 30))
     except ValueError:
         return JsonResponse({"ok": False, "error": "Bad number."}, status=400)
-    return JsonResponse({"ok": True, **job_roles.skill_stats(request.GET.get("role", ""), top)})
+    program = request.GET.get("program", "")
+    if program not in job_roles.PROGRAM_COLUMNS:
+        program = ""
+    return JsonResponse({"ok": True, **job_roles.skill_stats(request.GET.get("role", ""), top, program)})
 
 
 def check_gap_view(request):
@@ -154,8 +161,8 @@ def register_view(request):
     response.user = user
     response.save(update_fields=["user"])
     if not user.email_verified:
-        sent = email_verification.send_verification_email(request, user)
-        return render(request, "verify_email.html", {"state": "sent", "email": user.email, "send_failed": not sent})
+        # They can use UEnvision right away; the dashboard reminds them to confirm.
+        email_verification.send_verification_email(request, user)
     login(request, user)
     return redirect("student_dashboard")
 

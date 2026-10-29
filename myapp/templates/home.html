@@ -14,9 +14,15 @@
     <div class="panel"><p class="empty-note">No job-market data has been collected yet. Please check back soon.</p></div>
   {% else %}
   <form class="pub-role-form" method="get" action="{% url 'home' %}">
+    <label class="select-field"><span>Program</span>
+      <select name="program" id="program-select" onchange="this.form.submit()">
+        <option value="">Computer Science and IT</option>
+        {% for key, name in programs %}<option value="{{ key }}"{% if key == program %} selected{% endif %}>{{ name }}</option>{% endfor %}
+      </select>
+    </label>
     <label class="select-field"><span>Job role</span>
       <select name="role" id="role-select" onchange="this.form.submit()">
-        <option value="">All IT/CS roles</option>
+        <option value="">All {% if stats.program %}{{ stats.program }}{% else %}IT/CS{% endif %} roles</option>
         {% for r in stats.roles %}<option value="{{ r.key }}"{% if r.key == role %} selected{% endif %}>{{ r.label }} ({{ r.postings }} posting{{ r.postings|pluralize }})</option>{% endfor %}
       </select>
     </label>
@@ -28,7 +34,7 @@
     {% if stats.role %}
     <section class="panel">
       <h2 class="pub-h2">Top skills for {{ stats.role.label }}</h2>
-      <p class="muted pub-sub">Share of {{ stats.role.label }} postings that mention each skill. The grey number is the same skill's share across all IT/CS postings.</p>
+      <p class="muted pub-sub">Share of {{ stats.role.label }} postings that mention each skill. The grey number is the same skill's share across all {% if stats.program %}{{ stats.program }}{% else %}IT/CS{% endif %} postings.</p>
       <ol class="pub-bars">
         {% for s in stats.role.skills %}
         <li>
@@ -42,7 +48,7 @@
     </section>
     {% endif %}
     <section class="panel">
-      <h2 class="pub-h2">Top skills across all IT/CS roles</h2>
+      <h2 class="pub-h2">Top skills across all {% if stats.program %}{{ stats.program }}{% else %}IT/CS{% endif %} jobs</h2>
       <p class="muted pub-sub">Share of postings that mention each skill.</p>
       <ol class="pub-bars">
         {% for s in stats.overall.skills %}
@@ -53,10 +59,10 @@
         </li>
         {% endfor %}
       </ol>
-      <p class="chart-source">According to {{ stats.overall.postings }} IT/CS job posting{{ stats.overall.postings|pluralize }} from {{ stats.source_label }}.</p>
+      <p class="chart-source">According to {{ stats.overall.postings }} {% if stats.program %}{{ stats.program }}{% else %}IT/CS{% endif %} job posting{{ stats.overall.postings|pluralize }} from {{ stats.source_label }}.</p>
     </section>
   </div>
-  <p class="muted pub-foot">Job postings are collected from public job boards (Kalibrr) for academic research at the University of the East – CCSS. Role groups come from job titles, so small roles are based on only a few postings.</p>
+  <p class="muted pub-foot">Job postings are collected from public job boards (Kalibrr) for academic research at the University of the East – CCSS. Gemini marks which postings are tech jobs and whether they fit Computer Science or Information Technology graduates. Role groups come from job titles, so small roles are based on only a few postings.</p>
   {% endif %}
 </main>
 {% endblock %}

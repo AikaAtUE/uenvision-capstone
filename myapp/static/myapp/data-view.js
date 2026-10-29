@@ -20,8 +20,28 @@
   let pageNo = 1, ticket = 0, timer = null, lastPages = 1;
   const nf = new Intl.NumberFormat();
 
+  // Administrators: "Delete file" for the files that may be deleted (never the raw job postings).
+  const delForm = document.getElementById('delete-file-form');
+  const delBackdrop = document.getElementById('delete-file-backdrop');
+
   function setExportLink() {
     exportBtn.href = exportBtn.dataset.urlTemplate.replace('KEY', encodeURIComponent(sourceSel.value));
+    if (delForm) {
+      const opt = sourceSel.selectedOptions[0];
+      delForm.hidden = !(opt && opt.dataset.deleteNote && opt.dataset.exists);
+      delForm.action = delForm.dataset.urlTemplate.replace('KEY', encodeURIComponent(sourceSel.value));
+    }
+  }
+
+  if (delForm && delBackdrop) {
+    document.getElementById('delete-file-btn').addEventListener('click', () => {
+      const opt = sourceSel.selectedOptions[0];
+      document.getElementById('delete-file-name').textContent = opt.textContent.trim();
+      document.getElementById('delete-file-note').textContent = opt.dataset.deleteNote;
+      delBackdrop.classList.add('is-active');
+    });
+    document.getElementById('delete-file-cancel').addEventListener('click', () => delBackdrop.classList.remove('is-active'));
+    document.getElementById('delete-file-yes').addEventListener('click', () => delForm.submit());
   }
 
   function clearTable() { while (table.firstChild) table.removeChild(table.firstChild); }

@@ -18,9 +18,9 @@ def _admins():
 
 
 def notify_faculty_signup(request, new_user):
-    """A faculty member signed up and is waiting for approval: tell every administrator."""
+    """A faculty member signed up (and can already use UEnvision): tell every administrator to check them."""
     link = reverse("accounts") + "?status=pending"
-    message = f"{new_user.get_full_name()} ({new_user.email}) signed up as faculty and is waiting for approval."
+    message = f"{new_user.get_full_name()} ({new_user.email}) signed up as faculty. Approve them if they're UE faculty, or remove them."
     admins = list(_admins())
     Notification.objects.bulk_create([
         Notification(recipient=a, kind=Notification.FACULTY_SIGNUP, message=message, link=link, subject_user=new_user)
@@ -33,7 +33,7 @@ def notify_faculty_signup(request, new_user):
            "settings_url": request.build_absolute_uri(reverse("settings"))}
     try:
         send_mail(
-            subject=f"UEnvision: {new_user.get_full_name()} is waiting for approval",
+            subject=f"UEnvision: {new_user.get_full_name()} signed up as faculty",
             message=render_to_string("emails/faculty_signup.txt", ctx),
             html_message=render_to_string("emails/faculty_signup.html", ctx),
             from_email=settings.DEFAULT_FROM_EMAIL,

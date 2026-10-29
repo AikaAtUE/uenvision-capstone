@@ -79,15 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentUser) return;
     const nameEl = document.querySelector('.profile-name');
     if (nameEl) nameEl.textContent = currentUser.name;
-
-    const userIdEl = document.getElementById('set-userid');
-    const nameField = document.getElementById('set-name');
-    const emailField = document.getElementById('set-email');
-    const passField = document.getElementById('set-password');
-    if (userIdEl) userIdEl.textContent = currentUser.id;
-    if (nameField) nameField.textContent = currentUser.name;
-    if (emailField) emailField.textContent = currentUser.email;
-    if (passField) passField.dataset.real = currentUser.password;
+    // The Settings page fields come from Django (settings.html / update_account_view).
   }
   hydrateProfile();
 

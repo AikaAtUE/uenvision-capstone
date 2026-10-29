@@ -7,20 +7,50 @@
     {% include "_messages.html" %}
     {% if user.must_change_password %}<p class="flash flash--error" role="status">You're using a temporary password. Choose your own password below to keep using UEnvision.</p>{% endif %}
     <h2 class="section-title">Account settings</h2>
-    <p class="form-msg" id="settings-msg"></p>
+    {% if edit_account %}
+    <form class="settings-card account-form" method="post" action="{% url 'update_account' %}">
+      {% csrf_token %}
+      <label class="field"><span>First name</span><input type="text" name="first_name" value="{{ user.first_name }}" autocomplete="given-name" required></label>
+      <label class="field"><span>Middle name <small class="field-hint">(optional)</small></span><input type="text" name="middle_name" value="{{ user.middle_name }}" autocomplete="additional-name"></label>
+      <label class="field"><span>Last name</span><input type="text" name="last_name" value="{{ user.last_name }}" autocomplete="family-name" required></label>
+      <label class="field"><span>Email</span><input type="email" name="email" value="{{ user.email }}" autocomplete="email" required>
+        {% if user.is_learner %}<small class="field-hint">Use your UE email. If you change it, we'll send a confirmation link to the new address.</small>{% endif %}</label>
+      <div class="settings-actions">
+        <span></span>
+        <span class="settings-actions-right">
+          <a class="btn btn-ghost" href="{% url 'settings' %}">Cancel</a>
+          <button type="submit" class="btn btn-navy">Save</button>
+        </span>
+      </div>
+    </form>
+    {% else %}
     <dl class="settings-list">
       <div class="settings-row"><dt>User ID</dt><dd id="set-userid">{{ user.pk }}</dd></div>
-      <div class="settings-row"><dt>User name</dt><dd id="set-name" data-editable data-type="text">{{ user.get_full_name }}</dd></div>
-      <div class="settings-row"><dt>Email</dt><dd id="set-email" data-editable data-type="email">{{ user.email }}</dd></div>
+      <div class="settings-row"><dt>User name</dt><dd id="set-name">{{ user.get_full_name }}</dd></div>
+      <div class="settings-row"><dt>Email</dt>
+        <dd id="set-email" class="email-cell">
+          <span class="email-cell-address">{{ user.email }}</span>
+          {% if not user.email_verified %}
+          <span class="email-status email-status--no">Not confirmed</span>
+          <form method="post" action="{% url 'send_my_verification' %}" class="email-cell-form">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'settings' %}">
+            <button type="submit" class="btn btn-navy btn-sm">Send confirmation link</button>
+          </form>
+          {% elif user.is_learner %}
+          <span class="email-status email-status--ok">Confirmed</span>
+          {% endif %}
+        </dd>
+      </div>
       <div class="settings-row"><dt>Role</dt><dd id="set-role">{{ user.role_label }}</dd></div>
     </dl>
     <div class="settings-actions">
       <button class="btn btn-red" id="delete-btn">Delete</button>
       <span class="settings-actions-right">
-        <button class="btn btn-ghost" id="cancel-edit-btn" hidden>Cancel</button>
-        <button class="btn btn-navy" id="edit-btn">Edit</button>
+        <a class="btn btn-navy" id="account-edit-link" href="{% url 'settings' %}?edit=1">Edit</a>
       </span>
     </div>
+    {% endif %}
 
     {% if user.is_administrator %}
     <h2 class="section-title settings-section-gap" id="notification-settings">Notifications</h2>

@@ -33,11 +33,8 @@ from . import recommendations
 # Create your views here.
 
 def home_url_for(user):
-    """Where a logged-in user lands: students/alumni get their own dashboard, and
-    faculty who signed up themselves wait on the approval page until approved, and anyone
+    """Where a logged-in user lands: students/alumni get their own dashboard, and anyone
     with a temporary password goes to Settings to choose their own."""
-    if not getattr(user, "is_approved", True):
-        return reverse("pending_approval")
     if getattr(user, "must_change_password", False):
         return reverse("settings")
     return reverse("student_dashboard") if getattr(user, "is_learner", False) else reverse("dashboard")
@@ -55,8 +52,8 @@ def login_view(request):
             login_limits.record_failure(request, email)
         else:
             login_limits.clear_email(email)
-        if user is not None and not user.email_verified and email_verification.verification_required():
-            return render(request, "verify_email.html", {"state": "unconfirmed", "email": user.email})
+        # No email confirmation needed to log in: students/alumni who haven't confirmed
+        # yet are reminded on their dashboard and in Settings instead.
         if user is not None:
             login(request, user)
             next_url = request.POST.get("next") or request.GET.get("next")
@@ -94,16 +91,14 @@ def signup_view(request):
             middle_name=middle_name,
             last_name=last_name,
             role=CustomUser.Role.FACULTY,  # self-signups are always Faculty; only an admin can create admins
-            email_verified=not email_verification.verification_required(),
-            is_approved=False,  # an administrator approves self sign-ups
+            email_verified=True,  # faculty can use UEnvision right away, without confirming their email
+            # They can use everything right away too. An administrator still approves them on the
+            # Accounts page, or removes them (with their answers) if they aren't faculty.
+            is_approved=False,
         )
-        if not user.email_verified:
-            # Administrators hear about it once the email is confirmed (see verify_email_view).
-            sent = email_verification.send_verification_email(request, user)
-            return render(request, "verify_email.html", {"state": "sent", "email": user.email, "send_failed": not sent})
         notifications.notify_faculty_signup(request, user)
         login(request, user)
-        return redirect("pending_approval")
+        return redirect(home_url_for(user))
     return render(request, "signup.html")
 
 
@@ -136,16 +131,32 @@ def verify_email_view(request, uidb64, token):
         return render(request, "verify_email.html", {"state": "invalid"})
     user.email_verified = True
     user.save(update_fields=["email_verified"])
-    if not user.is_approved:
-        notifications.notify_faculty_signup(request, user)
-    return render(request, "verify_email.html", {"state": "confirmed", "pending": not user.is_approved})
+    return render(request, "verify_email.html", {"state": "confirmed"})
+
+
+@login_required
+@require_POST
+def send_my_verification_view(request):
+    """The "Send the confirmation link" button on the student dashboard and in Settings."""
+    user = request.user
+    next_url = request.POST.get("next") or ""
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = reverse("settings")
+    if user.email_verified:
+        messages.success(request, "Your email is already confirmed.")
+    elif not email_verification.can_resend(user.email):
+        messages.error(request, "We just sent you a link. Please wait a minute before asking for another one.")
+    elif email_verification.send_verification_email(request, user):
+        messages.success(request, f"We sent a confirmation link to {user.email}. Check your spam or junk folder too.")
+    else:
+        messages.error(request, "We couldn't send the email just now. Please try again in a minute.")
+    return redirect(next_url)
 
 
 @login_required
 def pending_approval_view(request):
-    if request.user.is_approved:
-        return redirect(home_url_for(request.user))
-    return render(request, "pending_approval.html")
+    # Faculty no longer wait for approval to use UEnvision; old links land on their home page.
+    return redirect(home_url_for(request.user))
 
 
 @require_POST
@@ -234,7 +245,7 @@ def dashboard_skills_view(request):
     if program and program not in curriculum_data.PROGRAMS:
         return JsonResponse({"ok": False, "error": "Unknown program."}, status=400)
     try:
-        data = pipeline.skills_dashboard(request.GET.get("kind", "hard"), top, source, level, months)
+        data = pipeline.skills_dashboard(request.GET.get("kind", "hard"), top, source, level, months, program)
     except (OSError, UnicodeDecodeError) as exc:
         return JsonResponse({"ok": False, "error": f"Couldn't read the data: {exc}"}, status=500)
     if data.get("exists"):
@@ -393,7 +404,39 @@ def about_view(request):
 
 @login_required
 def settings_view(request):
-    return render(request, "settings.html", {"active_page": "settings", "min_password_length": MIN_PASSWORD_LENGTH})
+    return render(request, "settings.html", {"active_page": "settings", "min_password_length": MIN_PASSWORD_LENGTH,
+                                             "edit_account": request.GET.get("edit") == "1"})
+
+
+@login_required
+@require_POST
+def update_account_view(request):
+    """Settings > Account settings: change your own name and email."""
+    user = request.user
+    data, error = _clean_account_fields(request.POST, exclude_pk=user.pk)
+    if not error and user.is_learner and not _is_ue_email(data["email"]):
+        error = f"Please use your UE email address (ending in @{UE_EMAIL_DOMAIN})."
+    if error:
+        messages.error(request, error)
+        return redirect(reverse("settings") + "?edit=1")
+    email_changed = data["email"].lower() != user.email.lower()
+    for field, value in data.items():
+        setattr(user, field, value)
+    fields = list(data)
+    # Students and alumni confirm a new email; faculty and staff don't need to.
+    needs_link = email_changed and user.is_learner and email_verification.verification_required()
+    if email_changed:
+        user.email_verified = not needs_link
+        fields.append("email_verified")
+    user.save(update_fields=fields)
+    if needs_link and email_verification.send_verification_email(request, user):
+        messages.success(request, f"Saved. We sent a confirmation link to {user.email}.")
+    elif needs_link:
+        messages.success(request, "Saved. We couldn't send the confirmation email just now, so use "
+                                  "\u201cSend confirmation link\u201d next to your email in a minute.")
+    else:
+        messages.success(request, "Your account details were saved.")
+    return redirect("settings")
 
 
 @login_required
@@ -473,7 +516,7 @@ DUMMY_TYPES = {"dummy_student": CustomUser.Role.STUDENT, "dummy_faculty": Custom
 # Filters on the Accounts page: (value, label, queryset filter)
 ACCOUNT_FILTERS = [
     ("", "All accounts", {}),
-    ("pending", "Waiting for approval", {"is_approved": False}),
+    ("pending", "Not approved yet", {"is_approved": False}),
     ("administrator", "Administrators", {"role": CustomUser.Role.ADMINISTRATOR}),
     ("developer", "Developers", {"role": CustomUser.Role.DEVELOPER}),
     ("faculty", "Faculty", {"role": CustomUser.Role.FACULTY, "is_dummy": False}),
@@ -485,7 +528,7 @@ ACCOUNT_FILTERS = [
 
 # Sort options on the Accounts page: value -> (label, order_by fields)
 ACCOUNT_SORTS = {
-    "": ("Waiting for approval first", ("is_approved", "last_name", "first_name")),
+    "": ("Not approved yet first", ("is_approved", "last_name", "first_name")),
     "name": ("Name (A–Z)", ("last_name", "first_name")),
     "-name": ("Name (Z–A)", ("-last_name", "-first_name")),
     "-joined": ("Newest first", ("-date_joined", "-pk")),
@@ -618,8 +661,7 @@ def account_approve_view(request, pk):
         target.is_approved = True
         target.save(update_fields=["is_approved"])
         notifications.mark_read_about(target)
-        notifications.notify_approved(request, target)
-        messages.success(request, f"Approved {target.get_full_name()} ({target.email}). They can use UEnvision now.")
+        messages.success(request, f"Approved {target.get_full_name()} ({target.email}).")
     return redirect(request.POST.get("next") if url_has_allowed_host_and_scheme(
         request.POST.get("next"), allowed_hosts={request.get_host()}) else "accounts")
 
@@ -696,8 +738,15 @@ def account_delete_view(request, pk):
         messages.error(request, "You can't remove your own account from here.")
     else:
         email = target.email
-        target.delete()
-        messages.success(request, f"Account {email} was removed.")
+        if not target.is_approved:
+            # A sign-up that was never approved isn't real faculty: their answers go too.
+            SurveyResponse.objects.filter(user=target).delete()
+            CurriculumSurveyResponse.objects.filter(user=target).delete()
+            target.delete()
+            messages.success(request, f"Account {email} and its survey answers were removed.")
+        else:
+            target.delete()
+            messages.success(request, f"Account {email} was removed.")
     return redirect("accounts")
 
 
@@ -783,9 +832,26 @@ def data_view(request):
             info = summary["sources"][key]["compiled"]
         else:
             info = pipeline._file_info(pipeline.table_path(key))
-        tables.append({"key": key, "label": label, "exists": info["exists"]})
+        tables.append({"key": key, "label": label, "exists": info["exists"],
+                       "delete_note": pipeline.DELETABLE_TABLES.get(key, "")})
     default = next((t["key"] for t in tables if t["exists"]), tables[0]["key"])
+    if request.GET.get("source") in pipeline.TABLES:
+        default = request.GET["source"]
     return render(request, "data_view.html", _data_ctx(request, "view", tables=tables, default_table=default))
+
+
+@administrator_required
+@require_POST
+def data_delete_view(request, key):
+    if key not in pipeline.TABLES:
+        raise Http404
+    label = pipeline.TABLES[key][0]
+    error = pipeline.delete_table(key)
+    if error:
+        messages.error(request, error)
+    else:
+        messages.success(request, f"Deleted {label}.")
+    return redirect(reverse("data") + "?" + urlencode({"source": key}))
 
 
 @login_required

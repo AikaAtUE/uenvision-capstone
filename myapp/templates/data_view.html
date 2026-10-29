@@ -7,6 +7,7 @@
   <header class="page-header"><h1>Data</h1></header>
   <div class="page-body">
     {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
     <h2 class="section-title">View &amp; export data</h2>
 
     <div class="data-toolbar">
@@ -14,7 +15,7 @@
         <span>Source</span>
         <select id="data-source">
           {% for t in tables %}
-          <option value="{{ t.key }}"{% if t.key == default_table %} selected{% endif %}>{{ t.label }}{% if not t.exists %} (no data yet){% endif %}</option>
+          <option value="{{ t.key }}"{% if t.key == default_table %} selected{% endif %}{% if t.exists %} data-exists="1"{% endif %}{% if user.is_administrator and t.delete_note %} data-delete-note="{{ t.delete_note }}"{% endif %}>{{ t.label }}{% if not t.exists %} (no data yet){% endif %}</option>
           {% endfor %}
         </select>
       </label>
@@ -26,6 +27,12 @@
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
         Export CSV
       </a>
+      {% if user.is_administrator %}
+      <form method="post" id="delete-file-form" data-url-template="{% url 'data_delete' 'KEY' %}" hidden>
+        {% csrf_token %}
+        <button type="button" class="btn btn-ghost btn-sm btn-danger-outline" id="delete-file-btn">Delete file</button>
+      </form>
+      {% endif %}
     </div>
     <p class="muted table-count" id="table-count" aria-live="polite"></p>
 
@@ -39,6 +46,21 @@
     </div>
   </div>
 </section>
+{% endblock %}
+{% block extra_partials %}
+{% if user.is_administrator %}
+<div class="modal-backdrop" id="delete-file-backdrop">
+  <div class="modal" role="alertdialog" aria-labelledby="delete-file-title">
+    <p id="delete-file-title"><strong>Delete <span id="delete-file-name"></span>?</strong></p>
+    <p class="muted" id="delete-file-note"></p>
+    <p class="muted">This can't be undone. Export it first if you might need it.</p>
+    <div class="modal-actions">
+      <button class="btn btn-red" id="delete-file-yes">Yes, delete</button>
+      <button class="btn btn-cancel" id="delete-file-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 {% block extra_js %}
 <script src="{% static 'myapp/data-view.js' %}?v={% now 'U' %}"></script>

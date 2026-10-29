@@ -57,13 +57,15 @@ document.addEventListener('DOMContentLoaded', () => {
         : "Dummy accounts' survey answers, including ones already submitted, are kept out of the real results.";
       show('edit-backdrop');
     } else if (btn.dataset.action === 'approve'){
-      confirmThen(`Approve ${label} as faculty? They'll get full access and an email saying so.`,
+      confirmThen(`Approve ${label} as faculty? Only approve people you know are UE faculty.`,
         'Yes, approve', false, () => submitAction(d.approveUrl));
     } else if (btn.dataset.action === 'reset'){
       confirmThen(`Reset the password for ${label}? A temporary password will be emailed to them, and they'll choose a new one when they log in.`,
         'Yes, reset', false, () => submitAction(d.resetUrl));
     } else if (btn.dataset.action === 'delete'){
-      confirmThen(`Permanently remove the account for ${label}? This cannot be undone.`,
+      confirmThen(d.approved === '1'
+        ? `Permanently remove the account for ${label}? This cannot be undone.`
+        : `Permanently remove the account for ${label} and all the survey answers they submitted? This cannot be undone.`,
         'Yes, remove', true, () => submitAction(d.deleteUrl));
     }
   });

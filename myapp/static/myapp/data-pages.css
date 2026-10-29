@@ -144,3 +144,10 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 .st-table .st-cell{text-align:center; font-size:1.05rem;}
 .st-yes{color:#1e7a4a; font-weight:700;}
 .st-no{color:var(--red, #c8202f); font-weight:700;}
+
+/* View Data: Delete file */
+#delete-file-form { margin: 0; }
+.btn-danger-outline { color: var(--red-dark, #a3161f); border-color: currentColor; }
+#delete-file-backdrop .modal p { margin-bottom: 12px; }
+#delete-file-backdrop .modal p.muted { font-weight: 500; font-size: .92rem; }
+#delete-file-backdrop .modal-actions { margin-top: 18px; }

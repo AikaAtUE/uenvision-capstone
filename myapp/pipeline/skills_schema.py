@@ -17,7 +17,16 @@ UNIVERSAL_COLUMNS = [
     "salary_shown", "base_salary", "maximum_salary", "salary_currency", "salary_interval",
     "date", "is_active", "is_expired",
     "hard_skills", "hard_skills_raw", "soft_skills", "certifications_or_licenses", "experience_level", "education",
+    "COMPUTER SCIENCE", "INFORMATION TECHNOLOGY", "isTechJob",
 ]
+
+# Yes/no answers Gemini gives for every job: field in Gemini's reply -> column name in the CSV.
+# Blank for jobs saved before these columns existed until the next extraction run fills them in.
+JOB_FLAG_COLUMNS = {
+    "computer_science": "COMPUTER SCIENCE",
+    "information_technology": "INFORMATION TECHNOLOGY",
+    "is_tech_job": "isTechJob",
+}
 
 # Source-specific / older column name -> universal name
 ALIASES = {

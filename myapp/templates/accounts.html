@@ -11,7 +11,7 @@
       <button type="button" class="btn btn-navy btn-sm" id="add-account-btn">+ Add account</button>
     </div>
     {% if pending_count and status != "pending" %}
-    <p class="acct-pending-note"><strong>{{ pending_count }} faculty sign-up{{ pending_count|pluralize }}</strong> waiting for approval. <a class="link-inline" href="?status=pending">Review</a></p>
+    <p class="acct-pending-note"><strong>{{ pending_count }} faculty sign-up{{ pending_count|pluralize }}</strong> not approved yet. They can already use UEnvision. Approve the real faculty, and remove anyone who isn't (their survey answers are removed too). <a class="link-inline" href="?status=pending">Review</a></p>
     {% endif %}
     <form class="data-toolbar acct-filters" method="get" action="{% url 'accounts' %}">
       <label class="select-field select-field--grow">
@@ -43,7 +43,7 @@
           <tr
             data-last="{{ a.last_name }}" data-first="{{ a.first_name }}" data-middle="{{ a.middle_name }}"
             data-email="{{ a.email }}" data-name="{{ a.get_full_name }}"
-            data-type="{% if a.is_dummy %}dummy_{% endif %}{{ a.role }}" data-type-label="{{ a.role_label }}" data-self="{% if a.pk == user.pk %}1{% endif %}"
+            data-type="{% if a.is_dummy %}dummy_{% endif %}{{ a.role }}" data-type-label="{{ a.role_label }}" data-self="{% if a.pk == user.pk %}1{% endif %}" data-approved="{% if a.is_approved %}1{% endif %}"
             data-edit-url="{% url 'account_edit' a.pk %}"
             data-reset-url="{% url 'account_reset_password' a.pk %}"
             data-delete-url="{% url 'account_delete' a.pk %}"
@@ -51,7 +51,7 @@
             <td>{{ a.pk }}</td>
             <td>{{ a.get_full_name }}{% if a.pk == user.pk %} <span class="pill pill--you">You</span>{% endif %}</td>
             <td>{{ a.email }}</td>
-            <td><span class="pill pill--{{ a.role }}{% if a.is_dummy %} pill--dummy{% endif %}">{{ a.role_label }}</span>{% if not a.is_approved %} <span class="pill pill--pending">Waiting for approval</span>{% endif %}{% if not a.email_verified %} <span class="pill pill--unverified">Email not confirmed</span>{% endif %}</td>
+            <td><span class="pill pill--{{ a.role }}{% if a.is_dummy %} pill--dummy{% endif %}">{{ a.role_label }}</span>{% if not a.is_approved %} <span class="pill pill--pending">Not approved yet</span>{% endif %}{% if not a.email_verified %} <span class="pill pill--unverified">Email not confirmed</span>{% endif %}</td>
             <td>{{ a.date_joined|date:"M j, Y" }}</td>
             <td class="row-actions">
               {% if not a.is_approved %}<button type="button" class="btn btn-navy btn-sm" data-action="approve">Approve</button>{% endif %}

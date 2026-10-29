@@ -9,6 +9,18 @@
 <section class="page is-active" id="page-student-dashboard">
   <header class="page-header"><h1>My skill gap</h1></header>
   <div class="page-body">
+    {% include "_messages.html" %}
+
+    {% if not user.email_verified %}
+    <div class="panel sd-callout sd-callout--verify">
+      <p><strong>Please confirm your email.</strong> We sent a link to <strong>{{ user.email }}</strong>. Open it to confirm this is your email (check your spam or junk folder too). You can keep using UEnvision in the meantime. <a class="link-inline" href="{% url 'settings' %}?edit=1">Wrong email? Change it in Settings.</a></p>
+      <form method="post" action="{% url 'send_my_verification' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="btn btn-navy btn-sm" type="submit">Send the link again</button>
+      </form>
+    </div>
+    {% endif %}
 
     {% if not has_survey %}
     <div class="panel sd-callout">

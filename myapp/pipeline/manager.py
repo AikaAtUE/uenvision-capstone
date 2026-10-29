@@ -101,6 +101,40 @@ def table_path(key: str) -> Path:
     return data_dir() / TABLES[key][1]
 
 
+# View Data files an administrator may delete. The raw scraped job postings (compiled
+# Kalibrr / Trabajo CSVs and their JSONs) are deliberately not here.
+# key -> what deleting it also removes, shown in the confirm box.
+DELETABLE_TABLES = {
+    "extracted": "This also deletes Hard Skills and Soft Skills (they are made from it), and the next "
+                 "extraction run starts over from the first job. The raw job postings are kept.",
+    "custom_skills": "Skills that were added because they weren't in the ontology will no longer show up "
+                     "in skill search until standardization adds them again.",
+}
+
+
+def delete_table(key: str) -> str | None:
+    """Delete one View Data CSV (see DELETABLE_TABLES). Returns an error message, or None when done."""
+    if key not in DELETABLE_TABLES:
+        return "That file can't be deleted here."
+    if is_running():
+        return "A scrape or extraction run is going. Wait for it to finish (or stop it) before deleting files."
+    paths = [table_path(key)]
+    if key == "extracted":
+        # hard/soft skills are built from it, and the resume file would rebuild it on the next run
+        paths += [table_path(k) for k in SKILL_CSVS]
+        paths += [state_dir() / "extracted_skills.json", state_dir() / "standardize_pending.csv"]
+    if not any(p.is_file() for p in paths):
+        return "That file is already gone."
+    for p in paths:
+        try:
+            p.unlink()
+        except FileNotFoundError:
+            pass
+    for k in list(_table_cache):
+        _table_cache.pop(k, None)
+    return None
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -248,10 +282,11 @@ def _month_range(first: str, last: str) -> list[str]:
 
 
 def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level: str = "",
-                     months: int = 0) -> dict:
+                     months: int = 0, program: str = "") -> dict:
     """Numbers behind the dashboard charts.
 
-    kind: 'hard' | 'soft'. top: how many skills. source / level: optional filters.
+    kind: 'hard' | 'soft'. top: how many skills. source / level / program ("BSCS" / "BSIT",
+    from the COMPUTER SCIENCE / INFORMATION TECHNOLOGY columns): optional filters.
     months: 0 = every month with data, otherwise only the latest N months.
     A skill is counted once per job posting that mentions it. Postings and skill
     names come from job_roles.it_postings() -- the same IT/CS postings and
@@ -265,7 +300,7 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
         return {"exists": False}
     sources = sorted({p["source"] for p in everything if p["source"]})
     levels = sorted({p["level"] for p in everything if p["level"]})
-    jobs = [(p["month"], p[kind]) for p in job_roles.it_postings(source, level)]
+    jobs = [(p["month"], p[kind]) for p in job_roles.it_postings(source, level, program)]
 
     dated = sorted({m for m, _ in jobs if m})
     month_list = _month_range(dated[0], dated[-1]) if dated else []

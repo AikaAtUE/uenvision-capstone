@@ -610,3 +610,17 @@ img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }
 .feedback-nudge-actions { display: flex; gap: 8px; align-items: center; }
 .feedback-nudge-actions form { margin: 0; }
 @media (max-width: 720px) { .feedback-nudge { padding: 10px 16px; } }
+
+/* ============ Settings: email + confirmation status ============ */
+.settings-row dd.email-cell { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 10px; text-align: right; min-width: 0; }
+.email-cell-address { overflow-wrap: anywhere; }
+.email-cell-form { margin: 0; }
+.email-status { font-size: .75rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.email-status--no { background: #fff3d6; color: #8a5a00; }
+.email-status--ok { background: #e5f4ec; color: #1c7d4d; }
+a.btn { text-decoration: none; }
+.account-form .settings-actions { margin-top: 4px; }
+@media (max-width: 720px) {
+  .settings-row:has(.email-cell) { flex-direction: column; gap: 8px; }
+  .settings-row dd.email-cell { justify-content: flex-start; text-align: left; }
+}

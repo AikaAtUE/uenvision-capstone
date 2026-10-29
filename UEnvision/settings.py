@@ -73,7 +73,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'myapp.middleware.IdleTimeoutMiddleware',
     'myapp.middleware.LearnerAccessMiddleware',
-    'myapp.middleware.PendingApprovalMiddleware',
     'myapp.middleware.ForcePasswordChangeMiddleware',
     'myapp.middleware.ProfessorSurveyFirstMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
