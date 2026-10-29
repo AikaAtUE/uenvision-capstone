@@ -14,7 +14,7 @@ LEARNER_URL_NAMES = {
     "home", "role_skills", "check_gap", "skill_search", "skill_add", "register", "login", "logout",
     "student_dashboard", "student_role", "student_generate", "my_skills", "my_skills_save",
     "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
-    "feedback", "survey_submit", "about", "help", "settings", "change_password", "session_ping",
+    "feedback", "survey_submit", "feedback_later", "about", "help", "settings", "change_password", "session_ping",
     "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
 }
 
@@ -131,4 +131,42 @@ class ForcePasswordChangeMiddleware:
                 if _wants_json(request):
                     return JsonResponse({"ok": False, "error": "Please choose a new password first."}, status=403)
                 return redirect("settings")
+        return self.get_response(request)
+
+
+# What a faculty member with no Professor Survey answer yet can open: the survey itself
+# (and the skill search it uses), plus account basics. Everything else sends them to the
+# survey first, the same way students and alumni answer theirs before getting an account.
+PROFESSOR_SURVEY_URL_NAMES = {
+    "professor_survey", "professor_survey_submit", "skill_search", "skill_add",
+    "settings", "change_password", "logout", "login", "session_ping", "help", "about",
+    "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+}
+
+
+def needs_professor_survey(user):
+    """Faculty (not administrators or developers) who haven't answered the Professor Survey."""
+    from .models import CurriculumSurveyResponse
+
+    return (getattr(settings, "REQUIRE_PROFESSOR_SURVEY", True)
+            and user.role == user.Role.FACULTY
+            and not CurriculumSurveyResponse.objects.filter(
+                user=user, respondent_type=CurriculumSurveyResponse.PROFESSOR).exists())
+
+
+class ProfessorSurveyFirstMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated and getattr(user, "role", "") == "faculty":
+            try:
+                match = resolve(request.path_info)
+            except Resolver404:
+                match = None
+            if match is not None and match.url_name not in PROFESSOR_SURVEY_URL_NAMES and needs_professor_survey(user):
+                if _wants_json(request):
+                    return JsonResponse({"ok": False, "error": "Please answer the Professor Survey first."}, status=403)
+                return redirect(f"{reverse('professor_survey')}?first=1")
         return self.get_response(request)

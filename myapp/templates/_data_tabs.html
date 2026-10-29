@@ -8,4 +8,7 @@
   <a class="data-tab{% if data_tab == 'extract' %} is-active{% endif %}" href="{% url 'data_extract' %}"{% if data_tab == 'extract' %} aria-current="page"{% endif %}>Extract Skills</a>
   <a class="data-tab{% if data_tab == 'responses' %} is-active{% endif %}" href="{% url 'survey_responses' %}"{% if data_tab == 'responses' %} aria-current="page"{% endif %}>Survey Responses</a>
   {% endif %}
+  {% if user.is_developer %}
+  <a class="data-tab{% if data_tab == 'tracker' %} is-active{% endif %}" href="{% url 'survey_tracker' %}"{% if data_tab == 'tracker' %} aria-current="page"{% endif %}>Survey Tracker</a>
+  {% endif %}
 </nav>

@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import student_views, survey_admin, views
+from . import student_views, survey_admin, survey_tracker, views
 
 urlpatterns = [
     # Public site
@@ -48,6 +48,7 @@ urlpatterns = [
     path("data/extract/api-keys/", views.api_keys_save_view, name="api_keys_save"),
     path("feedback/", views.feedback_view, name="feedback"),
     path("feedback/submit/", views.survey_submit_view, name="survey_submit"),
+    path("feedback/later/", views.feedback_later_view, name="feedback_later"),
     path("about/", views.about_view, name="about"),
     path("help/", views.help_view, name="help"),
     path("settings/", views.settings_view, name="settings"),
@@ -74,6 +75,8 @@ urlpatterns = [
     path("survey/alumni/submit/", views.alumni_survey_submit_view, name="alumni_survey_submit"),
     path("data/survey-responses/", survey_admin.survey_responses_view, name="survey_responses"),
     path("data/survey-responses/delete/", survey_admin.survey_responses_delete_view, name="survey_responses_delete"),
+    path("data/survey-tracker/", survey_tracker.survey_tracker_view, name="survey_tracker"),
+    path("data/survey-tracker/remind/", survey_tracker.survey_tracker_remind_view, name="survey_tracker_remind"),
     path("data/professor-survey/", views.professor_survey_view, name="professor_survey"),
     path("data/professor-survey/submit/", views.professor_survey_submit_view, name="professor_survey_submit"),
     path("survey/professor/", RedirectView.as_view(pattern_name="professor_survey", permanent=False)),

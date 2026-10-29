@@ -1,0 +1,11 @@
+Hi {{ user.first_name }},
+
+Thank you for using UEnvision. To finish our capstone evaluation, we still need you to answer:
+{% for item in items %}
+- {{ item }}{% endfor %}
+
+It only takes a few minutes. Log in here and you'll be taken to it:
+
+{{ url }}
+
+This is an automated message from UEnvision. Please don't reply to it.

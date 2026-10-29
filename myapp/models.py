@@ -68,6 +68,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # one (and for accounts still on an old shared password): the user can
     # only open Settings until they choose their own password (ForcePasswordChangeMiddleware).
     must_change_password = models.BooleanField(default=False)
+    # Feedback reminder (feedback_nudge.py): how many times the account has used the main
+    # pages, and until when the "Help us evaluate UEnvision" banner is hidden after "Later".
+    app_uses = models.PositiveIntegerField(default=0)
+    feedback_snoozed_until = models.DateTimeField(null=True, blank=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

@@ -12,6 +12,17 @@
   var BOOT = {};
   try { BOOT = JSON.parse(bootstrapEl.textContent || '{}'); } catch (e) { BOOT = {}; }
 
+  /* ---------- Data Privacy consent: a second checkbox above Submit ---------- */
+  // Some respondents scroll past the notice at the top and miss its checkbox, so the same
+  // checkbox is repeated near the Submit button. Ticking either one ticks both.
+  Array.prototype.forEach.call(document.querySelectorAll('input[data-mirror]'), function (copy) {
+    var main = document.getElementById(copy.getAttribute('data-mirror'));
+    if (!main) return;
+    copy.checked = main.checked;
+    copy.addEventListener('change', function () { main.checked = copy.checked; });
+    main.addEventListener('change', function () { copy.checked = main.checked; });
+  });
+
   /* ---------- shared helpers ---------- */
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -618,7 +629,7 @@
         return;
       }
       if (!consent) {
-        setFormError('student-error', 'Please confirm the Data Privacy notice before submitting.');
+        setFormError('student-error', 'Please tick “I have read the Data Privacy Notice” just above the Submit button.');
         return;
       }
       var currentChecked = qsa('.cs-subject-pick:checked', currentWrap);
@@ -820,7 +831,7 @@
         return;
       }
       if (!consent) {
-        setFormError('alumni-error', 'Please confirm the Data Privacy notice before submitting.');
+        setFormError('alumni-error', 'Please tick “I have read the Data Privacy Notice” just above the Submit button.');
         return;
       }
       var subjectChecks = qsa('.cs-subject-pick:checked', subjectsWrap);
@@ -983,7 +994,7 @@
     if (filterInput) wireSubjectFilter(form, filterInput);
     form.addEventListener('change', function (e) {
       if (e.target.classList.contains('cs-subject-pick')) updatePickedCount();
-      if (e.target === filterInput || e.target.classList.contains('cs-tag-input') || e.target.closest('.cs-other') || e.target.id === 'professor-consent') return;
+      if (e.target === filterInput || e.target.classList.contains('cs-tag-input') || e.target.closest('.cs-other') || e.target.id === 'professor-consent' || e.target.hasAttribute('data-mirror')) return;
       markDirty();
     });
 
@@ -1054,7 +1065,7 @@
 
       var consentBox = qs('#professor-consent', form);
       if (consentBox && !consentBox.checked) {
-        setFormError('professor-error', 'Please confirm the Data Privacy notice before submitting.');
+        setFormError('professor-error', 'Please tick “I have read the Data Privacy Notice” just above the Submit button.');
         return;
       }
       var subjectKeys = qsa('.cs-subject-block', blocksWrap).map(function (b) { return b.getAttribute('data-code'); });

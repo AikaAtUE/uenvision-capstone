@@ -126,6 +126,15 @@
         <span class="mobile-bar-title"></span>
       </div>
       {% if user.is_dummy %}<p class="dummy-banner" role="note"><strong>Test account.</strong> Your survey answers are saved as dummy data and don't count in the real results. Overall results you see here come from dummy answers only.</p>{% endif %}
+      {% if feedback_nudge %}
+      <div class="feedback-nudge" role="note">
+        <p><strong>Help us evaluate UEnvision.</strong> You've used it a few times now. Please answer the {{ feedback_nudge.text }}. It takes about 2 minutes.</p>
+        <div class="feedback-nudge-actions">
+          <a class="btn btn-red btn-sm" href="{% url 'feedback' %}?survey={{ feedback_nudge.first }}">Answer now</a>
+          <form method="post" action="{% url 'feedback_later' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-ghost btn-sm">Later</button></form>
+        </div>
+      </div>
+      {% endif %}
       {% block page_content %}{% endblock %}
     </main>
   </div>

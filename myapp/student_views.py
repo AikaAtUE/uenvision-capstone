@@ -24,7 +24,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from . import curriculum_data, email_verification, gap_analysis, job_roles, ontology, recommendations, skills_catalog
+from . import curriculum_data, email_verification, feedback_nudge, gap_analysis, job_roles, ontology, recommendations, skills_catalog
 from .models import MIN_PASSWORD_LENGTH, CurriculumSurveyResponse, CustomUser
 
 REGISTER_SALT = "uenvision-register"
@@ -205,6 +205,7 @@ def _status(mine, key):
 @login_required
 def student_dashboard_view(request):
     user = request.user
+    feedback_nudge.record_use(user)
     has_survey = CurriculumSurveyResponse.objects.filter(user=user).exists()
     mine = _my_skills(user)
     stats = job_roles.skill_stats(user.target_role, TOP_SKILLS)
@@ -253,6 +254,7 @@ def student_role_view(request):
 @login_required
 @require_POST
 def student_generate_view(request):
+    feedback_nudge.record_use(request.user)
     skills = [s.strip() for s in request.POST.getlist("skills") if s and s.strip()]
     skills = skills[:recommendations.MAX_SKILLS_PER_STUDENT_RUN]
     if not skills:

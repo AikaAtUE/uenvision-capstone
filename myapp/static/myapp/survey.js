@@ -325,4 +325,8 @@
   initSusForm();
   initUatForm();
   initFunctionalForm();
+
+  // ?survey=sus (from the "Help us evaluate UEnvision" banner) opens that survey directly.
+  var wanted = new URLSearchParams(window.location.search).get('survey');
+  if (wanted && /^[a-z]+$/.test(wanted)) showSurveyForm(wanted);
 })();

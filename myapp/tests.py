@@ -9,6 +9,11 @@ from django.contrib.messages import get_messages
 
 from .models import CustomUser, SurveyResponse
 
+# Most tests log in as a plain Faculty account to test other things, so the "answer the
+# Professor Survey first" redirect is off by default here; ProfessorSurveyFirstTests turns it on.
+from django.conf import settings as _settings
+_settings.REQUIRE_PROFESSOR_SURVEY = False
+
 
 class SurveyAndLogoutTests(TestCase):
     def setUp(self):
@@ -1834,3 +1839,121 @@ class HelpPageTests(TestCase):
     def test_linked_from_the_sidebar(self):
         r = self.page_for("faculty")
         self.assertContains(r, f'href="{reverse("help")}"')
+
+
+@override_settings(REQUIRE_PROFESSOR_SURVEY=True)
+class ProfessorSurveyFirstTests(IsolatedDataMixin, TestCase):
+    def make(self, role="faculty", email="prof@ue.edu.ph"):
+        return CustomUser.objects.create_user(email=email, password="x" * 12, first_name="Prof",
+                                              last_name="Cruz", role=role)
+
+    def submit(self):
+        return self.client.post(reverse("professor_survey_submit"), content_type="application/json", data=json.dumps(
+            {"consent": True, "subjects": [{"code": "CCP 1101", "skills": [{"name": "Python", "level": "applied"}]}]}))
+
+    def test_new_faculty_answer_the_survey_before_anything_else(self):
+        self.client.force_login(self.make())
+        for name in ("dashboard", "recommendations", "data", "feedback"):
+            r = self.client.get(reverse(name))
+            self.assertRedirects(r, reverse("professor_survey") + "?first=1", fetch_redirect_response=False)
+        page = self.client.get(reverse("professor_survey"))
+        self.assertContains(page, "Please answer this survey once before using the rest of the site")
+        self.assertEqual(self.client.get(reverse("settings")).status_code, 200)   # account basics still open
+        r = self.submit()
+        self.assertEqual(r.json()["next_url"], reverse("dashboard"))
+        dash = self.client.get(reverse("dashboard"))
+        self.assertEqual(dash.status_code, 200)
+        self.assertContains(dash, "Edit your data")
+
+    def test_administrators_and_developers_are_not_held(self):
+        for i, role in enumerate(("administrator", "developer")):
+            self.client.force_login(self.make(role, f"staff{i}@ue.edu.ph"))
+            r = self.client.get(reverse("dashboard"))
+            self.assertEqual(r.status_code, 200)
+            self.assertNotContains(r, "Edit your data")   # no record yet, so nothing to edit
+
+
+class FeedbackNudgeTests(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(email="fac@ue.edu.ph", password="x" * 12,
+                                                   first_name="Ana", last_name="Reyes")
+        self.client.force_login(self.user)
+
+    def test_banner_shows_after_a_few_uses_until_answered(self):
+        from .feedback_nudge import USES_BEFORE_ASKING
+        for _ in range(USES_BEFORE_ASKING - 1):
+            self.client.get(reverse("dashboard"))
+        self.assertNotContains(self.client.get(reverse("about")), "Help us evaluate UEnvision")
+        self.client.get(reverse("dashboard"))
+        page = self.client.get(reverse("about"))
+        self.assertContains(page, "Help us evaluate UEnvision")
+        self.assertContains(page, "SUS evaluation, UAT survey and test case sheet")
+        self.assertContains(page, reverse("feedback") + "?survey=sus")
+        self.assertNotContains(self.client.get(reverse("feedback")), "Help us evaluate UEnvision")
+        for kind in ("sus", "uat", "functional"):
+            SurveyResponse.objects.create(survey_type=kind, user=self.user, data={})
+        self.assertNotContains(self.client.get(reverse("about")), "Help us evaluate UEnvision")
+
+    def test_later_hides_it_for_a_few_days(self):
+        CustomUser.objects.filter(pk=self.user.pk).update(app_uses=10)
+        r = self.client.post(reverse("feedback_later"), {"next": reverse("about")})
+        self.assertRedirects(r, reverse("about"))
+        self.assertNotContains(self.client.get(reverse("about")), "Help us evaluate UEnvision")
+        CustomUser.objects.filter(pk=self.user.pk).update(feedback_snoozed_until=None)
+        self.assertContains(self.client.get(reverse("about")), "Help us evaluate UEnvision")
+
+    def test_students_are_only_asked_for_the_sus(self):
+        from .feedback_nudge import missing_surveys
+        student = CustomUser.objects.create_user(email="stu@ue.edu.ph", password="x" * 12, first_name="S",
+                                                 last_name="T", role="student")
+        self.assertEqual([k for k, _ in missing_surveys(student)], ["sus"])
+
+
+class SurveyTrackerTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        mk = lambda email, role: CustomUser.objects.create_user(email=email, password="x" * 12, first_name=email[:3],
+                                                                 last_name="L", role=role)
+        self.dev = mk("dev@ue.edu.ph", "developer")
+        self.fac = mk("fac@ue.edu.ph", "faculty")
+        self.stu = mk("stu@ue.edu.ph", "student")
+        self.admin = mk("adm@ue.edu.ph", "administrator")
+
+    def test_developers_only(self):
+        for u in (self.admin, self.fac):
+            self.client.force_login(u)
+            self.assertEqual(self.client.get(reverse("survey_tracker")).status_code, 403)
+        self.client.force_login(self.dev)
+        page = self.client.get(reverse("data"))
+        self.assertContains(page, reverse("survey_tracker"))
+
+    def test_shows_who_is_missing_and_sends_one_reminder_a_day(self):
+        from django.core import mail
+        from .models import CurriculumSurveyResponse
+        SurveyResponse.objects.create(survey_type="sus", user=self.stu, data={})
+        CurriculumSurveyResponse.objects.create(respondent_type="student", user=self.stu, data={})
+        self.client.force_login(self.dev)
+        page = self.client.get(reverse("survey_tracker"))
+        self.assertNotContains(page, "stu@ue.edu.ph")      # answered everything a student is asked
+        self.assertContains(page, "fac@ue.edu.ph")
+        self.assertContains(self.client.get(reverse("survey_tracker"), {"show": "all"}), "stu@ue.edu.ph")
+        r = self.client.post(reverse("survey_tracker_remind"), {"ids": [self.fac.pk, self.stu.pk]})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual([m.to for m in mail.outbox], [["fac@ue.edu.ph"]])
+        self.assertIn("the SUS evaluation", mail.outbox[0].body)
+        self.client.post(reverse("survey_tracker_remind"), {"ids": [self.fac.pk]})
+        self.assertEqual(len(mail.outbox), 1)              # not twice in a day
+
+
+class PrivacyConsentTests(TestCase):
+    def test_consent_checkbox_is_at_the_top_and_above_submit(self):
+        for name, main in (("student_survey", "student-consent"), ("alumni_survey", "alumni-consent")):
+            page = self.client.get(reverse(name))
+            self.assertContains(page, f'id="{main}"')
+            self.assertContains(page, f'data-mirror="{main}"')
+        prof = CustomUser.objects.create_user(email="p@ue.edu.ph", password="x" * 12, first_name="P", last_name="Q")
+        self.client.force_login(prof)
+        page = self.client.get(reverse("professor_survey"))
+        self.assertContains(page, 'id="professor-consent"')
+        self.assertContains(page, 'data-mirror="professor-consent"')

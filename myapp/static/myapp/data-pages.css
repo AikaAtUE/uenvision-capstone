@@ -135,3 +135,12 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
   .sr-filters .select-field, .sr-filters .select-field select{width:100%; min-width:0;}
   .sr-filters .btn{width:100%; justify-content:center;}
 }
+
+/* Data > Survey Tracker */
+.st-totals{display:flex; flex-wrap:wrap; gap:12px; margin:0 0 18px;}
+.st-total{display:flex; flex-direction:column; gap:2px; padding:10px 16px; border:1px solid var(--line); border-radius:10px; background:#fff; min-width:140px;}
+.st-total-num{font-size:1.3rem; font-weight:700; color:var(--navy);}
+.st-total .muted{font-size:.8rem;}
+.st-table .st-cell{text-align:center; font-size:1.05rem;}
+.st-yes{color:#1e7a4a; font-weight:700;}
+.st-no{color:var(--red, #c8202f); font-weight:700;}

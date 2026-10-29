@@ -75,6 +75,7 @@ MIDDLEWARE = [
     'myapp.middleware.LearnerAccessMiddleware',
     'myapp.middleware.PendingApprovalMiddleware',
     'myapp.middleware.ForcePasswordChangeMiddleware',
+    'myapp.middleware.ProfessorSurveyFirstMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -92,6 +93,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'myapp.context_processors.admin_notifications',
+                'myapp.feedback_nudge.banner',
             ],
         },
     },
@@ -200,6 +202,8 @@ else:
 DEFAULT_FROM_EMAIL = f"UEnvision <{os.environ.get('EMAIL_HOST_USER') or 'noreply@uenvision.tech'}>"
 # New sign-ups must click the link in their email before they can log in.
 REQUIRE_EMAIL_VERIFICATION = _env_bool('REQUIRE_EMAIL_VERIFICATION', bool(EMAIL_HOST))
+# Faculty must answer the Professor Survey once before they can use the rest of the site.
+REQUIRE_PROFESSOR_SURVEY = _env_bool('REQUIRE_PROFESSOR_SURVEY', True)
 # How long a confirmation link works (Django uses this for its token links).
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24  # 1 day
 

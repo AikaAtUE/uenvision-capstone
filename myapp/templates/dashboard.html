@@ -10,6 +10,12 @@
       <p class="muted">Last analyzation: <em id="last-analyzed">—</em></p>
       <div class="dash-toolbar-actions">
         {% include "_results_switch.html" %}
+        {% if has_professor_record %}
+        <a class="btn btn-navy btn-sm" href="{% url 'professor_survey' %}">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          Edit your data
+        </a>
+        {% endif %}
         <button class="btn btn-ghost btn-sm" id="filter-btn">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Filter

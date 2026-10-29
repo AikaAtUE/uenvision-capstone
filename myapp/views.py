@@ -24,7 +24,7 @@ from .models import (CustomUser, Notification, SurveyResponse, CurriculumSurveyR
                      make_temporary_password)
 from .pipeline import manager as pipeline
 from . import curriculum_data
-from . import email_verification, notifications
+from . import email_verification, feedback_nudge, notifications
 from . import gap_analysis
 from . import login_limits
 from . import ontology
@@ -208,7 +208,11 @@ def reset_password_confirm_view(request, uidb64, token):
 
 @login_required
 def dashboard_view(request):
-    return render(request, "dashboard.html", {"active_page": "dashboard"})
+    from .student_views import latest_response
+
+    feedback_nudge.record_use(request.user)
+    return render(request, "dashboard.html", {"active_page": "dashboard",
+                                              "has_professor_record": latest_response(request.user) is not None})
 
 
 @login_required
@@ -300,6 +304,7 @@ def recommendations_view(request):
     Either way, already generated Gemini resources are shown. Generating more is a
     separate POST (recommendations_generate_view) so simply opening this page never
     spends API quota."""
+    feedback_nudge.record_use(request.user)
     cached = recommendations.load_recommendations()
     subject_value = _subject_code(request.GET.get("subject", ""))
     choices = _subject_choices()
@@ -360,6 +365,17 @@ def recommendations_download_view(request):
 @login_required
 def feedback_view(request):
     return render(request, "feedback.html", {"active_page": "feedback"})
+
+
+@login_required
+@require_POST
+def feedback_later_view(request):
+    """The banner's "Later" button: hide it for a few days, then go back to the same page."""
+    feedback_nudge.snooze(request.user)
+    nxt = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        nxt = reverse("student_dashboard" if request.user.is_learner else "dashboard")
+    return redirect(nxt)
 
 
 @login_required
@@ -1156,7 +1172,8 @@ def professor_survey_submit_view(request):
     if current is None:
         payload["consent_at"] = now
         _save_curriculum_survey(CurriculumSurveyResponse.PROFESSOR, payload, user=request.user)
-        return JsonResponse({"ok": True, "created": True})
+        # First answer: faculty were held on this page until now, so take them in.
+        return JsonResponse({"ok": True, "created": True, "next_url": reverse("dashboard")})
     data = dict(current.data or {})
     data.update(payload)
     data.setdefault("consent_at", current.created_at.isoformat(timespec="seconds"))
@@ -1252,6 +1269,7 @@ def professor_survey_view(request):
         "active_page": "data",
         "data_tab": "professor_survey",
         "has_record": current is not None,
+        "required_first": current is None and request.user.role == CustomUser.Role.FACULTY,
         "consent_at": parse_datetime(consent_at) if consent_at else None,
         "edited_at": parse_datetime(data["edited_at"]) if data.get("edited_at") else (current.created_at if current else None),
         "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,

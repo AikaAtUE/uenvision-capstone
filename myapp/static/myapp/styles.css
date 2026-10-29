@@ -601,3 +601,12 @@ img.sidebar-logo--full, img.sidebar-logo--mark { margin: 0 auto; }
 /* "According to ..." line under each chart */
 .chart-source { margin: 10px 0 0; font-size: .85rem; color: var(--muted); font-style: italic; }
 .chart-source:empty { display: none; }
+
+/* "Help us evaluate UEnvision" banner (feedback_nudge.py) */
+.feedback-nudge { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap;
+  margin: 0; padding: 10px 28px; border-bottom: 1px solid #f1c7cb; background: #fff5f6; font-size: .9rem; }
+.feedback-nudge a.btn, .dash-toolbar-actions a.btn { text-decoration: none; }
+.feedback-nudge p { margin: 0; line-height: 1.5; }
+.feedback-nudge-actions { display: flex; gap: 8px; align-items: center; }
+.feedback-nudge-actions form { margin: 0; }
+@media (max-width: 720px) { .feedback-nudge { padding: 10px 16px; } }

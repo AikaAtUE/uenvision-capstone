@@ -23,6 +23,7 @@
 .cs-privacy li { margin: 4px 0; }
 .cs-consent { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; font-size: .92rem; }
 .cs-consent input { margin-top: 3px; }
+.cs-consent--bottom { margin: 18px 0 12px; padding: 12px 14px; border: 1px solid var(--line, #e2e3e7); border-radius: 8px; background: #fafafb; }
 
 .cs-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .cs-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }

@@ -26,7 +26,7 @@
   <form id="student-survey-form" class="panel cs-panel" novalidate>
     {% csrf_token %}
 
-    <div class="cs-privacy">
+    <div class="cs-privacy" id="student-privacy">
       <h3>Data Privacy Notice</h3>
       <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
       <ul>
@@ -80,6 +80,7 @@
       <div id="student-subject-blocks"></div>
     </div>
 
+    <label class="cs-consent cs-consent--bottom"><input type="checkbox" data-mirror="student-consent"> <span>I have read the <a href="#student-privacy" class="link-inline">Data Privacy Notice</a> at the top of this page and voluntarily agree to participate.</span></label>
     <p class="form-msg form-msg--error" id="student-error" hidden></p>
     <button type="submit" class="btn btn-navy">Submit survey</button>
   </form>

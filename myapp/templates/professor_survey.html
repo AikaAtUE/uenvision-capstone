@@ -21,6 +21,10 @@
     {% endif %}
   </header>
 
+  {% if required_first %}
+  <div class="cs-banner cs-banner--first" role="note"><strong>Welcome to UEnvision!</strong> Please answer this survey once before using the rest of the site. It tells UEnvision what your subjects already teach, so the skill gap analysis and your recommendations are accurate. You can edit your answers any time afterwards.</div>
+  {% endif %}
+
   {% if user.is_developer %}
   <div class="cs-banner"><strong>Developer account:</strong> your answers here are saved as dummy (test) data. They show up only in the dummy results that dummy accounts see, never in the real skill gap analysis.</div>
   {% endif %}
@@ -45,7 +49,7 @@
       </ul>
     </details>
     {% else %}
-    <div class="cs-privacy">
+    <div class="cs-privacy" id="professor-privacy">
       <h3>Data Privacy Notice</h3>
       <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
       <ul>
@@ -98,6 +102,9 @@
       <div id="professor-subject-blocks"></div>
     </div>
 
+    {% if not consent_at %}
+    <label class="cs-consent cs-consent--bottom"><input type="checkbox" data-mirror="professor-consent"> <span>I have read the <a href="#professor-privacy" class="link-inline">Data Privacy Notice</a> at the top of this page and voluntarily agree to participate. (You only need to do this once.)</span></label>
+    {% endif %}
     <p class="form-msg form-msg--error" id="professor-error" hidden></p>
     <div class="ps-save-bar">
       <button type="submit" class="btn btn-navy" id="professor-save">{% if has_record %}Save changes{% else %}Submit survey{% endif %}</button>

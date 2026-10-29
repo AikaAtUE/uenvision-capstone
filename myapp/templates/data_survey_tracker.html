@@ -1,0 +1,89 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Survey Tracker{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-survey-tracker">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
+    <h2 class="section-title">Survey tracker</h2>
+    <p class="muted sr-intro">Who has answered their curriculum survey and the Feedback surveys. Students and alumni are only asked for the SUS. Reminders go out at most once a day per person.{% if not email_configured %} No mail server is set up here, so reminder emails are only printed to the server console.{% endif %}</p>
+
+    <div class="st-totals">
+      <div class="st-total"><span class="st-total-num">{{ totals.curriculum }} / {{ asked.curriculum }}</span><span class="muted">Curriculum survey</span></div>
+      <div class="st-total"><span class="st-total-num">{{ totals.sus }} / {{ asked.sus }}</span><span class="muted">SUS</span></div>
+      <div class="st-total"><span class="st-total-num">{{ totals.uat }} / {{ asked.uat }}</span><span class="muted">UAT</span></div>
+      <div class="st-total"><span class="st-total-num">{{ totals.functional }} / {{ asked.functional }}</span><span class="muted">Test case sheet</span></div>
+    </div>
+
+    <form class="data-toolbar sr-filters" method="get" action="{% url 'survey_tracker' %}">
+      <label class="select-field"><span>Role</span>
+        <select name="role" onchange="this.form.submit()">
+          {% for value, label in role_filters %}<option value="{{ value }}"{% if value == role %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="select-field"><span>Show</span>
+        <select name="show" onchange="this.form.submit()">
+          {% for value, label in show_filters %}<option value="{{ value }}"{% if value == show %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <noscript><button type="submit" class="btn btn-navy btn-sm">Show</button></noscript>
+    </form>
+
+    <form method="post" action="{% url 'survey_tracker_remind' %}" id="st-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="sr-bulk">
+        <p class="muted table-count">{{ rows|length }} account{{ rows|length|pluralize }}</p>
+        <button type="submit" class="btn btn-red btn-sm" id="st-remind" disabled>Send reminder</button>
+      </div>
+      {% if rows %}
+      <div class="table-wrap">
+        <table class="sr-table st-table">
+          <thead><tr>
+            <th class="sr-check"><input type="checkbox" id="st-select-all" aria-label="Select all"></th>
+            <th>Account</th><th>Role</th><th>Curriculum survey</th><th>SUS</th><th>UAT</th><th>Test sheet</th><th>Last reminder</th>
+          </tr></thead>
+          <tbody>
+          {% for r in rows %}
+            <tr>
+              <td class="sr-check">{% if r.missing and not r.reminded_at %}<input type="checkbox" name="ids" value="{{ r.user.pk }}" aria-label="Remind {{ r.user.email }}">{% endif %}</td>
+              <td><div class="sr-who"><strong>{{ r.user.get_full_name }}</strong><span class="muted">{{ r.user.email }}</span></div></td>
+              <td>{{ r.user.role_label }}</td>
+              {% for key, done in r.cells.items %}
+              <td class="st-cell">{% if done is None %}<span class="muted" title="Not asked of this role">—</span>{% elif done %}<span class="st-yes" title="Answered">✓</span>{% else %}<span class="st-no" title="Not answered yet">✗</span>{% endif %}</td>
+              {% endfor %}
+              <td class="sr-date">{% if r.reminded_at %}{{ r.reminded_at|date:"M j, g:i A" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="empty-note">{% if show == "missing" %}Everyone here has answered everything.{% else %}No accounts.{% endif %}</p>
+      {% endif %}
+    </form>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script>
+  // Data > Survey Tracker: enable "Send reminder" once someone is ticked.
+  (function () {
+    var form = document.getElementById('st-form');
+    if (!form) return;
+    var btn = document.getElementById('st-remind'), all = document.getElementById('st-select-all');
+    function boxes() { return Array.prototype.slice.call(form.querySelectorAll('input[name="ids"]')); }
+    function refresh() {
+      var n = boxes().filter(function (b) { return b.checked; }).length;
+      btn.disabled = n === 0;
+      btn.textContent = n ? 'Send reminder (' + n + ')' : 'Send reminder';
+    }
+    if (all) all.addEventListener('change', function () { boxes().forEach(function (b) { b.checked = all.checked; }); refresh(); });
+    form.addEventListener('change', function (e) { if (e.target.name === 'ids') refresh(); });
+    refresh();
+  })();
+</script>
+{% endblock %}
