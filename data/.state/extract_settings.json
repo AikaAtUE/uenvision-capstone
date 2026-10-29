@@ -1,7 +1,0 @@
-{
-  "sources": [
-    "kalibrr"
-  ],
-  "batch_size": 80,
-  "model": "gemini-3.5-flash-lite"
-}

@@ -16,11 +16,16 @@ env/
 staticfiles/
 media/
 
-# Pipeline run state and logs
-data/.state/run.json
-data/.state/run.log
-data/.state/run_config.json
-data/.state/*.tmp
+# Datasets live on the site: scraping, skill extraction and recommendations write them
+# there, so a push must never replace them. Only the ontology that ships with the code
+# and the empty job JSON folders are kept in git.
+/data/*
+!/data/ontology/
+/data/ontology/*
+!/data/ontology/mind_tech_ontology.csv
+!/data/jsons/
+/data/jsons/*/*
+!/data/jsons/*/.gitkeep
 
 # Editors / OS
 .vscode/
