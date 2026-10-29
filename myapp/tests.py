@@ -44,7 +44,7 @@ class SurveyAndLogoutTests(TestCase):
         saved = SurveyResponse.objects.get()
         self.assertEqual(saved.user, self.user)
         self.assertEqual(saved.data["sus_score"], 100.0)  # client's 999 is ignored
-        self.assertEqual(saved.data["sus_version"], 3)
+        self.assertEqual(saved.data["sus_version"], 4)
         self.assertEqual(self.post({"type": "sus", "rows": [self.sus_row(3)]}).status_code, 200)
         self.assertEqual(SurveyResponse.objects.order_by("-pk").first().data["sus_score"], 50.0)
 

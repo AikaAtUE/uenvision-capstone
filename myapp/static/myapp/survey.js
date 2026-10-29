@@ -42,9 +42,9 @@
   var SUS_QUESTIONS = [
     'I would like to use UEnvision again.',
     'UEnvision is easy to use.',
-    'I can use UEnvision without help from a technical person.',
-    'The parts of UEnvision work well together.',
-    'Most people would learn UEnvision quickly.',
+    'It is easy to navigate through UEnvision.',
+    'All parts of UEnvision work well together.',
+    'UEnvision looks and works the same way on every page.',
     'I felt confident using UEnvision.'
   ];
 

@@ -775,7 +775,9 @@ MAX_SURVEY_ROWS = 200
 # 3 = the 6-statement, all-positive, plain-English SUS (every item scores answer - 1).
 # Responses saved before it used the 10-item SUS (no "sus_version" = standard alternating,
 # 2 = all-positive), so keep the versions apart when averaging.
-SUS_VERSION = 3
+# 4 = same scoring as 3, but the statement set changed (navigation and consistency
+#     replaced "without a technical person" and "most people would learn quickly").
+SUS_VERSION = 4
 SUS_QUESTION_COUNT = 6  # must match SUS_QUESTIONS in survey.js
 PH_TIME = dt_timezone(timedelta(hours=8), "PHT")  # no DST; avoids needing tzdata on Windows
 
