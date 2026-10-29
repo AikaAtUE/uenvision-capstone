@@ -834,10 +834,12 @@ def data_view(request):
             info = pipeline._file_info(pipeline.table_path(key))
         tables.append({"key": key, "label": label, "exists": info["exists"],
                        "delete_note": pipeline.DELETABLE_TABLES.get(key, "")})
+    clear_sources = [{"key": s, "label": pipeline.SOURCE_LABELS[s]} for s in pipeline.SOURCES]
     default = next((t["key"] for t in tables if t["exists"]), tables[0]["key"])
     if request.GET.get("source") in pipeline.TABLES:
         default = request.GET["source"]
-    return render(request, "data_view.html", _data_ctx(request, "view", tables=tables, default_table=default))
+    return render(request, "data_view.html", _data_ctx(request, "view", tables=tables, default_table=default,
+                                                       clear_sources=clear_sources))
 
 
 @administrator_required
@@ -854,6 +856,21 @@ def data_delete_view(request, key):
     return redirect(reverse("data") + "?" + urlencode({"source": key}))
 
 
+@administrator_required
+@require_POST
+def data_clear_source_view(request, source):
+    """Extracted Skills: remove every Kalibrr (or Trabajo) job posting, keep the other source's."""
+    if source not in pipeline.SOURCES:
+        raise Http404
+    removed, error = pipeline.clear_extracted_source(source)
+    if error:
+        messages.error(request, error)
+    else:
+        messages.success(request, f"Cleared {removed} {pipeline.SOURCE_LABELS[source]} job posting(s) from "
+                                  "Extracted Skills; Hard Skills and Soft Skills were rebuilt.")
+    return redirect(reverse("data") + "?" + urlencode({"source": "extracted"}))
+
+
 @login_required
 def data_table_view(request):
     key = request.GET.get("source", "")
@@ -862,10 +879,14 @@ def data_table_view(request):
     try:
         page = int(request.GET.get("page", 1))
         size = int(request.GET.get("page_size", 50))
+        sort = int(request.GET["sort"]) if request.GET.get("sort", "") != "" else None
+        # per-column filters arrive as f<column index>=text
+        filters = {int(k[1:]): v for k, v in request.GET.items() if k[:1] == "f" and k[1:].isdigit() and v.strip()}
     except ValueError:
         return JsonResponse({"ok": False, "error": "Bad paging values."}, status=400)
     try:
-        data = pipeline.query_table(key, request.GET.get("q", ""), page, size)
+        data = pipeline.query_table(key, request.GET.get("q", ""), page, size, sort=sort,
+                                    desc=request.GET.get("dir") == "desc", filters=filters)
     except (OSError, UnicodeDecodeError) as exc:
         return JsonResponse({"ok": False, "error": f"Couldn't read that file: {exc}"}, status=500)
     return JsonResponse({"ok": True, **data})
@@ -925,7 +946,8 @@ def data_import_view(request):
                 messages.success(
                     request,
                     f"{label}: {res['added']} row(s) added, {res['skipped']} skipped (duplicate or missing job_id); "
-                    f"{res['total']} row(s) now in {pipeline.table_path(target).name}.")
+                    + (f"{res['merged']} repeated posting(s) merged; " if res.get("merged") else "")
+                    + f"{res['total']} row(s) now in {pipeline.table_path(target).name}.")
         return redirect("data_import")
 
     return render(request, "data_import.html", _data_ctx(

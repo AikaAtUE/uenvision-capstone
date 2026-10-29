@@ -40,6 +40,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from dedupe_trabajo import EXTRA_COLUMNS as TRABAJO_DEDUPE_COLUMNS, dedupe_rows
+except ImportError:     # imported as myapp.pipeline.compile_jobs_to_csv
+    from .dedupe_trabajo import EXTRA_COLUMNS as TRABAJO_DEDUPE_COLUMNS, dedupe_rows
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-7s | %(message)s",
@@ -127,7 +132,7 @@ TRABAJO_FIELDNAMES = [
     "listing_page_number",
     "listing_snippet",
     "scraped_at",
-]
+] + TRABAJO_DEDUPE_COLUMNS
 
 # --------------------------------------------------------------------------
 # Helpers
@@ -362,6 +367,12 @@ def compile_to_csv(source: str, input_dir: Path, output_csv: Path) -> None:
             continue
 
         rows.append(row)
+
+    if source == "trabajo" and rows:
+        # Trabajo repeats one ad per city / per feed under new job_ids; keep one row per ad.
+        rows, stats = dedupe_rows(rows)
+        log.info("Merged %d duplicate Trabajo posting(s) (%d exact, %d near-identical): %d -> %d rows.",
+                 stats["removed"], stats["exact"], stats["near"], stats["input"], stats["kept"])
 
     if not rows:
         log.error(

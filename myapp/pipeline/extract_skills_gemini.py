@@ -27,6 +27,7 @@ from google.genai import errors, types
 from pydantic import BaseModel, Field
 from tqdm import tqdm
 
+from dedupe_trabajo import merged_job_ids
 from skills_schema import (ALIASES, JOB_FLAG_COLUMNS, SOURCE_CONFIG, UNIVERSAL_COLUMNS, normalize_record,
                            write_skill_csvs)
 
@@ -475,6 +476,15 @@ def main():
     results: List[dict] = []
     if Path(OUTPUT_JSON).exists():
         results = [normalize_record(r) for r in json.loads(Path(OUTPUT_JSON).read_text(encoding="utf-8"))]
+        if a.source_label == "trabajo" and "merged_job_ids" in df.columns:
+            # Postings the Trabajo compile step merged into another row: drop skills extracted earlier
+            # for those copies, so each ad is counted once in the skills datasets.
+            dropped = merged_job_ids(df.to_dict("records"))
+            before = len(results)
+            results = [r for r in results
+                       if not (r.get("source") == "trabajo" and str(r["job_id"]) in dropped)]
+            if len(results) < before:
+                print(f"Removed {before - len(results)} previously extracted duplicate Trabajo posting(s)")
         done = {str(r["job_id"]) for r in results}
         df = df[~df[COL_ID].astype(str).isin(done)]
         print(f"Resuming: {len(done)} done, {len(df)} remaining")

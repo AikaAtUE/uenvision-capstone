@@ -32,9 +32,16 @@
         {% csrf_token %}
         <button type="button" class="btn btn-ghost btn-sm btn-danger-outline" id="delete-file-btn">Delete file</button>
       </form>
+      <form method="post" id="clear-source-form" data-url-template="{% url 'data_clear_source' 'SRC' %}" hidden>
+        {% csrf_token %}
+        {% for s in clear_sources %}
+        <button type="button" class="btn btn-ghost btn-sm btn-danger-outline" data-clear-source="{{ s.key }}" data-label="{{ s.label }}">Clear {{ s.label }} postings</button>
+        {% endfor %}
+      </form>
       {% endif %}
     </div>
     <p class="muted table-count" id="table-count" aria-live="polite"></p>
+    <p class="muted table-hint">Click a column name to sort by it (again to reverse, a third time to undo). Type in the box under a column name to filter by that column.</p>
 
     <div class="table-wrap">
       <table id="view-table"></table>
@@ -51,7 +58,7 @@
 {% if user.is_administrator %}
 <div class="modal-backdrop" id="delete-file-backdrop">
   <div class="modal" role="alertdialog" aria-labelledby="delete-file-title">
-    <p id="delete-file-title"><strong>Delete <span id="delete-file-name"></span>?</strong></p>
+    <p id="delete-file-title"><strong id="delete-file-heading"></strong></p>
     <p class="muted" id="delete-file-note"></p>
     <p class="muted">This can't be undone. Export it first if you might need it.</p>
     <div class="modal-actions">

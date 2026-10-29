@@ -2130,3 +2130,148 @@ class TechJobColumnsTests(IsolatedDataMixin, TestCase):
         self.assertEqual(cs["stats"]["postings"], 3)
         self.assertNotIn("Cisco", [b["skill"] for b in cs["bars"]])
         self.assertEqual(cs["gap"]["postings_considered"], 3)
+
+
+class TrabajoDedupeTests(TestCase):
+    """Trabajo repeats one ad per city / feed under new job_ids; only Trabajo data is merged."""
+    DESC = ("We are hiring a ServiceNow developer to design configure and build workflow automation "
+            "on the ServiceNow platform with a focus on customer service management and integrations")
+
+    def _row(self, jid, city, posted, company="ATOS Information Technology Inc.", desc=None, title="ServiceNow Dev"):
+        return {"job_id": jid, "job_title": title, "company_name": company, "city": city,
+                "date_posted": posted, "description": desc if desc is not None else self.DESC}
+
+    def test_exact_and_near_copies_merge_into_the_earliest(self):
+        from .pipeline.dedupe_trabajo import dedupe_rows
+        reworded = self.DESC + " apply now"
+        rows = [self._row("a", "Pasig", "2026-10-28T10:00:00+01:00"),
+                self._row("b", "Cebu City", "2026-10-27T10:00:00+01:00", company="Atos Information Technology"),
+                self._row("c", "Pasig", "2026-10-28T11:00:00+01:00", desc=reworded, title="ServiceNow Developer"),
+                self._row("d", "Taguig", "2026-10-28T10:00:00+01:00", company="Another Company"),
+                self._row("e", "Manila", "", desc="")]
+        kept, stats = dedupe_rows(rows)
+        self.assertEqual([r["job_id"] for r in kept], ["b", "d", "e"])
+        self.assertEqual(stats["removed"], 2)
+        self.assertEqual(kept[0]["duplicate_count"], 2)
+        self.assertEqual(kept[0]["merged_job_ids"], "a; c")
+        self.assertEqual(kept[0]["other_locations"], "Pasig")
+        self.assertEqual(kept[1]["duplicate_count"], 0)       # another company's identical ad stays
+
+    def test_merging_again_keeps_the_earlier_merges(self):
+        from .pipeline.dedupe_trabajo import dedupe_rows, merged_job_ids
+        first, _ = dedupe_rows([self._row("a", "Pasig", "2026-10-28T10:00:00+01:00"),
+                                self._row("b", "Cebu City", "2026-10-28T12:00:00+01:00")])
+        again, stats = dedupe_rows(first + [self._row("c", "Makati", "2026-10-20T10:00:00+01:00")])
+        self.assertEqual([r["job_id"] for r in again], ["c"])
+        self.assertEqual(merged_job_ids(again), {"a", "b"})
+        self.assertEqual(again[0]["other_locations"], "Pasig; Cebu City")
+
+    def test_compile_merges_trabajo_but_not_kalibrr(self):
+        import csv, tempfile
+        from pathlib import Path
+        from .pipeline import compile_jobs_to_csv as cj
+        tmp = Path(tempfile.mkdtemp())
+        for i, city in enumerate(["Pasig", "Cebu City", "Taguig"]):
+            (tmp / f"job-{i}.json").write_text(json.dumps({
+                "job_id": f"1943-{i}", "title": "ServiceNow Dev", "description_text": self.DESC,
+                "company": {"name": "ATOS"}, "location": {"locality": city},
+                "date_posted": f"2026-10-2{i}T10:00:00+01:00"}), encoding="utf-8")
+        cj.compile_to_csv("trabajo", tmp, tmp / "out.csv")
+        with open(tmp / "out.csv", encoding="utf-8-sig") as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["job_id"], "1943-0")
+        self.assertEqual(rows[0]["merged_job_ids"], "1943-1; 1943-2")
+        self.assertNotIn("merged_job_ids", cj.KALIBRR_FIELDNAMES)
+
+    def test_import_merges_trabajo_csv_only(self):
+        import csv, io, tempfile
+        from pathlib import Path
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from .pipeline import manager
+
+        def upload():
+            buf = io.StringIO()
+            w = csv.DictWriter(buf, fieldnames=["job_id", "job_title", "company_name", "city", "description"])
+            w.writeheader()
+            for jid, city in (("1", "Pasig"), ("2", "Cebu City"), ("3", "Taguig")):
+                w.writerow({"job_id": jid, "job_title": "Dev", "company_name": "ATOS", "city": city,
+                            "description": self.DESC})
+            return SimpleUploadedFile("jobs.csv", buf.getvalue().encode("utf-8"), content_type="text/csv")
+
+        with override_settings(DATA_DIR=Path(tempfile.mkdtemp())):
+            res = manager.import_csv("trabajo", upload(), merge=True)
+            self.assertEqual((res["added"], res["merged"], res["total"]), (1, 2, 1))
+            res = manager.import_csv("kalibrr", upload(), merge=True)
+            self.assertEqual((res["added"], res["merged"], res["total"]), (3, 0, 3))
+
+
+class ViewDataSortFilterClearTests(IsolatedDataMixin, TestCase):
+    """View Data: per-column sort / filter, and clearing one job source from Extracted Skills."""
+
+    def setUp(self):
+        super().setUp()
+        import csv
+        from pathlib import Path
+        from django.conf import settings
+        from .pipeline import manager
+        self.manager = manager
+        self.dir = Path(settings.DATA_DIR)
+        (self.dir / ".state").mkdir(exist_ok=True)
+        rows = [("k1", "Data Analyst", "kalibrr", "SQL; Excel", "10"),
+                ("t1", "Web Developer", "trabajo", "JavaScript", "9"),
+                ("k2", "Network Engineer", "kalibrr", "Cisco", "100"),
+                ("t2", "QA Tester", "trabajo", "Selenium", "")]
+        with open(self.dir / "extracted_skills.csv", "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow(["job_id", "job_name", "source", "hard_skills", "salary"])
+            w.writerows(rows)
+        (self.dir / ".state" / "extracted_skills.json").write_text(json.dumps(
+            [{"job_id": r[0], "job_name": r[1], "source": r[2], "hard_skills": r[3].split("; ")} for r in rows]),
+            encoding="utf-8")
+        manager._table_cache.clear()
+        self.admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                                    last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+
+    def ids(self, **params):
+        self.client.force_login(self.admin)
+        d = self.client.get(reverse("data_table"), {"source": "extracted", **params}).json()
+        return [r[0] for r in d["rows"]]
+
+    def test_sort_numbers_as_numbers_and_blanks_last(self):
+        self.assertEqual(self.ids(sort=4, dir="asc"), ["t1", "k1", "k2", "t2"])
+        self.assertEqual(self.ids(sort=4, dir="desc"), ["k2", "k1", "t1", "t2"])
+        self.assertEqual(self.ids(sort=1, dir="asc"), ["k1", "k2", "t2", "t1"])
+
+    def test_filter_by_column(self):
+        self.assertEqual(self.ids(f2="TRABAJO"), ["t1", "t2"])
+        self.assertEqual(self.ids(f2="kalibrr", f3="cisco"), ["k2"])
+        self.assertEqual(self.ids(f2="kalibrr", sort=0, dir="desc"), ["k2", "k1"])
+        self.assertEqual(self.ids(f9="ignored"), ["k1", "t1", "k2", "t2"])   # unknown column
+
+    def test_clear_one_source_keeps_the_other_and_rebuilds_skills(self):
+        import csv
+        self.client.force_login(self.admin)
+        page = self.client.get(reverse("data"))
+        self.assertContains(page, 'data-clear-source="trabajo"')
+        r = self.client.post(reverse("data_clear_source", args=["trabajo"]), follow=True)
+        self.assertContains(r, "Cleared 2 Trabajo job posting(s)")
+        self.assertEqual(self.ids(), ["k1", "k2"])
+        state = json.loads((self.dir / ".state" / "extracted_skills.json").read_text(encoding="utf-8"))
+        self.assertEqual([s["job_id"] for s in state], ["k1", "k2"])
+        with open(self.dir / "hard_skills.csv", encoding="utf-8-sig") as f:
+            skills = [row["skill"] for row in csv.DictReader(f)]
+        self.assertEqual(sorted(skills), ["Cisco", "Excel", "SQL"])
+        r = self.client.post(reverse("data_clear_source", args=["trabajo"]), follow=True)
+        self.assertContains(r, "has no Trabajo job postings")
+
+    def test_clear_is_administrator_only_and_post_only(self):
+        fac = CustomUser.objects.create_user(email="fac@ue.edu.ph", password="secret123", first_name="F",
+                                             last_name="C", role=CustomUser.Role.FACULTY)
+        self.client.force_login(fac)
+        self.assertEqual(self.client.post(reverse("data_clear_source", args=["kalibrr"])).status_code, 403)
+        self.assertNotContains(self.client.get(reverse("data")), 'id="clear-source-form"')
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(reverse("data_clear_source", args=["kalibrr"])).status_code, 405)
+        self.assertEqual(self.client.post(reverse("data_clear_source", args=["indeed"])).status_code, 404)
+        self.assertEqual(len(self.ids()), 4)

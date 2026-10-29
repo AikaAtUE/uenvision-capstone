@@ -151,3 +151,24 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 #delete-file-backdrop .modal p { margin-bottom: 12px; }
 #delete-file-backdrop .modal p.muted { font-weight: 500; font-size: .92rem; }
 #delete-file-backdrop .modal-actions { margin-top: 18px; }
+
+/* View Data: clear one job source from Extracted Skills */
+#clear-source-form { margin: 0; display: flex; gap: 8px; flex-wrap: wrap; }
+#clear-source-form[hidden] { display: none; }
+
+/* View Data: per-column sort + filter */
+.table-hint { font-size: .8rem; margin: -8px 0 12px; }
+#view-table thead th { vertical-align: bottom; }
+#view-table .sort-btn {
+  all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-weight: 700;
+  color: inherit; border-radius: 4px;
+}
+#view-table .sort-btn:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+#view-table .sort-ind { font-size: .7rem; opacity: .35; min-width: .8em; }
+#view-table th[aria-sort="ascending"] .sort-ind, #view-table th[aria-sort="descending"] .sort-ind { opacity: 1; }
+#view-table tr.filter-row th { padding: 0 10px 10px; background: #f0c8cd; }
+#view-table .col-filter {
+  width: 100%; min-width: 90px; box-sizing: border-box; font: inherit; font-weight: 400; font-size: .8rem;
+  padding: 5px 8px; border: 1px solid rgba(90, 16, 23, .25); border-radius: 6px; background: #fff; color: var(--ink);
+}
+#view-table .col-filter:focus { outline: none; border-color: var(--navy); }

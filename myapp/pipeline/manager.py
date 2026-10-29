@@ -29,6 +29,7 @@ from pathlib import Path
 
 from django.conf import settings
 
+from .dedupe_trabajo import EXTRA_COLUMNS as TRABAJO_DEDUPE_COLUMNS, dedupe_rows
 from .skills_schema import (SKILL_CSVS, UNIVERSAL_COLUMNS, normalize_record,
                             write_skill_csvs)
 
@@ -135,6 +136,42 @@ def delete_table(key: str) -> str | None:
     return None
 
 
+def clear_extracted_source(source: str) -> tuple[int, str | None]:
+    """Remove one source's job postings (Kalibrr or Trabajo) from Extracted Skills, its resume file
+    and the Hard / Soft Skills CSVs built from it. Returns (rows removed, error message or None)."""
+    if source not in SOURCES:
+        return 0, "Unknown job source."
+    if is_running():
+        return 0, "A scrape or extraction run is going. Wait for it to finish (or stop it) before clearing data."
+    loaded = load_table("extracted")
+    if loaded is None:
+        return 0, "There are no extracted skills yet."
+    columns, rows = loaded
+    if "source" not in columns:
+        return 0, "Extracted Skills has no source column, so postings can't be told apart."
+    col = columns.index("source")
+    keep = [r for r in rows if (r[col] if col < len(r) else "").strip().lower() != source]
+    removed = len(rows) - len(keep)
+    if not removed:
+        return 0, f"Extracted Skills has no {SOURCE_LABELS[source]} job postings."
+
+    buf = io.StringIO(newline="")
+    w = csv.writer(buf, lineterminator="\r\n")
+    w.writerow(columns)
+    w.writerows(keep)
+    _atomic_write_text(table_path("extracted"), buf.getvalue(), encoding="utf-8-sig")
+    # The resume file would otherwise bring the rows back on the next extraction run.
+    state_file = state_dir() / "extracted_skills.json"
+    if state_file.is_file():
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        state = [r for r in state if str(r.get("source") or "").strip().lower() != source]
+        _atomic_write_text(state_file, json.dumps(state, indent=2, ensure_ascii=False))
+    write_skill_csvs([dict(zip(columns, r)) for r in keep], str(data_dir()))
+    for k in list(_table_cache):
+        _table_cache.pop(k, None)
+    return removed, None
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -216,7 +253,22 @@ def load_table(key: str):
     return columns, rows
 
 
-def query_table(key: str, q: str = "", page: int = 1, page_size: int = 50) -> dict:
+_NUMBER_RE = re.compile(r"^-?\d+(\.\d+)?$")
+
+
+def _sort_key(value: str):
+    """Numbers sort as numbers, text case-insensitively, blanks last (whatever the direction)."""
+    v = value.strip().replace(",", "")
+    if not v:
+        return (1, 0, 0.0, "")
+    if _NUMBER_RE.match(v):
+        return (0, 0, float(v), "")
+    return (0, 1, 0.0, value.strip().lower())
+
+
+def query_table(key: str, q: str = "", page: int = 1, page_size: int = 50,
+                sort: int | None = None, desc: bool = False, filters: dict | None = None) -> dict:
+    """filters: {column index: text}; a row matches when that column contains the text (any case)."""
     loaded = load_table(key)
     if loaded is None:
         return {"exists": False, "columns": [], "rows": [], "total": 0, "matched": 0, "page": 1, "pages": 1}
@@ -224,6 +276,15 @@ def query_table(key: str, q: str = "", page: int = 1, page_size: int = 50) -> di
     q = (q or "").strip().lower()
     if q:
         rows = [r for r in rows if any(q in c.lower() for c in r)]
+    for idx, text in (filters or {}).items():
+        text = (text or "").strip().lower()
+        if text and 0 <= idx < len(columns):
+            rows = [r for r in rows if idx < len(r) and text in r[idx].lower()]
+    if sort is not None and 0 <= sort < len(columns):
+        blanks = [r for r in rows if sort >= len(r) or not r[sort].strip()]
+        filled = [r for r in rows if sort < len(r) and r[sort].strip()]
+        filled.sort(key=lambda r: _sort_key(r[sort]), reverse=desc)
+        rows = filled + blanks
     matched = len(rows)
     page_size = max(1, min(page_size, 200))
     pages = max(1, -(-matched // page_size))
@@ -242,6 +303,8 @@ def query_table(key: str, q: str = "", page: int = 1, page_size: int = 50) -> di
         "page": page,
         "pages": pages,
         "page_size": page_size,
+        "sort": sort if sort is not None and 0 <= sort < len(columns) else None,
+        "desc": desc,
     }
 
 
@@ -879,6 +942,13 @@ def import_csv(kind: str, upload, merge: bool) -> dict:
         fieldnames = list(UNIVERSAL_COLUMNS) + extra
     else:
         fieldnames = existing_cols + [c for c in columns if c not in existing_cols]
+    merged = 0
+    if kind == "trabajo":       # same duplicate merge as the Trabajo compile step
+        kept, stats = dedupe_rows(existing_rows + to_add)
+        merged = len(existing_rows) + len(to_add) - len(kept)
+        existing_rows, to_add = [], kept
+        added -= merged
+        fieldnames += [c for c in TRABAJO_DEDUPE_COLUMNS if c not in fieldnames]
     buf = io.StringIO(newline="")
     w = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore", lineterminator="\r\n")
     w.writeheader()
@@ -890,7 +960,7 @@ def import_csv(kind: str, upload, merge: bool) -> dict:
 
     if kind == "extracted":
         _merge_extracted_state(existing_rows + to_add if merge else to_add, replace=not merge)
-    return {"added": added, "skipped": skipped, "total": len(existing_rows) + added}
+    return {"added": added, "skipped": skipped, "merged": merged, "total": len(existing_rows) + len(to_add)}
 
 
 def _merge_extracted_state(rows: list, replace: bool) -> None:

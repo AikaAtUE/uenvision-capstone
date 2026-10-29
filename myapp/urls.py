@@ -36,6 +36,7 @@ urlpatterns = [
     path("data/table/", views.data_table_view, name="data_table"),
     path("data/download/<str:key>/", views.data_download_view, name="data_download"),
     path("data/delete/<str:key>/", views.data_delete_view, name="data_delete"),
+    path("data/clear/<str:source>/", views.data_clear_source_view, name="data_clear_source"),
     path("data/import/", views.data_import_view, name="data_import"),
     path("data/scrape/", views.data_scrape_view, name="data_scrape"),
     path("data/scrape/run/", views.scrape_run_view, name="scrape_run"),
