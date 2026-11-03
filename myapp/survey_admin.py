@@ -46,6 +46,7 @@ def _summary(resp, names_by_code):
         "student_number": str(info.get("student_number") or ""),
         "course": str(info.get("course") or ""),
         "year": f"Year {year}" if info.get("year_level") else (f"Graduated {year}" if year else ""),
+        "section": str(info.get("section") or ""),
         "account": user.email if user else "",
         "subjects": subjects,
         "skill_count": sum(len(s["skills"]) for s in subjects),
@@ -53,7 +54,7 @@ def _summary(resp, names_by_code):
 
 
 def _search_text(row):
-    parts = [row["name"], row["email"], row["student_number"], row["course"], row["account"],
+    parts = [row["name"], row["email"], row["student_number"], row["course"], row["section"], row["account"],
              row["obj"].get_respondent_type_display(), str(row["obj"].pk)]
     for s in row["subjects"]:
         parts += [s["code"], s["name"]] + [k["name"] for k in s["skills"]]

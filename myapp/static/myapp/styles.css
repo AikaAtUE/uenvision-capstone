@@ -169,6 +169,12 @@ a{color:inherit;}
   display:flex; align-items:center; justify-content:center; color:var(--navy); flex-shrink:0;
 }
 .avatar svg{width:20px; height:20px;}
+.avatar{overflow:hidden;}
+.avatar-img{width:100%; height:100%; object-fit:cover; display:block;}
+.photo-row{display:flex; align-items:center; gap:16px; flex-wrap:wrap;}
+.photo-preview{width:72px; height:72px;}
+.photo-preview svg{width:36px; height:36px;}
+.photo-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
 .profile-text{display:flex; flex-direction:column; line-height:1.25;}
 .profile-name{font-weight:700; font-size:.92rem;}
 .profile-role{font-size:.76rem; color:var(--muted);}

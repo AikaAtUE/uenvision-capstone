@@ -40,7 +40,7 @@
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
 
-          <div class="likert-list" id="sus-questions"></div>
+          <div class="likert-list" id="sus-questions" data-first-statement="{{ sus_first_statement }}"></div>
 
           <label class="field"><span>Additional comments (optional)</span><textarea id="sus-comments" rows="3"></textarea></label>
           <p class="form-msg form-msg--error form-error" id="sus-error" hidden></p>
@@ -73,7 +73,7 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel survey-panel--wide">
         <h2 class="section-title">Functional test case sheet</h2>
-        <p class="muted survey-desc">Do the steps of each test case, write what actually happened, and mark it Pass, Fail, or Blocked.</p>
+        <p class="muted survey-desc">A functional test checks that each part of UEnvision does what it is supposed to do. For each test case, do what the scenario says, then answer whether it happened as expected. If it didn't, write what happened instead. Comments or remarks about your experience are welcome on any test case.</p>
         <form id="functional-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>

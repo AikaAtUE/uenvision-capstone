@@ -21,6 +21,16 @@
     {% endif %}
   </header>
 
+  <div class="cs-steps" id="professor-steps">
+    <h3>How to answer</h3>
+    <ol>
+      <li>Read the Data Privacy Notice and tick the box to agree.</li>
+      <li>Tick every subject you teach this semester and last semester. Use <strong>+ Add a subject that isn’t listed</strong> for one that is missing, like an elective.</li>
+      <li>For each subject, type or pick the technical skills you cover and choose how you cover each one: <strong>Introduced</strong> (mentioned in lectures), <strong>Practiced</strong> (done in labs or exercises) or <strong>Applied</strong> (part of graded outputs or projects).</li>
+      <li>Press <strong>Submit survey</strong> (or <strong>Save changes</strong> if you have answered before). You can come back and change your answers any time.</li>
+    </ol>
+  </div>
+
   {% if required_first %}
   <div class="cs-banner cs-banner--first" role="note"><strong>Welcome to UEnvision!</strong> Please answer this survey once before using the rest of the site. It tells UEnvision what your subjects already teach, so the skill gap analysis and your recommendations are accurate. You can edit your answers any time afterwards.</div>
   {% endif %}
@@ -119,4 +129,5 @@
 {% endblock %}
 {% block extra_js %}
 <script src="{% static 'myapp/curriculum-survey.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'myapp/cs-professor.js' %}?v={% now 'U' %}"></script>
 {% endblock %}

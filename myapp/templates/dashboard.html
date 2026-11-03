@@ -16,9 +16,9 @@
           Edit your data
         </a>
         {% endif %}
-        <button class="btn btn-ghost btn-sm" id="filter-btn">
+        <button type="button" class="btn btn-ghost btn-sm" id="filter-btn" aria-controls="filter-drawer" aria-expanded="false">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Filter
+          Filter <span class="filter-count" id="filter-count" hidden></span>
         </button>
       </div>
     </div>
@@ -52,25 +52,7 @@
     </div>
 
     <div class="panel" id="skills-panel" data-url="{% url 'dashboard_skills' %}">
-      <div class="skill-controls">
-        <label class="select-field"><span>Skill type</span>
-          <select id="ctl-kind"><option value="hard">Hard skills</option><option value="soft">Soft skills</option></select></label>
-        <label class="select-field"><span>Number of top skills</span>
-          <input type="number" id="ctl-top" min="1" max="30" step="1" value="10" inputmode="numeric"></label>
-        <label class="select-field"><span>Source</span>
-          <select id="ctl-source"><option value="">All sources</option></select></label>
-        <label class="select-field"><span>Job level</span>
-          <select id="ctl-level"><option value="">All levels</option></select></label>
-        <label class="select-field" id="ctl-months-wrap" hidden><span>Period</span>
-          <select id="ctl-months">
-            <option value="0">All months</option><option value="12">Last 12 months</option>
-            <option value="24" selected>Last 24 months</option><option value="36">Last 36 months</option>
-          </select></label>
-        <label class="select-field" id="ctl-program-wrap"><span>Program</span>
-          <select id="ctl-program">
-            <option value="">BSIT and BSCS</option><option value="BSIT">BSIT</option><option value="BSCS">BSCS</option>
-          </select></label>
-      </div>
+      <p class="filter-summary" id="filter-summary" aria-live="polite"></p>
 
       <div class="tabs" role="tablist">
         <button class="tab is-active" data-tab="top-skills">Top in-demand skills</button>
@@ -120,8 +102,15 @@
               <div class="bars bars--wide" id="gap-well-covered"></div>
             </div>
           </div>
-          <h3 class="gap-subj-title">By subject <small>— where each in-demand skill is covered, and which under-taught skills fit the subject</small></h3>
+          <h3 class="gap-subj-title" id="gap-subj-title">By subject <small>— where each in-demand skill is covered, and which under-taught skills fit the subject</small></h3>
           <div class="gap-subj-wrap" id="gap-by-subject"></div>
+          {% if user.is_administrator %}
+          <div id="gap-comparison" hidden>
+            <h3 class="gap-subj-title">Job postings vs faculty vs students <small>— which top in-demand skills each source mentions, grouped by category</small></h3>
+            <div class="cmp-groups" id="cmp-groups"></div>
+            <div class="gap-subj-wrap" id="cmp-table"></div>
+          </div>
+          {% endif %}
           <p class="muted" id="gap-note"></p>
           <p class="chart-source" id="src-gap"></p>
         </div>

@@ -46,11 +46,13 @@ Scope, deliberately kept narrow for this first pass:
 import math
 
 
+from . import skill_categories
 from .models import CurriculumSurveyResponse
 from .pipeline.skill_standardizer import clean_display, norm
 
 MAX_LISTED = 12  # how many under-taught / well-covered skills the UI shows
 MAX_SUBJECT_SKILLS = 8  # per-subject lists in the breakdown
+MAX_TAUGHT_IN = 4  # subject codes listed per skill in the three-source comparison
 
 # Survey level -> weight in 0..1. An unknown or missing level counts in full, the
 # same as the original unweighted mention count.
@@ -264,6 +266,34 @@ def _by_subject(responses, industry_pct, industry_label, under_taught_keys, prog
 
 
 # ---------------------------------------------------------------------------
+# Three-source comparison (end of the report)
+# ---------------------------------------------------------------------------
+COMPARISON_GROUPS = [
+    # (key, label, faculty reported?, students/alumni reported?)
+    ("all_three", "In job postings, taught by faculty and learned by students", True, True),
+    ("faculty_only", "Taught by faculty, but no student or alumni reported learning it", True, False),
+    ("students_only", "Students or alumni learned it, but no faculty reported teaching it", False, True),
+    ("postings_only", "Only in job postings: not reported by faculty or students", False, False),
+]
+
+
+def _comparison(rows):
+    """Which top in-demand skills each source mentions, grouped by skill category.
+    Every row is already a job-postings skill; this adds where faculty and students agree
+    or disagree, so a skill missing from one source stands out."""
+    groups = []
+    for key, label, fac, stu in COMPARISON_GROUPS:
+        skills = [r["skill"] for r in rows if r["faculty_reported"] == fac and r["students_reported"] == stu]
+        groups.append({"key": key, "label": label, "count": len(skills), "skills": skills})
+    by_category = {}
+    for r in rows:
+        by_category.setdefault(r["category"], []).append(r)
+    categories = [{"category": cat, "rows": by_category[cat]}
+                  for cat in sorted(by_category, key=skill_categories.order_key)]
+    return {"groups": groups, "categories": categories}
+
+
+# ---------------------------------------------------------------------------
 # Put it together
 # ---------------------------------------------------------------------------
 def compute(top: int = 10, source: str = "", level: str = "", program: str = "", dummy: bool = False) -> dict:
@@ -291,11 +321,15 @@ def compute(top: int = 10, source: str = "", level: str = "", program: str = "",
     has_survey_data = total_responses > 0
     mention_counts, weight_sums = {}, {}
     taught, learned = {}, {}
+    taught_in = {}  # skill key -> {subject code: None}, in the order first reported
     for resp in responses:
         for k, w in resp["weights"].items():
             mention_counts[k] = mention_counts.get(k, 0) + 1
             weight_sums[k] = weight_sums.get(k, 0.0) + w
             (taught if resp["type"] == "professor" else learned).setdefault(k, []).append(w)
+        for code, per in resp["subjects"].items():
+            for k in per:
+                taught_in.setdefault(k, {})[code] = None
 
     industry_vec = [c for _, c in top_n]
     academic_vec = [weight_sums.get(k, 0.0) for k, _ in top_n]
@@ -318,6 +352,11 @@ def compute(top: int = 10, source: str = "", level: str = "", program: str = "",
             "taught_depth_pct": _pct(_mean(taught.get(k, []))),
             "learned_proficiency_pct": _pct(_mean(learned.get(k, []))),
             "gap_score": round(industry_pct[k] - academic_pct, 1),
+            # For the three-source comparison (job postings vs faculty vs students):
+            "category": skill_categories.category_for(industry_label[k]),
+            "faculty_reported": k in taught,
+            "students_reported": k in learned,
+            "taught_in": list(taught_in.get(k, {}))[:MAX_TAUGHT_IN],
         })
 
     under_taught = sorted(
@@ -347,6 +386,7 @@ def compute(top: int = 10, source: str = "", level: str = "", program: str = "",
         "under_taught": under_taught,
         "well_covered": well_covered,
         "top_gap": under_taught[0]["skill"] if under_taught else None,
+        "comparison": _comparison(rows),
         "by_subject": _by_subject(responses, industry_pct, industry_label, under_taught_keys, program)
                       if has_survey_data else [],
     }

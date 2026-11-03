@@ -16,6 +16,7 @@ LEARNER_URL_NAMES = {
     "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
     "feedback", "survey_submit", "feedback_later", "about", "help", "settings", "change_password", "session_ping",
     "update_account", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+    "profile_photo", "profile_photo_upload",
 }
 
 # Dummy (test) students can also open the overall Dashboard, which for them is
@@ -87,7 +88,7 @@ class IdleTimeoutMiddleware:
 # What a user with a temporary password (set by an administrator) can open until they choose their own.
 PASSWORD_CHANGE_URL_NAMES = {
     "settings", "change_password", "logout", "login", "session_ping", "verify_email", "resend_verification",
-    "forgot_password", "reset_password", "reset_password_confirm",
+    "forgot_password", "reset_password", "reset_password_confirm", "profile_photo",
 }
 
 
@@ -116,6 +117,7 @@ PROFESSOR_SURVEY_URL_NAMES = {
     "professor_survey", "professor_survey_submit", "skill_search", "skill_add",
     "settings", "change_password", "logout", "login", "session_ping", "help", "about",
     "update_account", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+    "profile_photo", "profile_photo_upload",
 }
 
 

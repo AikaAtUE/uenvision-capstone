@@ -393,7 +393,9 @@ def recommendations_download_view(request):
 
 @login_required
 def feedback_view(request):
-    return render(request, "feedback.html", {"active_page": "feedback"})
+    audience = sus_audience(request.user)
+    return render(request, "feedback.html", {"active_page": "feedback",
+                                             "sus_first_statement": SUS_FIRST_STATEMENTS[audience]})
 
 
 @login_required
@@ -777,8 +779,30 @@ MAX_SURVEY_ROWS = 200
 # 2 = all-positive), so keep the versions apart when averaging.
 # 4 = same scoring as 3, but the statement set changed (navigation and consistency
 #     replaced "without a technical person" and "most people would learn quickly").
-SUS_VERSION = 4
+# 5 = same scoring as 4, but statement 1 ("I would like to use UEnvision again.") became
+#     "I would like to use UEnvision to ...", worded for students, alumni or faculty
+#     (see SUS_FIRST_STATEMENTS; each response saves which one it was shown as "sus_audience").
+SUS_VERSION = 5
 SUS_QUESTION_COUNT = 6  # must match SUS_QUESTIONS in survey.js
+# Statement 1 depends on who is answering. Administrators and developers get the faculty
+# wording, since they use the same staff pages.
+SUS_FIRST_STATEMENTS = {
+    "student": "I would like to use UEnvision to keep me updated on the skills that job postings ask for, "
+               "so I can prepare for them before I graduate.",
+    "alumni": "I would like to use UEnvision to keep me updated on the skills that job postings ask for, "
+              "so I can keep my skills current in my career.",
+    "faculty": "I would like to use UEnvision to keep me updated on the skills that job postings ask for, "
+               "so I can include them in the subjects I teach.",
+}
+
+
+def sus_audience(user):
+    """Which wording of SUS statement 1 this account sees: student, alumni or faculty."""
+    if user.role == user.Role.STUDENT:
+        return "student"
+    if user.role == user.Role.ALUMNI:
+        return "alumni"
+    return "faculty"
 PH_TIME = dt_timezone(timedelta(hours=8), "PHT")  # no DST; avoids needing tzdata on Windows
 
 
@@ -818,6 +842,7 @@ def survey_submit_view(request):
                 return JsonResponse({"ok": False, "error": "SUS answers must be 1-5."}, status=400)
             row["sus_score"] = _compute_sus_score(answers)  # never trust the client's score
             row["sus_version"] = SUS_VERSION
+            row["sus_audience"] = sus_audience(request.user)  # which statement 1 they were shown
 
     # Who answered comes from the account, not from the form.
     name, role = request.user.get_full_name(), request.user.role_label
@@ -1131,6 +1156,9 @@ def _is_ue_email(value):
     return domain == UE_EMAIL_DOMAIN or domain.endswith("." + UE_EMAIL_DOMAIN)
 
 
+MAX_SECTION_LENGTH = 30
+
+
 def _parse_curriculum_submission(request, needs_personal_info=True):
     """Shared POST-body parsing/sanity-checking for all three submit views.
     Returns (payload_dict, error_message_or_None)."""
@@ -1230,6 +1258,13 @@ def student_survey_submit_view(request):
         return JsonResponse({"ok": False, "error": "Please select at least one current-semester subject."}, status=400)
     if payload.get("has_previous") and "previous" not in terms:
         return JsonResponse({"ok": False, "error": "Please select at least one previous-semester subject."}, status=400)
+    # Section is asked of students only (alumni no longer have one).
+    section = str(payload["personal_info"].get("section") or "").strip()
+    if not section:
+        return JsonResponse({"ok": False, "error": "Please enter your section."}, status=400)
+    if len(section) > MAX_SECTION_LENGTH:
+        return JsonResponse({"ok": False, "error": "That section is too long."}, status=400)
+    payload["personal_info"]["section"] = section
     _clean_target_role(payload)
     response = _save_curriculum_survey(CurriculumSurveyResponse.STUDENT, payload, dummy=_is_dummy(request))
     return _learner_survey_saved(request, response)

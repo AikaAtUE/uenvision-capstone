@@ -15,7 +15,7 @@
 
   let data = null;
   const hidden = new Set();       // skills toggled off in the line chart legend
-  let timer = null, reqId = 0, filtersBuilt = false;
+  let reqId = 0, filtersBuilt = false;
 
   const monthLabel = m => MONTHS[+m.slice(5) - 1] + ' ' + m.slice(0, 4);
   const colorOf = i => COLORS[i % COLORS.length];
@@ -188,7 +188,10 @@
     const rows = gap.by_subject || [];
     if (!rows.length) {
       const p = document.createElement('p'); p.className = 'empty-note';
-      p.textContent = 'No subject has survey answers that match in-demand skills yet.'; box.appendChild(p);
+      p.textContent = gap.scope === 'mine'
+        ? 'None of your subjects have survey answers that match in-demand skills yet. Add your subjects in the Professor Survey.'
+        : 'No subject has survey answers that match in-demand skills yet.';
+      box.appendChild(p);
       return;
     }
     const table = document.createElement('table'); table.className = 'gap-subj-table';
@@ -211,6 +214,49 @@
       const c5 = document.createElement('td');
       c5.appendChild(skillList(r.could_add, i => i.skill + ' (' + i.industry_pct + '%)'));
       tr.append(c1, c2, c3, c4, c5); tbody.appendChild(tr);
+    });
+    table.appendChild(tbody); box.appendChild(table);
+  }
+
+  /* ---------------- job postings vs faculty vs students ---------------- */
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function drawComparison(gap) {
+    const wrap = $('gap-comparison');
+    if (!wrap) return;                      // faculty don't get this section
+    const cmp = gap.comparison;
+    wrap.hidden = !cmp;
+    if (!cmp) return;
+    const groups = $('cmp-groups'); clear(groups);
+    cmp.groups.forEach(g => {
+      const card = el('div', 'cmp-group cmp-group--' + g.key);
+      card.append(el('p', 'cmp-count', String(g.count)), el('p', 'cmp-label', g.label));
+      card.appendChild(el('p', 'cmp-skills', g.skills.length ? g.skills.join(', ') : '—'));
+      groups.appendChild(card);
+    });
+    const box = $('cmp-table'); clear(box);
+    const table = el('table', 'gap-subj-table cmp-table');
+    const head = el('tr');
+    ['Skill', 'Job postings', 'Faculty (taught depth)', 'Students / alumni (proficiency)', 'Reported in subject'].forEach(h => head.appendChild(el('th', null, h)));
+    const thead = el('thead'); thead.appendChild(head); table.appendChild(thead);
+    const tbody = el('tbody');
+    const yesNo = (reported, pct) => reported ? '✓ ' + (pct == null ? '' : pct + '%') : '✗ not reported';
+    cmp.categories.forEach(c => {
+      const tr = el('tr', 'cmp-cat'); const th = el('th', null, c.category); th.colSpan = 5; tr.appendChild(th); tbody.appendChild(tr);
+      c.rows.forEach(r => {
+        const row = el('tr');
+        row.append(
+          el('td', null, r.skill),
+          el('td', null, r.industry_pct + '%'),
+          el('td', r.faculty_reported ? null : 'cmp-missing', yesNo(r.faculty_reported, r.taught_depth_pct)),
+          el('td', r.students_reported ? null : 'cmp-missing', yesNo(r.students_reported, r.learned_proficiency_pct)),
+          el('td', r.taught_in.length ? null : 'muted', r.taught_in.length ? r.taught_in.join(', ') : '—'));
+        tbody.appendChild(row);
+      });
     });
     table.appendChild(tbody); box.appendChild(table);
   }
@@ -245,7 +291,13 @@
       gap.well_covered.forEach(r => gapRow(wc, r));
     }
     const byType = gap.survey_responses_by_type || {};
+    const subjTitle = $('gap-subj-title');
+    if (subjTitle && gap.scope === 'mine') {
+      subjTitle.firstChild.textContent = 'Your subjects ';
+      subjTitle.lastChild.textContent = '— the subjects in your Professor Survey: which in-demand skills they cover, and which under-taught skills fit them';
+    }
     drawSubjects(gap);
+    drawComparison(gap);
     $('gap-note').textContent = gap.survey_responses + ' survey response(s) with tagged skills (' +
       ['student', 'alumni', 'professor'].map(t => (byType[t] || 0) + ' ' + t).join(', ') + ').';
   }
@@ -354,6 +406,7 @@
     Array.from(ctl.source.options).forEach(o => { if (o.value) o.textContent = o.value.charAt(0).toUpperCase() + o.value.slice(1); });
     fill(ctl.level, d.levels, 'All levels');
     filtersBuilt = true;
+    setSummary();
   }
 
   function showEmpty(msg) {
@@ -386,22 +439,62 @@
       .catch(() => { if (my === reqId) errEl.textContent = 'Could not reach the server. Try again.'; });
   }
 
-  const later = () => { clearTimeout(timer); timer = setTimeout(load, 250); };
-  ctl.top.addEventListener('input', later);
-  ctl.top.addEventListener('change', () => {
+  /* ---------------- Filter drawer ---------------- */
+  // The controls sit in the Filter drawer. Nothing reloads until "Apply filters"; closing
+  // the drawer any other way puts the controls back to what is currently applied.
+  const drawer = $('filter-drawer'), backdrop = $('filter-backdrop'), filterBtn = $('filter-btn');
+  const KEYS = ['kind', 'top', 'program', 'source', 'level', 'months'];
+  const DEFAULTS = { kind: 'hard', top: '10', program: '', source: '', level: '', months: '24' };
+  let applied = Object.assign({}, DEFAULTS);
+
+  const label = (c) => c.tagName === 'SELECT' ? (c.options[c.selectedIndex] || {}).textContent || '' : c.value;
+  function setSummary() {
+    const parts = [label(ctl.kind), 'top ' + applied.top, label(ctl.program), label(ctl.source), label(ctl.level)];
+    const sum = $('filter-summary'); clear(sum);
+    sum.appendChild(document.createTextNode('Showing: '));
+    parts.forEach((p, i) => {
+      if (i) sum.appendChild(document.createTextNode(' · '));
+      const b = document.createElement('strong'); b.textContent = p; sum.appendChild(b);
+    });
+    if ($('tab-skill-trends').classList.contains('is-active')) {
+      sum.appendChild(document.createTextNode(' · ' + label(ctl.months)));
+    }
+    const changed = KEYS.filter(k => applied[k] !== DEFAULTS[k]).length;
+    const badge = $('filter-count');
+    badge.textContent = changed; badge.hidden = !changed;
+  }
+  function openDrawer() {
+    drawer.classList.add('is-active'); backdrop.classList.add('is-active');
+    drawer.setAttribute('aria-hidden', 'false'); filterBtn.setAttribute('aria-expanded', 'true');
+    drawer.focus();
+  }
+  function closeDrawer(restore) {
+    if (restore) KEYS.forEach(k => { ctl[k].value = applied[k]; });
+    drawer.classList.remove('is-active'); backdrop.classList.remove('is-active');
+    drawer.setAttribute('aria-hidden', 'true'); filterBtn.setAttribute('aria-expanded', 'false');
+  }
+  function apply() {
     let v = parseInt(ctl.top.value, 10);
     if (!(v >= 1)) v = 10;
-    ctl.top.value = Math.min(v, 30); load();
-  });
-  [ctl.kind, ctl.source, ctl.level, ctl.months, ctl.program].forEach(c => c.addEventListener('change', () => { hidden.clear(); load(); }));
+    ctl.top.value = String(Math.min(v, 30));
+    const next = {}; KEYS.forEach(k => { next[k] = ctl[k].value; });
+    const changed = KEYS.some(k => next[k] !== applied[k]);
+    applied = next;
+    closeDrawer(false);
+    setSummary();
+    if (changed) { hidden.clear(); load(); }
+  }
+  filterBtn.addEventListener('click', openDrawer);
+  $('filter-close').addEventListener('click', () => closeDrawer(true));
+  backdrop.addEventListener('click', () => closeDrawer(true));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && drawer.classList.contains('is-active')) closeDrawer(true); });
+  $('filter-apply').addEventListener('click', apply);
+  ctl.top.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
+  $('filter-clear-all').addEventListener('click', () => { KEYS.forEach(k => { ctl[k].value = DEFAULTS[k]; }); });
 
-  // The period picker only matters for the trend chart. The program picker narrows every
-  // tab (job postings by the COMPUTER SCIENCE / INFORMATION TECHNOLOGY columns, and the
-  // gap analysis's survey answers too).
-  const monthsWrap = $('ctl-months-wrap');
-  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
-    monthsWrap.hidden = t.dataset.tab !== 'skill-trends';
-  }));
+  // The period only matters for the trend chart, so the summary mentions it on that tab.
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setTimeout(setSummary)));
 
+  setSummary();
   load();
 })();

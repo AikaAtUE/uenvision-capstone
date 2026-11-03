@@ -1,10 +1,21 @@
-.skill-controls{display:flex; flex-wrap:wrap; gap:14px 18px; align-items:flex-end; margin-bottom:22px;}
-.skill-controls .select-field select{min-width:150px;}
-.skill-controls .select-field input{
-  width:130px; padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#f7f7f8; font:inherit;
+/* Filters live in the Filter drawer (_filter_drawer.html). */
+#filter-drawer .drawer-body{flex:1; overflow:auto;}
+#filter-drawer .drawer-section{overflow:visible;}
+#filter-drawer .select-field{margin-bottom:12px;}
+#filter-drawer .select-field:last-child{margin-bottom:0;}
+#filter-drawer .select-field select, #filter-drawer .select-field input{width:100%; min-width:0;}
+#filter-drawer .select-field input{
+  padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#f7f7f8; font:inherit;
 }
-.skill-controls .select-field input:focus{background:#fff; border-color:var(--navy); outline:none;}
-.skill-controls .select-field[hidden]{display:none;}
+#filter-drawer .select-field input:focus{background:#fff; border-color:var(--navy); outline:none;}
+.drawer-hint{font-size:.78rem; color:var(--muted); margin-top:6px;}
+.filter-count{
+  display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px;
+  border-radius:9px; background:var(--navy); color:#fff; font-size:.7rem; font-weight:700;
+}
+.filter-count[hidden]{display:none;}
+.filter-summary{font-size:.82rem; color:var(--muted); margin:-6px 0 18px;}
+.filter-summary strong{color:var(--ink); font-weight:600;}
 
 .bars--wide .bar-row{grid-template-columns:minmax(110px,230px) 1fr 92px;}
 .bars--wide .bar-label{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -86,3 +97,17 @@
   .gap-cols{grid-template-columns:1fr;}
   .gap-col .bars--wide .bar-row{grid-template-columns:1fr auto;}
 }
+
+/* Job postings vs faculty vs students (administrators) */
+.cmp-groups{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:16px;}
+.cmp-group{border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; border-top:4px solid var(--navy);}
+.cmp-group--faculty_only, .cmp-group--students_only{border-top-color:#d08a00;}
+.cmp-group--postings_only{border-top-color:var(--red);}
+.cmp-count{font-family:var(--font-head); font-size:1.6rem; font-weight:700; margin:0;}
+.cmp-label{font-size:.82rem; font-weight:600; margin:2px 0 6px;}
+.cmp-skills{font-size:.8rem; color:var(--muted); margin:0;}
+.cmp-table{min-width:640px;}
+.cmp-table th:nth-child(n){width:auto;}
+.cmp-cat th{background:#f6f7f9; font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); border-bottom:1px solid var(--line);}
+.cmp-missing{color:var(--red);}
+#filter-drawer:focus{outline:none;}

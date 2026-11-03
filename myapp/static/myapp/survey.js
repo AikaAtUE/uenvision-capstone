@@ -39,6 +39,8 @@
   // Lewis, 2011), in plain English, with statements that asked the same thing dropped
   // per the adviser's comments. Every item scores (answer - 1). Keep this list in the
   // same order as SUS_QUESTION_COUNT in views.py expects.
+  // Statement 1 ("I would like to use UEnvision to ...") is worded for students, alumni or
+  // faculty; the page gets it from SUS_FIRST_STATEMENTS in views.py (data-first-statement).
   var SUS_QUESTIONS = [
     'I would like to use UEnvision again.',
     'UEnvision is easy to use.',
@@ -56,12 +58,15 @@
     { id: 'settings', label: 'Editing account settings saved correctly.' }
   ];
 
+  // Written as short scenarios ("You open ... "), per the adviser. Logging in and out are
+  // left out: every tester has already done both just to reach this sheet.
   var FUNCTIONAL_DEFAULT_ROWS = [
-    { feature: 'Log in', steps: 'Enter a valid email and password, click Log in.', expected: 'User is taken to the Dashboard.' },
-    { feature: 'Dashboard filter', steps: 'Open Filter, uncheck a skill, click Apply filters.', expected: 'Top in-demand skills chart updates to exclude that skill.' },
-    { feature: 'Export data', steps: 'Go to Data, choose a source, click Export.', expected: 'A CSV file downloads with the visible table’s rows.' },
-    { feature: 'Edit settings', steps: 'Go to Settings, click Edit, change name/email, click Save.', expected: 'The new values are shown in Settings and the sidebar.' },
-    { feature: 'Log out', steps: 'Click Log out in the sidebar.', expected: 'User is returned to the Log in screen.' }
+    { feature: 'Dashboard', steps: 'You open the Dashboard from the sidebar.', expected: 'The stat cards and the Top in-demand skills chart load with job posting numbers.' },
+    { feature: 'Dashboard filters', steps: 'On the Dashboard, you click Filter, set Number of top skills to 5 and Program to BSIT, and click Apply filters.', expected: 'The Top in-demand skills chart updates to show 5 skills from BSIT-related postings.' },
+    { feature: 'Skill gap analysis', steps: 'On the Dashboard, you open the Skill gap analysis tab.', expected: 'The Under-taught and Well-covered skill lists are shown.' },
+    { feature: 'Recommendations', steps: 'You open Recommendations from the sidebar and choose one of your subjects.', expected: 'In-demand skills that fit the subject are listed, with suggested resources.' },
+    { feature: 'Export data', steps: 'You go to Data, choose a source, and click Export.', expected: 'A CSV file downloads with the rows of the table you are viewing.' },
+    { feature: 'Edit settings', steps: 'You go to Settings, change your name, and click Save.', expected: 'Your new name is shown in Settings and in the sidebar.' }
   ];
 
   var functionalRowCount = 0;
@@ -119,7 +124,9 @@
   function renderSusQuestions() {
     var container = qs('#sus-questions');
     if (!container || container.childElementCount) return;
-    container.innerHTML = SUS_QUESTIONS.map(function (question, i) {
+    var questions = SUS_QUESTIONS.slice();
+    if (container.dataset.firstStatement) questions[0] = container.dataset.firstStatement;
+    container.innerHTML = questions.map(function (question, i) {
       var n = i + 1;
       var options = [1, 2, 3, 4, 5].map(function (v) {
         return '<label class="likert-option"><input type="radio" name="sus-q' + n + '" value="' + v + '" required><span>' + v + '</span></label>';
@@ -220,25 +227,24 @@
       ? '<input type="text" class="ft-feature" placeholder="Feature being tested" aria-label="Feature">'
       : '<span class="ft-feature-text">' + escapeHtml(row.feature) + '</span>';
     var steps = custom
-      ? '<textarea class="ft-steps" rows="2" placeholder="What the tester does" aria-label="Steps"></textarea>'
+      ? '<textarea class="ft-steps" rows="2" placeholder="What the tester does, e.g. You open ..." aria-label="Scenario"></textarea>'
       : '<p class="ft-text ft-steps-text">' + escapeHtml(row.steps) + '</p>';
     var expected = custom
       ? '<textarea class="ft-expected" rows="2" placeholder="What should happen" aria-label="Expected result"></textarea>'
       : '<p class="ft-text ft-expected-text">' + escapeHtml(row.expected) + '</p>';
-    var status = ['Pass', 'Fail', 'Blocked'].map(function (opt, i) {
-      return '<label class="checkbox uat-radio"><input type="radio" name="ft-status-' + idx + '" value="' + opt + '"' +
-        (i === 0 ? ' checked' : '') + '><span>' + opt + '</span></label>';
+    var status = ['Yes', 'No'].map(function (opt) {
+      return '<label class="checkbox uat-radio"><input type="radio" name="ft-status-' + idx + '" value="' + opt + '"><span>' + opt + '</span></label>';
     }).join('');
     return '<div class="ft-case" data-row="' + idx + '">' +
       '<div class="ft-case-head"><span class="ft-id">' + id + '</span>' + head +
         (custom ? '<button type="button" class="link-inline link-inline--sm ft-remove">Remove</button>' : '') + '</div>' +
       '<div class="ft-grid">' +
-        '<div class="ft-cell"><p class="ft-label">Steps</p>' + steps + '</div>' +
+        '<div class="ft-cell"><p class="ft-label">Scenario</p>' + steps + '</div>' +
         '<div class="ft-cell"><p class="ft-label">Expected result</p>' + expected + '</div>' +
       '</div>' +
-      '<label class="field ft-field"><span>What actually happened</span><textarea class="ft-actual" rows="2"></textarea></label>' +
-      '<div class="ft-status-row"><span class="ft-label">Result</span><div class="uat-check-options">' + status + '</div></div>' +
-      '<label class="field ft-field"><span>Notes (optional)</span><input type="text" class="ft-notes"></label>' +
+      '<div class="ft-status-row"><span class="ft-label">Did it happen as expected?</span><div class="uat-check-options">' + status + '</div></div>' +
+      '<label class="field ft-field"><span>If No, what happened instead?</span><textarea class="ft-actual" rows="2"></textarea></label>' +
+      '<label class="field ft-field"><span>Comments or remarks (optional)</span><input type="text" class="ft-notes"></label>' +
     '</div>';
   }
   function addFunctionalRow(row) {
@@ -267,8 +273,8 @@
         feature: fieldText(card, '.ft-feature', '.ft-feature-text'),
         steps: fieldText(card, '.ft-steps', '.ft-steps-text'),
         expected_result: fieldText(card, '.ft-expected', '.ft-expected-text'),
-        actual_result: qs('.ft-actual', card).value.trim(),
-        status: checked ? checked.value : 'Pass',
+        actual_result: qs('.ft-actual', card).value.trim() || null,
+        status: checked ? checked.value : '',
         notes: qs('.ft-notes', card).value.trim() || null
       };
     });
@@ -295,8 +301,12 @@
         setFormError('functional-error', 'Please fill in the feature, steps and expected result of every test case you added.');
         return;
       }
-      if (rows.some(function (r) { return !r.actual_result; })) {
-        setFormError('functional-error', 'Please write what actually happened for every test case.');
+      if (rows.some(function (r) { return !r.status; })) {
+        setFormError('functional-error', 'Please answer Yes or No for every test case.');
+        return;
+      }
+      if (rows.some(function (r) { return r.status === 'No' && !r.actual_result; })) {
+        setFormError('functional-error', 'For every test case you answered No, please write what happened instead.');
         return;
       }
       saveSurveyResponse('functional', 'functional_test_results', rows, form).then(function (result) {

@@ -53,6 +53,20 @@
     </p>
     {% endif %}
 
+    {% if curriculum_suggestions %}
+    <details class="panel rec-curriculum" open>
+      <summary><strong>Curriculum suggestions</strong> <span class="muted">— in-demand skills that fit a subject but that no survey answer reports being taught there yet</span></summary>
+      <ul class="rec-curriculum-list">
+        {% for r in curriculum_suggestions %}
+        <li><strong>{{ r.code }}</strong> {{ r.name }}: consider adding
+          {% for k in r.could_add %}{{ k.skill }} <span class="muted">({{ k.industry_pct }}% of postings)</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="muted rec-curriculum-note">Which skills fit a subject comes from the MIND Tech Skills Ontology; the demand comes from the job postings. A suggestion disappears once a faculty, student or alumni survey answer reports the skill for that subject.</p>
+    </details>
+    {% endif %}
+
     {% if under_taught %}
     <p class="form-msg rec-caveat">
       Every resource below is AI-suggested. Each link is opened automatically and dropped if the page

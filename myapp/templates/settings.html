@@ -52,6 +52,30 @@
     </div>
     {% endif %}
 
+    <h2 class="section-title settings-section-gap" id="profile-picture">Profile picture</h2>
+    <div class="settings-card">
+      <div class="photo-row">
+        <span class="avatar photo-preview" id="photo-preview" aria-hidden="true">
+          {% if user.photo_updated %}<img class="avatar-img" src="{% url 'profile_photo' user.pk %}?v={{ user.photo_updated|date:'U' }}" alt="">
+          {% else %}<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor"/></svg>{% endif %}
+        </span>
+        <div>
+          <form method="post" action="{% url 'profile_photo_upload' %}" enctype="multipart/form-data" id="photo-form" class="photo-actions">
+            {% csrf_token %}
+            <input type="file" name="photo" id="photo-input" accept="image/jpeg,image/png,image/webp" hidden>
+            <button type="button" class="btn btn-navy btn-sm" id="photo-pick">{% if user.photo_updated %}Change picture{% else %}Upload a picture{% endif %}</button>
+          </form>
+          {% if user.photo_updated %}
+          <form method="post" action="{% url 'profile_photo_upload' %}" class="photo-actions">
+            {% csrf_token %}
+            <button type="submit" name="remove" value="1" class="link-inline">Remove picture</button>
+          </form>
+          {% endif %}
+          <small class="field-hint" id="photo-msg">JPEG or PNG. It's cropped to a square and made smaller before uploading.</small>
+        </div>
+      </div>
+    </div>
+
     {% if user.is_administrator %}
     <h2 class="section-title settings-section-gap" id="notification-settings">Notifications</h2>
     <form class="settings-card" method="post" action="{% url 'notification_settings' %}">
@@ -84,6 +108,8 @@
   {% include "_delete_modal.html" %}
 {% endblock %}
 {% block extra_js %}
+{% load static %}
+<script src="{% static 'myapp/profile-photo.js' %}?v={% now 'U' %}"></script>
 <script>
   // Client-side check for instant feedback; the server re-checks everything.
   (function () {

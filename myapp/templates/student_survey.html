@@ -14,6 +14,17 @@
     <p class="muted">Help us compare what's taught in class with what the job market actually asks for. This takes about 5–10 minutes.</p>
   </header>
 
+  <div class="cs-steps" id="student-steps">
+    <h3>How to answer</h3>
+    <ol>
+      <li>Read the Data Privacy Notice and tick the box to agree.</li>
+      <li>Fill in your name, UE email, student number, course, year level and section.</li>
+      <li>Your subjects appear after you pick your course and year level. Tick every subject you are taking this semester, and the ones you took last semester.</li>
+      <li>For each subject you ticked, type or pick the skills you learned in it, then choose how good you are at each one now (Beginner, Intermediate, Advanced or Expert). If a skill isn’t suggested, type it in the skill box to search for it.</li>
+      <li>Press <strong>Submit survey</strong>. You can then create an account to see your own skill gap results.</li>
+    </ol>
+  </div>
+
   {% if is_placeholder_curriculum %}
   <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
   {% endif %}
@@ -31,7 +42,7 @@
       <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
       <ul>
         <li><strong>Purpose:</strong> to compare the technical skills taught in the BSIT/BSCS curricula against current IT/CS job market demand.</li>
-        <li><strong>What is collected:</strong> your name, UE email, course, student number, year level, the subjects you've taken, and the skills/proficiency you report for each.</li>
+        <li><strong>What is collected:</strong> your name, UE email, course, student number, year level, section, the subjects you've taken, and the skills/proficiency you report for each.</li>
         <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
         <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
         <li><strong>Questions or concerns:</strong> you may reach the UEnvision research team through your course adviser.</li>
@@ -39,9 +50,10 @@
       <label class="cs-consent"><input type="checkbox" id="student-consent"> <span>I have read the Data Privacy Notice above and voluntarily agree to participate.</span></label>
     </div>
 
-    <div class="cs-row-2">
+    <div class="cs-row-3">
       <label class="field"><span>Full name</span><input type="text" id="student-name" required></label>
       <label class="field"><span>UE email address</span><input type="email" id="student-email" required></label>
+      <label class="field"><span>Student number</span><input type="text" id="student-number" required></label>
     </div>
     <div class="cs-row-3">
       <label class="field"><span>Course</span>
@@ -51,7 +63,6 @@
           <option value="BSCS">BS Computer Science</option>
         </select>
       </label>
-      <label class="field"><span>Student number</span><input type="text" id="student-number" required></label>
       <label class="field"><span>Year level</span>
         <select id="student-year" required>
           <option value="">Select…</option>
@@ -61,6 +72,7 @@
           <option value="4">4th Year</option>
         </select>
       </label>
+      <label class="field"><span>Section</span><input type="text" id="student-section" maxlength="30" placeholder="As shown on your class schedule" autocomplete="off" required></label>
     </div>
 
     <p class="cs-hint" id="student-hint">Choose your course and year level above to see your subjects.</p>
@@ -90,4 +102,5 @@
 {% endblock %}
 {% block extra_js %}
 <script src="{% static 'myapp/curriculum-survey.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'myapp/cs-student.js' %}?v={% now 'U' %}"></script>
 {% endblock %}

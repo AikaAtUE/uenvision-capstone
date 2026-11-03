@@ -58,7 +58,7 @@
                 {% if r.account %}<span class="muted">Account: {{ r.account }}</span>{% endif %}
               </div></td>
               <td>{{ r.obj.get_respondent_type_display }}{% if r.obj.is_dummy %} <span class="pill pill--dummy">Dummy</span>{% endif %}</td>
-              <td>{{ r.course|default:"—" }}{% if r.year %}<br><span class="muted">{{ r.year }}</span>{% endif %}</td>
+              <td>{{ r.course|default:"—" }}{% if r.year %}<br><span class="muted">{{ r.year }}{% if r.section %} · Section {{ r.section }}{% endif %}</span>{% endif %}</td>
               <td>
                 <details class="sr-details">
                   <summary>{{ r.subjects|length }} subject{{ r.subjects|length|pluralize }}, {{ r.skill_count }} skill{{ r.skill_count|pluralize }}</summary>

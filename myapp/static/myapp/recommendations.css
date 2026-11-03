@@ -47,3 +47,10 @@
   .rec-skill-head{flex-direction:column; align-items:flex-start;}
 }
 .rec-subject-form{display:flex; gap:12px; align-items:flex-end; margin:4px 0 14px; max-width:720px;}
+
+/* Curriculum suggestions */
+.rec-curriculum{padding:14px 18px; margin:0 0 16px;}
+.rec-curriculum summary{cursor:pointer;}
+.rec-curriculum-list{margin:10px 0 6px; padding-left:20px; font-size:.9rem;}
+.rec-curriculum-list li + li{margin-top:6px;}
+.rec-curriculum-note{font-size:.8rem; margin:6px 0 0;}

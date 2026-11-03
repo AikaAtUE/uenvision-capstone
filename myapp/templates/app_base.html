@@ -15,7 +15,8 @@
 
       <a class="profile" id="profile-btn" href="{% url 'settings' %}">
         <span class="avatar" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor"/></svg>
+          {% if user.photo_updated %}<img class="avatar-img" src="{% url 'profile_photo' user.pk %}?v={{ user.photo_updated|date:'U' }}" alt="">
+          {% else %}<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="currentColor"/></svg>{% endif %}
         </span>
         <span class="profile-text">
           <span class="profile-name">{{ user.get_full_name }}</span>

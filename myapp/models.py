@@ -72,6 +72,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # pages, and until when the "Help us evaluate UEnvision" banner is hidden after "Later".
     app_uses = models.PositiveIntegerField(default=0)
     feedback_snoozed_until = models.DateTimeField(null=True, blank=True)
+    # When the profile picture (ProfilePhoto) was last set; None = no picture. Kept here so
+    # the sidebar knows whether to show one without loading the image itself.
+    photo_updated = models.DateTimeField(null=True, blank=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -230,3 +233,14 @@ class Notification(models.Model):
         if (timezone.now() - self.created_at).total_seconds() < 60:
             return "Just now"
         return f"{timesince(self.created_at)} ago"
+
+
+class ProfilePhoto(models.Model):
+    """A user's profile picture, set on Settings. A small JPEG/PNG (resized in the browser
+    first) kept in the database, so no media folder or extra server setup is needed. It
+    lives in its own table so it isn't loaded with the user on every page."""
+
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name="profile_photo")
+    data = models.BinaryField()
+    content_type = models.CharField(max_length=20)
+    updated_at = models.DateTimeField(auto_now=True)

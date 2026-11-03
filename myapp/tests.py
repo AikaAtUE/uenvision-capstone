@@ -44,7 +44,8 @@ class SurveyAndLogoutTests(TestCase):
         saved = SurveyResponse.objects.get()
         self.assertEqual(saved.user, self.user)
         self.assertEqual(saved.data["sus_score"], 100.0)  # client's 999 is ignored
-        self.assertEqual(saved.data["sus_version"], 4)
+        self.assertEqual(saved.data["sus_version"], 5)
+        self.assertEqual(saved.data["sus_audience"], "faculty")
         self.assertEqual(self.post({"type": "sus", "rows": [self.sus_row(3)]}).status_code, 200)
         self.assertEqual(SurveyResponse.objects.order_by("-pk").first().data["sus_score"], 50.0)
 
@@ -55,6 +56,19 @@ class SurveyAndLogoutTests(TestCase):
         js = (Path(__file__).parent / "static" / "myapp" / "survey.js").read_text(encoding="utf-8")
         block = re.search(r"var SUS_QUESTIONS = \[(.*?)\];", js, re.S).group(1)
         self.assertEqual(len(re.findall(r"^\s*'", block, re.M)), SUS_QUESTION_COUNT)
+
+    def test_sus_first_statement_is_worded_for_the_role(self):
+        from .views import SUS_FIRST_STATEMENTS
+        for role, audience in [(CustomUser.Role.STUDENT, "student"), (CustomUser.Role.ALUMNI, "alumni"),
+                               (CustomUser.Role.FACULTY, "faculty"), (CustomUser.Role.ADMINISTRATOR, "faculty")]:
+            user = CustomUser.objects.create_user(email=f"{role}@ue.edu.ph", password="secret123",
+                                                  first_name="A", last_name="B", role=role)
+            self.client.force_login(user)
+            html = self.client.get(reverse("feedback")).content.decode()
+            self.assertIn(f'data-first-statement="{SUS_FIRST_STATEMENTS[audience]}"', html)
+            self.assertTrue(SUS_FIRST_STATEMENTS[audience].startswith("I would like to use UEnvision to "))
+            self.post({"type": "sus", "rows": [self.sus_row()]})
+            self.assertEqual(SurveyResponse.objects.filter(user=user).get().data["sus_audience"], audience)
 
     def test_name_and_role_come_from_the_account(self):
         self.client.force_login(self.user)
@@ -350,7 +364,7 @@ class CurriculumSurveySubmitTests(IsolatedDataMixin, TestCase):
         p = {
             "consent": True,
             "personal_info": {"name": "Juan", "ue_email": "juan@ue.edu.ph", "course": "BSIT",
-                              "student_number": "2023-1", "year_level": 3},
+                              "student_number": "2023-1", "year_level": 3, "section": "TN31"},
             "has_previous": True,
             "subjects": [
                 {"code": "CIA 1102", "term": "current", "skills": [{"name": "Python", "level": "advanced"}]},
@@ -371,6 +385,26 @@ class CurriculumSurveySubmitTests(IsolatedDataMixin, TestCase):
         p = self.payload()
         p["personal_info"]["ue_email"] = "juan@gmail.com"
         self.assertEqual(self.post(p).status_code, 400)
+
+    def test_student_section_is_required_and_saved(self):
+        from .models import CurriculumSurveyResponse
+        for blank in ("", "   ", None):
+            p = self.payload()
+            p["personal_info"]["section"] = blank
+            r = self.post(p)
+            self.assertEqual(r.status_code, 400)
+            self.assertEqual(r.json()["error"], "Please enter your section.")
+        p = self.payload()
+        p["personal_info"]["section"] = "X" * 31
+        self.assertEqual(self.post(p).status_code, 400)
+        p = self.payload()
+        p["personal_info"]["section"] = "  TN31 "
+        self.assertEqual(self.post(p).status_code, 200)
+        self.assertEqual(CurriculumSurveyResponse.objects.get().data["personal_info"]["section"], "TN31")
+
+    def test_section_is_asked_of_students_not_alumni(self):
+        self.assertContains(self.client.get(reverse("student_survey")), 'id="student-section"')
+        self.assertNotContains(self.client.get(reverse("alumni_survey")), "Section</span>")
 
     def test_requires_previous_semester(self):
         p = self.payload()
@@ -523,7 +557,7 @@ class StudentFlowTests(IsolatedDataMixin, TestCase):
         payload = {
             "consent": True,
             "personal_info": {"name": "Juan Dela Cruz", "ue_email": "juan@ue.edu.ph", "course": "BSIT",
-                              "student_number": "2023-1", "year_level": 1},
+                              "student_number": "2023-1", "year_level": 1, "section": "TN11"},
             "has_previous": False,
             "target_role": "data-analyst",
             "subjects": [{"code": "CCP 1101", "term": "current",
@@ -1268,7 +1302,7 @@ class DummyAccountTests(IsolatedDataMixin, TestCase):
     def student_payload(self, email):
         return {"consent": True,
                 "personal_info": {"name": "Dummy Kid", "ue_email": email, "course": "BSIT",
-                                  "student_number": "2099-1", "year_level": 1},
+                                  "student_number": "2099-1", "year_level": 1, "section": "TN11"},
                 "has_previous": False, "target_role": "data-analyst",
                 "subjects": [{"code": "CCP 1101", "term": "current",
                               "skills": [{"name": "Python", "level": "advanced"}]}]}
@@ -2364,7 +2398,7 @@ class KeepFormInputsTests(IsolatedDataMixin, TestCase):
 
     def test_failed_register_keeps_the_typed_values(self):
         payload = {"consent": True, "personal_info": {"name": "Juan Dela Cruz", "ue_email": "juan@ue.edu.ph",
-                   "course": "BSIT", "student_number": "2023-1", "year_level": 1}, "has_previous": False,
+                   "course": "BSIT", "student_number": "2023-1", "year_level": 1, "section": "TN11"}, "has_previous": False,
                    "subjects": [{"code": "CCP 1101", "term": "current", "skills": []}]}
         reg = self.client.post(reverse("student_survey_submit"), data=json.dumps(payload),
                                content_type="application/json").json()["register_url"]

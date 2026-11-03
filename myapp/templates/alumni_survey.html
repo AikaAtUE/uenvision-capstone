@@ -14,6 +14,17 @@
     <p class="muted">Help us compare what UE taught you with what the job market actually asked for once you graduated. This takes about 10 minutes.</p>
   </header>
 
+  <div class="cs-steps" id="alumni-steps">
+    <h3>How to answer</h3>
+    <ol>
+      <li>Read the Data Privacy Notice and tick the box to agree.</li>
+      <li>Fill in your name, UE email, student number, course and the year you graduated.</li>
+      <li>Pick your last semester at UE and tick the subjects you took in it. For each one, pick the skills you learned and how good you were at each one after the subject.</li>
+      <li>Pick the skills you learned overall at UE, then answer the questions about your current job or job search.</li>
+      <li>Press <strong>Submit survey</strong>. You can then create an account to see your own skill gap results.</li>
+    </ol>
+  </div>
+
   {% if is_placeholder_curriculum %}
   <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
   {% endif %}
@@ -125,4 +136,5 @@
 {% endblock %}
 {% block extra_js %}
 <script src="{% static 'myapp/curriculum-survey.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'myapp/cs-alumni.js' %}?v={% now 'U' %}"></script>
 {% endblock %}

@@ -1,0 +1,242 @@
+/* UEnvision — Professor survey page. Needs curriculum-survey.js (shared helpers) loaded first. */
+(function () {
+  'use strict';
+
+  var CS = window.UECurriculumSurvey;
+  if (!CS) return;
+  var BOOT = CS.BOOT,
+      qs = CS.qs,
+      qsa = CS.qsa,
+      escapeHtml = CS.escapeHtml,
+      showToast = CS.showToast,
+      setFormError = CS.setFormError,
+      skillsFor = CS.skillsFor,
+      submitPayload = CS.submitPayload,
+      surveyDraft = CS.surveyDraft,
+      writeFields = CS.writeFields,
+      buildSkillPicker = CS.buildSkillPicker,
+      missingLevelError = CS.missingLevelError,
+      IPA_LEVELS = CS.IPA_LEVELS,
+      domId = CS.domId,
+      termTagsHtml = CS.termTagsHtml,
+      wireSubjectFilter = CS.wireSubjectFilter,
+      buildOtherSubjectForm = CS.buildOtherSubjectForm,
+      addedTag = CS.addedTag;
+
+  /* =====================================================================
+     PROFESSOR SURVEY
+  ===================================================================== */
+  (function initProfessorSurvey() {
+    var form = document.getElementById('professor-survey-form');
+    if (!form) return;
+
+    // The survey is also the professor's editable record: BOOT.record holds their
+    // saved subjects (null on a first visit), which are pre-filled below.
+    var pickers = {};
+    var blocksWrap = qs('#professor-subject-blocks');
+    var statusEl = document.getElementById('professor-status');
+    var saveBtn = document.getElementById('professor-save');
+    var editing = !!BOOT.record;
+    var dirty = false;
+    var poolOf = {};   // code -> {subj, poolKey}
+    ['current', 'previous_semester', 'previous_summer'].forEach(function (key) {
+      (((BOOT.pools || {})[key]) || []).forEach(function (subj) { if (!poolOf[subj.code]) poolOf[subj.code] = { subj: subj, poolKey: key }; });
+    });
+
+    function markDirty() {
+      if (dirty || !editing) return;
+      dirty = true;
+      if (statusEl) { statusEl.textContent = 'Unsaved changes'; statusEl.classList.add('is-dirty'); }
+    }
+
+    function subjectCheckHtml(subj) {
+      return '<label class="cs-subject-check">' +
+        '<input type="checkbox" class="cs-subject-pick" value="' + escapeHtml(subj.code) + '">' +
+        '<span class="cs-subject-text"><span><span class="cs-subject-code">' + escapeHtml(subj.code) + '</span>' + escapeHtml(subj.name) + '</span>' +
+        termTagsHtml(subj.code) + '</span>' +
+      '</label>';
+    }
+
+    /* One "skills per subject" block. extra: {tag html, removable, custom, programs, termLabel, bucket} */
+    function addBlock(code, name, skills, extra) {
+      if (pickers[code]) return;
+      var blockId = 'cs-psubj-' + domId(code);
+      blocksWrap.insertAdjacentHTML('beforeend',
+        '<div class="cs-subject-block" id="' + blockId + '" data-code="' + escapeHtml(code) + '">' +
+          '<div class="ms-subject-head"><h4>' + escapeHtml(code) + ' — ' + escapeHtml(name) + (extra.tag ? ' ' + extra.tag : '') + '</h4>' +
+          (extra.removable ? '<button type="button" class="ms-remove-subject cs-remove-added">Remove subject</button>' : '') + '</div>' +
+          '<div class="cs-skill-picker"></div>' +
+        '</div>'
+      );
+      var block = document.getElementById(blockId);
+      var api = buildSkillPicker(qs('.cs-skill-picker', block), extra.custom ? [] : skillsFor('', code), IPA_LEVELS, blockId, skills || []);
+      pickers[code] = { api: api, name: name, programs: extra.programs || [], code: code,
+                        termLabel: extra.termLabel || '', bucket: extra.bucket || '', custom: !!extra.custom };
+      return block;
+    }
+    function removeBlock(code) {
+      var el = document.getElementById('cs-psubj-' + domId(code));
+      if (el) el.remove();
+      delete pickers[code];
+    }
+
+    function renderPool(wrapId, poolKey) {
+      var wrap = document.getElementById(wrapId);
+      if (!wrap) return;
+      var pool = ((BOOT.pools || {})[poolKey]) || [];
+      wrap.innerHTML = '<div class="cs-subject-grid">' + pool.map(subjectCheckHtml).join('') + '</div>';
+      wrap.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('cs-subject-pick')) return;
+        var code = e.target.value;
+        var subj = pool.filter(function (s) { return s.code === code; })[0];
+        if (e.target.checked) {
+          addBlock(code, subj.name, [], { programs: subj.programs, termLabel: subj.term_label, bucket: poolKey });
+        } else {
+          var n = pickers[code] ? pickers[code].api.collect().length : 0;
+          if (n && !window.confirm('Remove ' + code + ' and its ' + n + ' skill' + (n === 1 ? '' : 's') + ' from your record?')) {
+            e.target.checked = true;
+            return;
+          }
+          removeBlock(code);
+        }
+      });
+    }
+
+    // filter box + running count over every subject list on the page
+    var filterInput = document.getElementById('professor-subject-filter');
+    var pickedCount = document.getElementById('professor-picked-count');
+    function updatePickedCount() {
+      if (!pickedCount) return;
+      var n = Object.keys(pickers).length;
+      pickedCount.textContent = n ? n + ' subject' + (n === 1 ? '' : 's') + ' selected' : 'No subjects selected yet';
+    }
+    if (filterInput) wireSubjectFilter(form, filterInput);
+    form.addEventListener('change', function (e) {
+      if (e.target.classList.contains('cs-subject-pick')) updatePickedCount();
+      if (e.target === filterInput || e.target.classList.contains('cs-tag-input') || e.target.closest('.cs-other') || e.target.id === 'professor-consent' || e.target.hasAttribute('data-mirror')) return;
+      markDirty();
+    });
+
+    function addCustom(subj, skills) {
+      var block = addBlock(subj.code, subj.name, skills, { tag: addedTag(subj.programs), removable: true, custom: true,
+                                                           programs: subj.programs, termLabel: 'Added by you', bucket: 'added' });
+      updatePickedCount();
+      return block;
+    }
+
+    // subjects that aren't in the lists (electives and the like)
+    var otherWrap = document.getElementById('professor-other-subject');
+    if (otherWrap) {
+      buildOtherSubjectForm(otherWrap, {
+        knownCodes: BOOT.knownCodes,
+        isTaken: function (code) { return !!pickers[code]; },
+        onAdd: function (subj) {
+          var block = addCustom(subj, []);
+          markDirty();
+          block.scrollIntoView({ block: 'nearest' });
+          var inp = qs('.cs-tag-input', block); if (inp) inp.focus();
+        }
+      });
+    }
+    blocksWrap.addEventListener('click', function (e) {
+      var btn = e.target.closest('.cs-remove-added');
+      if (!btn) return;
+      var block = btn.closest('.cs-subject-block');
+      var code = block.getAttribute('data-code');
+      var n = pickers[code] ? pickers[code].api.collect().length : 0;
+      if (n && !window.confirm('Remove ' + code + ' and its ' + n + ' skill' + (n === 1 ? '' : 's') + ' from your record?')) return;
+      removeBlock(code);
+      updatePickedCount();
+      markDirty();
+    });
+
+    renderPool('professor-current-subjects', 'current');
+    renderPool('professor-previous-subjects', 'previous_semester');
+    renderPool('professor-summer-subjects', 'previous_summer');
+
+    // pre-fill the saved record (or, on a first answer, the unfinished draft)
+    function fillSubjects(list, fromDraft) {
+      (list || []).forEach(function (s) {
+        if (s.custom) {
+          addCustom({ code: s.code, name: s.name, programs: s.programs || [] }, s.skills);
+        } else if (poolOf[s.code]) {
+          var box = qsa('.cs-subject-pick', form).filter(function (c) { return c.value === s.code; })[0];
+          if (box) box.checked = true;
+          var hit = poolOf[s.code];
+          addBlock(s.code, hit.subj.name, s.skills, { programs: hit.subj.programs, termLabel: hit.subj.term_label, bucket: hit.poolKey });
+        } else if (!fromDraft) {
+          // reported before, but not offered in this or last semester: kept until removed
+          addBlock(s.code, s.name, s.skills, { tag: '<span class="cs-added-tag">From your record</span>', removable: true });
+        }
+      });
+      updatePickedCount();
+    }
+    fillSubjects(BOOT.record, false);
+
+    var draft = surveyDraft(form, function () {
+      var consentBox = document.getElementById('professor-consent');
+      return {
+        consent: !!(consentBox && consentBox.checked),
+        subjects: qsa('.cs-subject-block', blocksWrap).map(function (b) {
+          var p = pickers[b.getAttribute('data-code')];
+          return { code: p.code, name: p.name, custom: p.custom, programs: p.programs, skills: p.api.collect() };
+        })
+      };
+    }, function (d) {
+      if (d.consent) writeFields({ 'professor-consent': true }, ['professor-consent']);
+      fillSubjects(d.subjects, true);
+    });
+
+    window.addEventListener('beforeunload', function (e) {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      setFormError('professor-error', '');
+      var levelError = missingLevelError(form);
+      if (levelError) { setFormError('professor-error', levelError); return; }
+
+      var consentBox = qs('#professor-consent', form);
+      if (consentBox && !consentBox.checked) {
+        setFormError('professor-error', 'Please tick “I have read the Data Privacy Notice” just above the Submit button.');
+        return;
+      }
+      var subjectKeys = qsa('.cs-subject-block', blocksWrap).map(function (b) { return b.getAttribute('data-code'); });
+      if (!subjectKeys.length) {
+        setFormError('professor-error', 'Please select at least one subject you currently teach or taught last semester.');
+        return;
+      }
+
+      var subjects = subjectKeys.map(function (key) {
+        var p = pickers[key];
+        var out = { code: p.code, name: p.name, programs: p.programs, term_label: p.termLabel, term_bucket: p.bucket, skills: p.api.collect() };
+        if (p.custom) out.custom = true;
+        return out;
+      });
+
+      // consent is given once; later saves carry it forward
+      var payload = { consent: true, subjects: subjects };
+      if (saveBtn) saveBtn.textContent = 'Saving…';
+
+      submitPayload(BOOT.submitUrl, form, payload, function (body) {
+        if (saveBtn) saveBtn.textContent = editing ? 'Save changes' : 'Submit survey';
+        if (!body || body.ok !== true) return;   // offline fallback: nothing saved on the server
+        dirty = false;
+        draft.clear();
+        if (body.created) {
+          showToast('Thank you! Your subjects and skills were saved. You can edit them here any time.');
+          setTimeout(function () { window.location.reload(); }, 1200);
+          return;
+        }
+        if (statusEl) { statusEl.classList.remove('is-dirty'); statusEl.textContent = 'Saved just now'; }
+        showToast('Your subjects and skills were saved.');
+      }, function (msg) {
+        if (saveBtn) saveBtn.textContent = editing ? 'Save changes' : 'Submit survey';
+        setFormError('professor-error', msg);
+      });
+    });
+  })();
+})();
