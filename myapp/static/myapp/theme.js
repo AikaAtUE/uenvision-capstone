@@ -17,7 +17,7 @@
 
   function pref() {
     var p = root.getAttribute('data-theme-pref');
-    return p === 'light' || p === 'dark' ? p : 'system';
+    return p === 'dark' || p === 'system' ? p : 'light';   // light unless they chose otherwise
   }
   function effective(p) {
     return p === 'dark' || (p === 'system' && media && media.matches) ? 'dark' : 'light';

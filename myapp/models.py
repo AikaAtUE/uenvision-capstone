@@ -80,9 +80,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # the sidebar knows whether to show one without loading the image itself.
     photo_updated = models.DateTimeField(null=True, blank=True)
     # Colour theme picked in Settings (or with the theme button in the top bar):
-    # "light", "dark", or "system" (follow the phone / computer setting).
+    # "light" (the default), "dark", or "system" (follow the phone / computer setting).
     THEMES = ("light", "dark", "system")
-    theme = models.CharField(max_length=10, default="system", blank=True)
+    theme = models.CharField(max_length=10, default="light", blank=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

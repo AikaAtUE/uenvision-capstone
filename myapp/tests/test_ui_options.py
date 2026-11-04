@@ -18,15 +18,27 @@ class ThemeTests(TestCase):
         self.user = make_user("fac@ue.edu.ph", CustomUser.Role.FACULTY)
         CurriculumSurveyResponse.objects.create(respondent_type="professor", user=self.user, data={"subjects": []})
 
-    def test_new_accounts_follow_the_system_setting(self):
-        self.assertEqual(self.user.theme, "system")
+    def test_new_accounts_start_in_light_mode(self):
+        self.assertEqual(self.user.theme, "light")
+        self.client.force_login(self.user)
+        self.assertContains(self.client.get(reverse("about")), 'data-theme-pref="light"')
+
+    def test_migration_moves_untouched_accounts_to_light(self):
+        from importlib import import_module
+        from django.apps import apps
+        CustomUser.objects.filter(pk=self.user.pk).update(theme="system")
+        dark = make_user("dark@ue.edu.ph", CustomUser.Role.FACULTY, theme="dark")
+        import_module("myapp.migrations.0016_theme_default_light").system_to_light(apps, None)
+        self.user.refresh_from_db(); dark.refresh_from_db()
+        self.assertEqual((self.user.theme, dark.theme), ("light", "dark"))
 
     def test_theme_is_set_in_the_head_before_the_page_draws(self):
         page = self.client.get(reverse("login")).content.decode()
         # anonymous pages fall back to the browser's last choice (localStorage)
         self.assertIn('data-theme-pref=""', page)
         self.assertLess(page.index("data-theme"), page.index("styles.css"))
-        self.assertIn("prefers-color-scheme: dark", page)
+        self.assertIn("prefers-color-scheme: dark", page)   # only used when "System" is picked
+        self.assertIn("if(p!=='dark'&&p!=='system')p='light';", page)   # no choice yet: light
         self.client.force_login(self.user)
         CustomUser.objects.filter(pk=self.user.pk).update(theme="dark")
         self.assertContains(self.client.get(reverse("about")), 'data-theme-pref="dark"')
@@ -37,7 +49,7 @@ class ThemeTests(TestCase):
         self.assertContains(page, 'id="appearance"')
         for value in ("light", "dark", "system"):
             self.assertContains(page, f'name="theme" value="{value}"')
-        self.assertContains(page, 'value="system" data-theme-choice checked')
+        self.assertContains(page, 'value="light" data-theme-choice checked')
 
     def test_saving_the_theme(self):
         self.client.force_login(self.user)

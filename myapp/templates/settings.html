@@ -96,12 +96,12 @@
         <legend>Colour theme</legend>
         {% for value, label in theme_choices %}
         <label class="theme-choice">
-          <input type="radio" name="theme" value="{{ value }}" data-theme-choice{% if user.theme|default:'system' == value %} checked{% endif %}>
+          <input type="radio" name="theme" value="{{ value }}" data-theme-choice{% if user.theme|default:'light' == value %} checked{% endif %}>
           <span>{{ label }}</span>
         </label>
         {% endfor %}
       </fieldset>
-      <small class="field-hint">System follows your phone or computer's light / dark setting. You can also switch with the moon / sun button at the top right of every page.</small>
+      <small class="field-hint">Light is the default. System follows your phone or computer's light / dark setting. You can also switch with the moon / sun button at the top right of every page.</small>
       <noscript><button type="submit" class="btn btn-navy">Save</button></noscript>
     </form>
 
