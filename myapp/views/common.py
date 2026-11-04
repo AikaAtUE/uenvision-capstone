@@ -42,6 +42,13 @@ def _sees_dummy_results(request):
     return user.is_dummy or (user.is_developer and bool(request.session.get(DEV_DUMMY_VIEW_KEY)))
 
 
+def _sees_student_view(request):
+    """Developers test both sides: with the Faculty / Student view switch on Student, the
+    Dashboard and Recommendations show the student / alumni skill gap page instead."""
+    from ..context_processors import DEV_STUDENT_VIEW_KEY
+    return request.user.is_developer and bool(request.session.get(DEV_STUDENT_VIEW_KEY))
+
+
 def _safe_json(obj):
     """mark_safe()'d JSON for embedding in a <script type="application/json">
     tag — escapes "</" so nothing in the data can break out of the tag."""

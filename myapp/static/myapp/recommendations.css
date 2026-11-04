@@ -1,5 +1,5 @@
 .rec-intro{margin-bottom:10px;}
-.rec-note, .rec-caveat{margin-bottom:14px; padding:10px 14px; border-radius:8px; background:#f7f7f8; font-weight:400;}
+.rec-note, .rec-caveat{margin-bottom:14px; padding:10px 14px; border-radius:8px; background:var(--input-bg); font-weight:400;}
 .rec-caveat{background:#fff8e1; color:var(--ink);}
 
 .rec-toolbar{
@@ -29,7 +29,7 @@
 .rec-skill-pick input{width:16px; height:16px;}
 .rec-skill-name{font-size:1rem;}
 .rec-skill-stats{font-size:.82rem;}
-.rec-pill-generated{background:#e1e7f4; color:var(--navy);}
+.rec-pill-generated{background:#e1e7f4; color:var(--navy-text);}
 
 .rec-resources{display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:12px; margin-top:12px;}
 .rec-card{display:flex; gap:10px; border:1px solid var(--line); border-radius:8px; padding:10px; align-items:flex-start;}

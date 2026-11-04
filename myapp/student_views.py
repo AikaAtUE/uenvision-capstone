@@ -179,6 +179,69 @@ def clean_learner_info(kind, post):
     return info, None
 
 
+def student_number_taken(number, exclude_pk=None, dummy=False):
+    """Another account already registered this student number (one account per student).
+    Dummy (test) accounts are only compared with each other, so they never block a real student."""
+    others = CustomUser.objects.filter(learner_info__student_number=number, is_dummy=dummy)
+    if exclude_pk is not None:
+        others = others.exclude(pk=exclude_pk)
+    return others.exists()
+
+
+STUDENT_NUMBER_TAKEN = ("Another account already uses this student number. Check that it is typed correctly, "
+                        "or log in to that account instead.")
+
+
+def clean_learner_names(post):
+    """First / middle / last name as typed on registration or "About you". -> (dict, error or None)"""
+    names = {k: " ".join(str(post.get(k) or "").split())[:MAX_NAME_LENGTH]
+             for k in ("first_name", "middle_name", "last_name")}
+    if not names["first_name"] or not names["last_name"]:
+        return names, "Please enter your first and last name."
+    return names, None
+
+
+def about_summary(user):
+    """What the survey's "About you" line shows, after an edit."""
+    info = user.learner_info or {}
+    year = str(info.get("year_level") or "")
+    suffix = {"1": "st", "2": "nd", "3": "rd"}.get(year, "th")
+    return {"name": user.get_full_name(), "email": user.email, "student_number": info.get("student_number", ""),
+            "course": info.get("course", ""), "year_label": f"{year}{suffix} Year" if year else "",
+            "section": info.get("section", ""), "year_graduated": info.get("year_graduated", "")}
+
+
+@login_required
+@require_POST
+def learner_about_save_view(request):
+    """The survey's "About you": a student / alumni saves corrected details to their account
+    right away (name, course, student number, year level + section or year graduated).
+    The email is changed in Settings instead, where it is checked and confirmed again."""
+    user = request.user
+    if not user.is_learner:
+        return JsonResponse({"ok": False, "error": "Only students and alumni have these details."}, status=403)
+    try:
+        post = json.loads(request.body or b"{}")
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Malformed request."}, status=400)
+    if not isinstance(post, dict):
+        return JsonResponse({"ok": False, "error": "Malformed request."}, status=400)
+    kind = "alumni" if user.role == CustomUser.Role.ALUMNI else "student"
+    names, error = clean_learner_names(post)
+    info = None
+    if not error:
+        info, error = clean_learner_info(kind, post)
+    if not error and student_number_taken(info["student_number"], exclude_pk=user.pk, dummy=user.is_dummy):
+        error = STUDENT_NUMBER_TAKEN
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    for field, value in names.items():
+        setattr(user, field, value)
+    user.learner_info = {**(user.learner_info or {}), **info}
+    user.save(update_fields=["first_name", "middle_name", "last_name", "learner_info"])
+    return JsonResponse({"ok": True, "about": about_summary(user)})
+
+
 def _valid_email(email):
     from django.core.exceptions import ValidationError
     from django.core.validators import validate_email
@@ -237,6 +300,8 @@ def register_view(request):
             error = f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
         elif password != password2:
             error = "Passwords do not match."
+    if not error and student_number_taken(info["student_number"]):
+        error = STUDENT_NUMBER_TAKEN
     if error:
         # what they typed stays in the form (never the passwords), so only the problem needs fixing
         form = {k: v for k, v in post.items() if k not in ("password", "password2", "csrfmiddlewaretoken")}
@@ -342,6 +407,37 @@ def _my_skills(user):
     return mine
 
 
+# What each level in the "You" column of My skill gap means. Introduced / Practiced / Applied
+# use the same words as the student / alumni survey (LEARNER_IPA_LEVELS in curriculum-survey.js)
+# so both pages explain the levels the same way. Order = order of the legend.
+YOU_LEVELS = [
+    ("applied", "Applied", "strong",
+     "You used it on your own in a graded output, such as a project, case study or capstone, where it was part "
+     "of what was assessed. Counts toward job readiness."),
+    ("practiced", "Practiced", "strong",
+     "You did it yourself in guided lab work, exercises, quizzes or assignments, with your teacher’s help "
+     "and feedback. Counts toward job readiness."),
+    ("introduced", "Introduced", "building",
+     "You first met the skill: it was explained or shown in lectures or readings, but you did not do it on your "
+     "own yet. Does not count toward job readiness yet."),
+    ("missing", "Not yet", "missing", "You haven’t reported this skill in any of your subjects."),
+]
+# Answers saved before the Introduced / Practiced / Applied levels (Beginner ... Expert).
+OLD_LEVEL_TEXT = {
+    "strong": "From an older survey answer (Intermediate or higher). Counts toward job readiness.",
+    "building": "From an older survey answer (Beginner). Does not count toward job readiness yet.",
+}
+_YOU_KEYS = {key for key, *_ in YOU_LEVELS}
+
+
+def _you_level_key(status, level):
+    """Which YOU_LEVELS entry (or "old_strong" / "old_building") explains this pill."""
+    if status == "missing":
+        return "missing"
+    level = str(level or "").lower()
+    return level if level in _YOU_KEYS else f"old_{status}"
+
+
 def _status(mine, key):
     m = mine.get(key)
     if not m:
@@ -351,6 +447,13 @@ def _status(mine, key):
 
 @login_required
 def student_dashboard_view(request):
+    return render_student_dashboard(request)
+
+
+def render_student_dashboard(request, active_page="student_dashboard"):
+    """The student / alumni skill gap page. Developers also get it on Dashboard and
+    Recommendations when their Faculty / Student view switch is on Student (active_page
+    then keeps that menu item highlighted)."""
     user = request.user
     feedback_nudge.record_use(user)
     has_survey = CurriculumSurveyResponse.objects.filter(user=user).exists()
@@ -360,9 +463,15 @@ def student_dashboard_view(request):
     compare = (role["skills"] if role else stats["overall"]["skills"]) if stats.get("exists") else []
     for s in compare:
         s["status"], s["my_level"] = _status(mine, s["key"])
+        s["level_key"] = _you_level_key(s["status"], s["my_level"])
     overall = stats["overall"]["skills"] if stats.get("exists") else []
     for s in overall:
         s["status"], s["my_level"] = _status(mine, s["key"])
+        s["level_key"] = _you_level_key(s["status"], s["my_level"])
+    level_text = {key: text for key, _, _, text in YOU_LEVELS}
+    level_text.update({f"old_{k}": v for k, v in OLD_LEVEL_TEXT.items()})
+    for s in list(compare) + list(overall):
+        s["level_text"] = level_text[s["level_key"]]
 
     have = sum(1 for s in compare if s["status"] == "strong")
     readiness = round(have / len(compare) * 100) if compare else None
@@ -372,7 +481,7 @@ def student_dashboard_view(request):
         s["cached_resources"] = cached.get(s["skill"].strip().lower(), [])
 
     return render(request, "student_dashboard.html", {
-        "active_page": "student_dashboard",
+        "active_page": active_page,
         "has_survey": has_survey,
         "survey_url": reverse("alumni_survey" if user.role == CustomUser.Role.ALUMNI else "student_survey"),
         "stats": stats,
@@ -383,6 +492,7 @@ def student_dashboard_view(request):
         "readiness": readiness,
         "have": have,
         "to_build": to_build,
+        "you_levels": [{"key": k, "label": label, "status": status, "text": text} for k, label, status, text in YOU_LEVELS],
         "my_skills": sorted(mine.values(), key=lambda m: (-m["weight"], m["skill"].lower())),
         "max_per_run": recommendations.MAX_SKILLS_PER_STUDENT_RUN,
         "default_photo": recommendations.DEFAULT_PHOTO,
@@ -395,7 +505,8 @@ def student_role_view(request):
     role = request.POST.get("role", "")
     request.user.target_role = role if role in job_roles.ROLE_LABELS else ""
     request.user.save(update_fields=["target_role"])
-    return redirect("student_dashboard")
+    # developers pick a role from the student view of their Dashboard
+    return redirect("student_dashboard" if request.user.is_learner else "dashboard")
 
 
 @login_required
@@ -494,8 +605,10 @@ def my_skills_view(request):
     user = request.user
     from . import views
 
-    if not user.is_learner:
-        return redirect("professor_survey")   # professors edit their record on the Professor Survey page
+    # Faculty and administrators edit their record on the Professor Survey page. Developers see
+    # both sides, so they also get it here, as Data > My subjects & skills (the professor version).
+    if not user.is_learner and not user.is_developer:
+        return redirect("professor_survey")
     response = latest_response(user)
     is_alumni = user.role == CustomUser.Role.ALUMNI
     professor = not user.is_learner

@@ -118,7 +118,8 @@ def _apply_account_info(request, payload, kind):
     """A registered student/alumni answers as their account: name and email come from it,
     and the rest of "About you" (which they may have corrected) is checked and saved back
     to the account. -> error message or None."""
-    from ..student_views import clean_learner_info
+    from ..student_views import (STUDENT_NUMBER_TAKEN, clean_learner_info, clean_learner_names,
+                                 student_number_taken)
 
     user = request.user
     if not user.is_learner:
@@ -127,12 +128,28 @@ def _apply_account_info(request, payload, kind):
     info, error = clean_learner_info(kind, sent)
     if error:
         return error
+    if student_number_taken(info["student_number"], exclude_pk=user.pk, dummy=user.is_dummy):
+        return STUDENT_NUMBER_TAKEN
+    fields = []
+    if any(k in sent for k in ("first_name", "last_name")):   # name edited under "About you"
+        names, error = clean_learner_names(sent)
+        if error:
+            return error
+        for field, value in names.items():
+            if getattr(user, field) != value:
+                setattr(user, field, value)
+                fields.append(field)
+    for k in ("first_name", "middle_name", "last_name"):
+        sent.pop(k, None)
+    if user.learner_info != info:
+        user.learner_info = info
+        fields.append("learner_info")
+    if fields:
+        user.save(update_fields=fields)
+    # the email is the account's (changed in Settings, where it is confirmed again)
     payload["personal_info"] = {**sent, **info, "name": user.get_full_name(), "ue_email": user.email}
     if kind == "student":
         payload["personal_info"]["year_level"] = int(info["year_level"])
-    if user.learner_info != info:
-        user.learner_info = info
-        user.save(update_fields=["learner_info"])
     return None
 
 
@@ -311,6 +328,7 @@ def _prefill(user):
     needed = ("student_number", "course") + (("year_graduated",) if user.role == user.Role.ALUMNI
                                              else ("year_level", "section"))
     return {**info, "name": user.get_full_name(), "email": user.email,
+            "first_name": user.first_name, "middle_name": user.middle_name, "last_name": user.last_name,
             "year_label": f"{year}{suffix} Year" if year else "",
             # accounts an administrator made have no details yet: then the fields show open
             "complete": all(info.get(k) for k in needed)}

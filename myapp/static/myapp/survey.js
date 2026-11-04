@@ -67,6 +67,21 @@
     'I would use UEnvision as part of my work.'
   ];
 
+  // UAT for students and alumni (#uat-questions[data-audience="learner"]): the same ten
+  // 1-5 statements and scoring, about their side of UEnvision. Same count as UAT_QUESTIONS.
+  var UAT_QUESTIONS_STUDENT = [
+    'Overall, I am satisfied with UEnvision.',
+    'UEnvision helps me know which skills IT job postings ask for.',
+    'My skill gap page clearly shows which in-demand skills I already have and which I still need.',
+    'The job readiness score and skill comparison are easy to understand.',
+    'The learning resources suggested for my skill gaps are useful to me.',
+    'Answering the survey and updating My subjects & skills is easy.',
+    'I trust the results that UEnvision shows.',
+    'The look and layout of UEnvision are pleasant.',
+    'UEnvision responds quickly when I use it.',
+    'I would recommend UEnvision to other students and fresh graduates.'
+  ];
+
   // Each case is one scenario paragraph: what the tester does and what should happen,
   // per the adviser (no separate "expected process" / "expected output" columns).
   var FUNCTIONAL_DEFAULT_ROWS = [
@@ -195,12 +210,13 @@
   /* ---------- UAT ---------- */
   function initUatForm() {
     var container = qs('#uat-questions');
-    if (container && !container.childElementCount) container.innerHTML = likertHtml(UAT_QUESTIONS, 'uat');
+    var questions = container && container.dataset.audience === 'learner' ? UAT_QUESTIONS_STUDENT : UAT_QUESTIONS;
+    if (container && !container.childElementCount) container.innerHTML = likertHtml(questions, 'uat');
     var form = qs('#uat-form');
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('uat-error', '');
-      var answers = readLikert('uat', UAT_QUESTIONS.length);
+      var answers = readLikert('uat', questions.length);
       if (!answers) { setFormError('uat-error', 'Please answer every statement before submitting.'); return; }
       var payload = { comments: qs('#uat-comments').value.trim() || null };
       answers.forEach(function (value, i) { payload['q' + (i + 1)] = value; });

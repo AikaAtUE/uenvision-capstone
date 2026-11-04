@@ -10,30 +10,32 @@
       <h2 class="section-title" style="margin:0">Manage accounts</h2>
       <button type="button" class="btn btn-navy btn-sm" id="add-account-btn">+ Add account</button>
     </div>
-    {% if pending_count and status != "pending" %}
-    <p class="acct-pending-note"><strong>{{ pending_count }} faculty sign-up{{ pending_count|pluralize }}</strong> not approved yet. They can already use UEnvision. Approve the real faculty, and remove anyone who isn't (their survey answers are removed too). <a class="link-inline" href="?status=pending">Review</a></p>
+    {% if pending_count and state != "pending" %}
+    <p class="acct-pending-note"><strong>{{ pending_count }} faculty sign-up{{ pending_count|pluralize }}</strong> not approved yet. They can already use UEnvision. Approve the real faculty, and remove anyone who isn't (their survey answers are removed too). <a class="link-inline" href="?state=pending">Review</a></p>
     {% endif %}
-    <form class="data-toolbar acct-filters" method="get" action="{% url 'accounts' %}">
+    {# Search here; role, status, real/dummy and sort live in the Filter drawer (the same drawer as the Dashboard's). #}
+    <form class="acct-toolbar" method="get" action="{% url 'accounts' %}" role="search">
       <label class="select-field select-field--grow">
         <span>Search</span>
         <input type="search" name="q" value="{{ q }}" placeholder="Name or email" autocomplete="off">
       </label>
-      <label class="select-field">
-        <span>Sort by</span>
-        <select name="sort" onchange="this.form.submit()">
-          {% for value, label in sort_choices %}<option value="{{ value }}"{% if value == sort %} selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select>
-      </label>
-      <label class="select-field">
-        <span>Show</span>
-        <select name="status" onchange="this.form.submit()">
-          {% for value, label in status_choices %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}{% if value == "pending" and pending_count %} ({{ pending_count }}){% endif %}</option>{% endfor %}
-        </select>
-      </label>
+      {% if role %}<input type="hidden" name="role" value="{{ role }}">{% endif %}
+      {% if state %}<input type="hidden" name="state" value="{{ state }}">{% endif %}
+      {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+      {% if sort %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
       <button type="submit" class="btn btn-navy btn-sm">Search</button>
-      {% if q or status or sort %}<a class="link-inline acct-clear" href="{% url 'accounts' %}">Clear</a>{% endif %}
+      <button type="button" class="btn btn-ghost btn-sm" id="acct-filter-btn" aria-controls="acct-filter-drawer" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Filter <span class="filter-count" id="acct-filter-count"{% if not filter_count %} hidden{% endif %}>{{ filter_count }}</span>
+      </button>
+      {% if q or filter_count %}<a class="link-inline acct-clear" href="{% url 'accounts' %}">Clear all</a>{% endif %}
     </form>
-    <p class="muted table-count">{% if q or status %}{{ accounts|length }} of {{ total_count }} accounts{% else %}{{ accounts|length }} account{{ accounts|length|pluralize }}{% endif %}</p>
+    {% if filter_chips %}
+    <p class="acct-chips" aria-label="Filters in use">Showing:
+      {% for label, url in filter_chips %}<a class="acct-chip" href="{{ url }}" aria-label="Remove filter: {{ label }}">{{ label }} <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></a>{% endfor %}
+    </p>
+    {% endif %}
+    <p class="muted table-count">{% if q or filter_count %}{{ accounts|length }} of {{ total_count }} accounts{% else %}{{ accounts|length }} account{{ accounts|length|pluralize }}{% endif %}</p>
 
     <div class="table-wrap">
       <table id="accounts-table">
@@ -71,6 +73,42 @@
 {% endblock %}
 
 {% block extra_partials %}
+{# Filter drawer: same look as the Dashboard's (_filter_drawer.html). Apply reloads the page with the filters in the URL. #}
+<div class="drawer-backdrop" id="acct-filter-backdrop"></div>
+<aside class="drawer" id="acct-filter-drawer" aria-label="Account filters" aria-hidden="true" tabindex="-1">
+  <form method="get" action="{% url 'accounts' %}" id="acct-filter-form" style="display:contents">
+    {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+    <div class="drawer-head">
+      <button type="button" class="drawer-close" id="acct-filter-close" aria-label="Close filters">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <h3>Filters</h3>
+      <button type="button" class="link-inline" id="acct-filter-reset">Reset all</button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <h4>Who</h4>
+        <label class="select-field"><span>Role</span>
+          <select name="role">{% for value, label in role_choices %}<option value="{{ value }}"{% if value == role %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label class="select-field"><span>Real or dummy</span>
+          <select name="kind">{% for value, label in kind_choices %}<option value="{{ value }}"{% if value == kind %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      </div>
+      <div class="drawer-section">
+        <h4>Status</h4>
+        <label class="select-field"><span>Account status</span>
+          <select name="state">{% for value, label in state_choices %}<option value="{{ value }}"{% if value == state %} selected{% endif %}>{{ label }}{% if value == "pending" and pending_count %} ({{ pending_count }}){% endif %}</option>{% endfor %}</select></label>
+      </div>
+      <div class="drawer-section">
+        <h4>Order</h4>
+        <label class="select-field"><span>Sort by</span>
+          <select name="sort">{% for value, label in sort_choices %}<option value="{{ value }}"{% if value == sort %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button type="submit" class="btn btn-navy btn-block">Apply filters</button>
+    </div>
+  </form>
+</aside>
 {# Shared hidden form used by Reset password / Remove (action URL is set by accounts.js) #}
 <form id="action-form" method="post" hidden>{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
 

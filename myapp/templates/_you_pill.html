@@ -1,0 +1,2 @@
+{# One pill in the "You" column of My skill gap. Its meaning shows on hover, keyboard focus and tap (see student_dashboard.html). #}
+<span class="sd-tip"><button type="button" class="sd-pill sd-pill--{{ s.status }} sd-tip-btn" aria-expanded="false" aria-describedby="{{ tip_prefix }}-{{ tip_n }}">{% if s.status == "missing" %}Not yet{% else %}{{ s.my_level|default:"Reported" }}{% endif %}</button><span class="sd-tip-text" role="tooltip" id="{{ tip_prefix }}-{{ tip_n }}">{{ s.level_text }}</span></span>

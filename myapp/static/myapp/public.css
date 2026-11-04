@@ -1,5 +1,5 @@
 /* Public pages: homepage, "check your skill gap", registration */
-.pub-header{display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:#fff; border-bottom:1px solid var(--line);}
+.pub-header{display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:var(--surface); border-bottom:1px solid var(--line);}
 .pub-brand{display:flex; align-items:center;}
 .pub-logo{height:40px; width:auto;}
 .pub-nav{display:flex; gap:10px;}
@@ -49,18 +49,18 @@
 .pub-intro p{color:var(--muted); line-height:1.55; margin:0 0 8px;}
 .pub-steps{margin:0; padding-left:20px; display:grid; gap:4px; line-height:1.5;}
 .pub-choice{grid-template-columns:repeat(3, 1fr);}
-.pub-choice-card--none{border-style:dashed; border-color:var(--line, #e4e2dc);}
-.pub-choice-card--none:hover{border-color:var(--line, #e4e2dc);}
+.pub-choice-card--none{border-style:dashed; border-color:var(--line, var(--line));}
+.pub-choice-card--none:hover{border-color:var(--line, var(--line));}
 @media (max-width: 860px){ .pub-choice{grid-template-columns:1fr;} }
 .pub-choice-card--none span strong{font-family:inherit; font-size:inherit;}
 
 /* Student / alumni registration (comes before the survey) */
 .reg-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 8px; padding: 0; margin: 0 0 14px; counter-reset: reg; font-size: .85rem; }
 .reg-steps li { counter-increment: reg; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: #eef0f4; color: var(--muted, #5b6472); }
-.reg-steps li::before { content: counter(reg); display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fff; font-weight: 700; font-size: .75rem; }
+.reg-steps li::before { content: counter(reg); display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); font-weight: 700; font-size: .75rem; }
 .reg-steps li.is-done::before { content: "\2713"; background: #1f7a4d; color: #fff; }
 .reg-steps li.is-current { background: var(--navy, #16233f); color: #fff; }
-.reg-steps li.is-current::before { color: var(--navy, #16233f); }
+.reg-steps li.is-current::before { color: var(--navy-text); }
 .pub-register .reg-form { max-width: none; }
 .reg-form .cs-privacy { margin-top: 4px; }
 .reg-h { font-size: 1rem; margin: 10px 0 2px; }

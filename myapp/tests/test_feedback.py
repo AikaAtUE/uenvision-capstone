@@ -193,11 +193,11 @@ class FeedbackNudgeTests(TestCase):
         CustomUser.objects.filter(pk=self.user.pk).update(feedback_snoozed_until=None)
         self.assertContains(self.client.get(reverse("about")), "Help us evaluate UEnvision")
 
-    def test_students_are_only_asked_for_the_sus(self):
+    def test_students_are_asked_for_the_sus_and_their_uat(self):
         from ..feedback_nudge import missing_surveys
         student = CustomUser.objects.create_user(email="stu@ue.edu.ph", password="x" * 12, first_name="S",
                                                  last_name="T", role="student")
-        self.assertEqual([k for k, _ in missing_surveys(student)], ["sus"])
+        self.assertEqual([k for k, _ in missing_surveys(student)], ["sus", "uat"])   # no functional sheet
 
 
 class FunctionalSheetTests(TestCase):
@@ -219,9 +219,11 @@ class FunctionalSheetTests(TestCase):
 
     def test_uat_has_no_login_question(self):
         js = self.js()
-        block = js[js.index("var UAT_QUESTIONS"):js.index("var FUNCTIONAL_DEFAULT_ROWS")]
-        self.assertNotIn("Logging in", block)
-        self.assertEqual(block.count("'") // 2, 10)    # ten Likert statements
+        for name in ("var UAT_QUESTIONS = [", "var UAT_QUESTIONS_STUDENT = ["):
+            start = js.index(name)
+            block = js[start:js.index("];", start)]
+            self.assertNotIn("Logging in", block)
+            self.assertEqual(block.count("'") // 2, 10, name)    # ten Likert statements each
 
     def test_sheet_explains_what_it_is_for(self):
         user = CustomUser.objects.create_user(email="f@ue.edu.ph", password="secret123", first_name="F", last_name="A")

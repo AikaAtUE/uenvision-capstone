@@ -2,7 +2,7 @@ from django.conf import settings as django_settings
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -31,7 +31,31 @@ def about_view(request):
 @login_required
 def settings_view(request):
     return render(request, "settings.html", {"active_page": "settings", "min_password_length": MIN_PASSWORD_LENGTH,
-                                             "edit_account": request.GET.get("edit") == "1"})
+                                             "edit_account": request.GET.get("edit") == "1",
+                                             "theme_choices": THEME_CHOICES})
+
+
+THEME_CHOICES = [("light", "Light"), ("dark", "Dark"), ("system", "System")]
+
+
+@login_required
+@require_POST
+def theme_save_view(request):
+    """Settings > Appearance and the top-bar light/dark button: Light, Dark or System.
+    theme.js posts it in the background (JSON back); without JavaScript the Settings form
+    posts it and comes back to Settings."""
+    theme = request.POST.get("theme", "")
+    if theme not in request.user.THEMES:
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Choose light, dark or system."}, status=400)
+        messages.error(request, "Choose light, dark or system.")
+        return redirect("settings")
+    request.user.theme = theme
+    request.user.save(update_fields=["theme"])
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "theme": theme})
+    messages.success(request, "Appearance saved.")
+    return redirect(reverse("settings") + "#appearance")
 
 
 @login_required

@@ -86,6 +86,7 @@ class SurveyTrackerTests(TestCase):
         from django.core import mail
         from ..models import CurriculumSurveyResponse
         SurveyResponse.objects.create(survey_type="sus", user=self.stu, data={})
+        SurveyResponse.objects.create(survey_type="uat", user=self.stu, data={})   # students have their own UAT
         CurriculumSurveyResponse.objects.create(respondent_type="student", user=self.stu, data={})
         self.client.force_login(self.dev)
         page = self.client.get(reverse("survey_tracker"))

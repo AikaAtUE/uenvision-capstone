@@ -15,6 +15,7 @@
       surveyDraft = CS.surveyDraft,
       readFields = CS.readFields,
       writeFields = CS.writeFields,
+      aboutNames = CS.aboutNames || function () { return {}; },
       pickSubject = CS.pickSubject,
       addSkills = CS.addSkills,
       buildSkillPicker = CS.buildSkillPicker,
@@ -301,7 +302,7 @@
 
       var payload = {
         consent: true,
-        personal_info: { name: name, ue_email: email, course: course, student_number: studentNumber, year_level: Number(year), section: section },
+        personal_info: Object.assign({ name: name, ue_email: email, course: course, student_number: studentNumber, year_level: Number(year), section: section }, aboutNames()),
         has_previous: hasPrevious,
         target_role: BOOT.targetRole || '',
         subjects: subjects

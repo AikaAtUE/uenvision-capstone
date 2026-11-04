@@ -5,9 +5,9 @@
 #filter-drawer .select-field:last-child{margin-bottom:0;}
 #filter-drawer .select-field select, #filter-drawer .select-field input{width:100%; min-width:0;}
 #filter-drawer .select-field input{
-  padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:#f7f7f8; font:inherit;
+  padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:var(--input-bg); font:inherit;
 }
-#filter-drawer .select-field input:focus{background:#fff; border-color:var(--navy); outline:none;}
+#filter-drawer .select-field input:focus{background:var(--surface); border-color:var(--navy); outline:none;}
 .drawer-hint{font-size:.78rem; color:var(--muted); margin-top:6px;}
 .filter-count{
   display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px;
@@ -36,13 +36,13 @@
 
 .trend-wrap{position:relative;}
 .trend-svg{width:100%; height:auto; display:block; touch-action:pan-y;}
-.trend-svg text{font-family:inherit; font-size:11px; fill:#6b7280;}
-.trend-svg .grid{stroke:#e4e2dc; stroke-width:1;}
+.trend-svg text{font-family:inherit; font-size:11px; fill:var(--muted);}
+.trend-svg .grid{stroke:var(--line); stroke-width:1;}
 .trend-svg .guide{stroke:#9aa0ad; stroke-width:1; stroke-dasharray:3 3;}
 .trend-svg .line{fill:none; stroke-width:2.4; stroke-linejoin:round; stroke-linecap:round; transition:opacity .12s;}
 .trend-svg .line.is-dim{opacity:.15;}
 .trend-tip{
-  position:absolute; pointer-events:none; background:#fff; border:1px solid var(--line); border-radius:8px;
+  position:absolute; pointer-events:none; background:var(--surface); border:1px solid var(--line); border-radius:8px;
   box-shadow:0 6px 18px rgba(22,35,63,.14); padding:9px 11px; font-size:.78rem; min-width:150px; z-index:5;
 }
 .trend-tip strong{display:block; margin-bottom:5px; color:var(--ink);}
@@ -108,7 +108,7 @@
 .cmp-skills{font-size:.8rem; color:var(--muted); margin:0;}
 .cmp-table{min-width:640px;}
 .cmp-table th:nth-child(n){width:auto;}
-.cmp-cat th{background:#f6f7f9; font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); border-bottom:1px solid var(--line);}
+.cmp-cat th{background:var(--soft); font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); border-bottom:1px solid var(--line);}
 .cmp-missing{color:var(--red);}
 #filter-drawer:focus{outline:none;}
 
@@ -119,6 +119,6 @@
 .training-overview > .muted{margin:4px 0 10px; font-size:.86rem;}
 .training-list{margin:0; padding-left:22px; display:grid; gap:8px;}
 .training-list li{line-height:1.4;}
-.training-skill{display:inline-block; min-width:120px; font-weight:700; color:var(--navy); margin-right:8px;}
+.training-skill{display:inline-block; min-width:120px; font-weight:700; color:var(--navy-text); margin-right:8px;}
 .training-name{font-weight:600; margin-right:8px; overflow-wrap:anywhere;}
 .training-meta{font-size:.82rem;}

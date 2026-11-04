@@ -1,9 +1,13 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme-pref="{% if user.is_authenticated %}{{ user.theme|default:'system' }}{% endif %}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{# Light / Dark / System colours, set before the stylesheet loads so the page never flashes the wrong colours. #}
+{# Logged-in users: the choice saved on their account (Settings). Otherwise: the last choice made in this browser. #}
+<script>(function(){var d=document.documentElement,p=d.getAttribute('data-theme-pref');try{if(p){localStorage.setItem('ue_theme',p);}else{p=localStorage.getItem('ue_theme');}}catch(e){}if(p!=='light'&&p!=='dark')p='system';var dark=p==='dark'||(p==='system'&&!!window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);d.setAttribute('data-theme-pref',p);d.setAttribute('data-theme',dark?'dark':'light');d.style.colorScheme=dark?'dark':'light';})();</script>
+<meta name="color-scheme" content="light dark">
 <title>{% block title %}UEnvision{% endblock %} — Curriculum Mapping System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +38,8 @@
 <div class="toast" id="toast"></div>
 
 <script src="{% static 'myapp/script.js' %}?v={% now 'U' %}"></script>
+<script src="{% static 'myapp/theme.js' %}?v={% now 'U' %}"{% if user.is_authenticated %} data-save-url="{% url 'theme_save' %}" data-csrf="{{ csrf_token }}"{% endif %}></script>
+<script src="{% static 'myapp/password-toggle.js' %}?v={% now 'U' %}"></script>
 <script src="{% static 'myapp/welcome-tips.js' %}?v={% now 'U' %}"></script>
 {% if user.is_administrator %}<script src="{% static 'myapp/notif-bell.js' %}?v={% now 'U' %}"></script>{% endif %}
 {% if user.is_authenticated %}

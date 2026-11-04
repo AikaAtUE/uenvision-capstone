@@ -19,7 +19,10 @@
 
   const kindWords = d => (d.kind === 'all' ? 'hard and soft' : d.kind === 'soft' ? 'soft' : 'hard');
   const monthLabel = m => MONTHS[+m.slice(5) - 1] + ' ' + m.slice(0, 4);
-  const colorOf = i => COLORS[i % COLORS.length];
+  // In dark mode the navy series would vanish into the background, so it is drawn lighter.
+  const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+  const themed = c => (c === '#16233f' && isDark() ? '#8fa6dc' : c);
+  const colorOf = i => themed(COLORS[i % COLORS.length]);
   const dashOf = i => (Math.floor(i / COLORS.length) % 2 ? '6 4' : null);
 
   function el(tag, attrs, text) {
@@ -98,7 +101,7 @@
   // Each bar is split by job board; Trabajo and Kalibrr keep the same colour on every filter.
   const SOURCE_COLORS = { trabajo: '#c8202f', kalibrr: '#16233f' };
   const sourceLabel = s => (s ? cap(s) : 'Other');
-  function sourceColor(s, i) { return SOURCE_COLORS[s] || COLORS[(i + 2) % COLORS.length]; }
+  function sourceColor(s, i) { return themed(SOURCE_COLORS[s] || COLORS[(i + 2) % COLORS.length]); }
 
   function drawSourceKey(sources) {
     const key = $('bar-source-key');
@@ -465,6 +468,8 @@
       })
       .catch(() => { if (my === reqId) errEl.textContent = 'Could not reach the server. Try again.'; });
   }
+  // Light / dark switched while the charts are showing: redraw them in the new colours.
+  window.addEventListener('ue:themechange', () => { if (data) { drawBars(data); drawTrend(data); } });
 
   /* ---------------- Filter drawer ---------------- */
   // The controls sit in the Filter drawer. Nothing reloads until "Apply filters"; closing

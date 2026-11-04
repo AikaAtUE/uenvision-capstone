@@ -274,7 +274,7 @@ class StudentFlowTests(IsolatedDataMixin, TestCase):
         self.assertEqual(user.learner_info, {"student_number": "2023-1", "course": "BSIT",
                                              "year_level": "1", "section": "TN11"})
         survey = self.client.get(reverse("student_survey"))
-        self.assertContains(survey, "From your registration.")
+        self.assertContains(survey, "Saved on your account.")
         self.assertContains(survey, 'value="2023-1"')
         self.assertContains(self.register(email="other@ue.edu.ph"), "", status_code=302)   # logged in: straight to the survey
 
@@ -327,8 +327,11 @@ class StudentFlowTests(IsolatedDataMixin, TestCase):
             self.assertRedirects(self.client.get(reverse(name)), reverse("student_dashboard"),
                                  fetch_redirect_response=False)
         self.assertEqual(self.client.get(reverse("feedback")).status_code, 200)
-        self.assertNotContains(self.client.get(reverse("feedback")), "data-survey=\"uat\"")
-        r = self.client.post(reverse("survey_submit"), data=json.dumps({"type": "uat", "rows": [{}]}),
+        # students and alumni answer the SUS and their own UAT, but not the functional test sheet
+        page = self.client.get(reverse("feedback"))
+        self.assertContains(page, "data-survey=\"uat\"")
+        self.assertNotContains(page, "data-survey=\"functional\"")
+        r = self.client.post(reverse("survey_submit"), data=json.dumps({"type": "functional", "rows": [{}]}),
                              content_type="application/json")
         self.assertEqual(r.status_code, 403)
         # a logged-in learner retaking the survey is linked directly

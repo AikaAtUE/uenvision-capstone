@@ -15,6 +15,7 @@
       surveyDraft = CS.surveyDraft,
       readFields = CS.readFields,
       writeFields = CS.writeFields,
+      aboutNames = CS.aboutNames || function () { return {}; },
       readRadios = CS.readRadios,
       writeRadios = CS.writeRadios,
       pickSubject = CS.pickSubject,
@@ -326,7 +327,7 @@
 
       var payload = {
         consent: true,
-        personal_info: { name: name, ue_email: email, course: course, student_number: studentNumber, year_graduated: yearGraduated },
+        personal_info: Object.assign({ name: name, ue_email: email, course: course, student_number: studentNumber, year_graduated: yearGraduated }, aboutNames()),
         target_role: BOOT.targetRole || '',
         last_semester: { program: course, term_key: termSel.value, term_label: (((BOOT.termsByProgram || {})[course] || []).filter(function (t) { return t.key === termSel.value; })[0] || {}).label },
         subjects: subjects,

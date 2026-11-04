@@ -57,3 +57,29 @@
 .sd-callout--verify{background:#fff8e6; border:1px solid #f1d58a;}
 .sd-callout--verify p{flex:1; min-width:240px; margin:0; line-height:1.5;}
 .sd-callout--verify form{margin:0;}
+/* "You" column: what the levels mean (legend above the tables + a tip on every pill) */
+.sd-legend{background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow-card); padding:14px 18px; margin-bottom:20px; font-size:.85rem;}
+.sd-legend-title{margin:0 0 10px; line-height:1.5;}
+.sd-legend-list{list-style:none; margin:0; padding:0; display:grid; gap:8px;}
+.sd-legend-list li{display:grid; grid-template-columns:96px 1fr; gap:10px; align-items:start; line-height:1.45;}
+.sd-legend-list .sd-pill{justify-self:start; text-align:center;}
+button.sd-pill{border:0; font-family:inherit; cursor:help; line-height:inherit;}
+button.sd-pill:focus-visible{outline:2px solid var(--navy-text); outline-offset:2px;}
+.sd-tip{position:relative; display:inline-block;}
+.sd-info-btn{border:0; background:none; padding:0 2px; margin-left:2px; color:var(--muted); font:inherit; font-size:.95em; cursor:help; min-width:24px; min-height:24px;}
+.sd-info-btn:hover, .sd-info-btn:focus-visible{color:var(--ink);}
+.sd-tip-text{
+  display:none; position:absolute; right:0; top:calc(100% + 6px); z-index:20; width:max-content; max-width:min(260px, 78vw);
+  background:#16233f; color:#fff; padding:8px 10px; border-radius:8px; font-size:.78rem; font-weight:500; line-height:1.4;
+  text-align:left; white-space:normal; text-transform:none; letter-spacing:0; box-shadow:0 8px 20px rgba(0,0,0,.22);
+}
+.sd-tip--info .sd-tip-text{left:0; right:auto;}
+.sd-tip.is-open .sd-tip-text, .sd-tip:focus-within .sd-tip-text{display:block;}
+@media (hover: hover){ .sd-tip:hover .sd-tip-text{display:block;} }
+:root[data-theme="dark"] .sd-tip-text{background:#2a3654; border:1px solid var(--line); box-shadow:0 8px 20px rgba(0,0,0,.5);}
+@media (max-width: 640px){
+  .sd-legend{padding:12px 14px;}
+  .sd-legend-list li{grid-template-columns:1fr; gap:4px;}
+  .sd-tip--info .sd-tip-text{left:auto; right:0;}
+  .sd-table th.sd-you-th{white-space:nowrap;}
+}

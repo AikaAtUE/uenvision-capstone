@@ -13,9 +13,9 @@ from django.urls import Resolver404, resolve, reverse
 LEARNER_URL_NAMES = {
     "home", "role_skills", "check_gap", "skill_search", "skill_add", "register", "login", "logout",
     "student_dashboard", "student_role", "student_generate", "my_skills", "my_skills_save",
-    "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
+    "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit", "learner_about_save",
     "feedback", "survey_submit", "feedback_later", "about", "help", "settings", "change_password", "session_ping",
-    "update_account", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+    "update_account", "theme_save", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
     "profile_photo", "profile_photo_upload",
 }
 
@@ -88,7 +88,7 @@ class IdleTimeoutMiddleware:
 # What a user with a temporary password (set by an administrator) can open until they choose their own.
 PASSWORD_CHANGE_URL_NAMES = {
     "settings", "change_password", "logout", "login", "session_ping", "verify_email", "resend_verification",
-    "forgot_password", "reset_password", "reset_password_confirm", "profile_photo",
+    "forgot_password", "reset_password", "reset_password_confirm", "profile_photo", "theme_save",
 }
 
 
@@ -116,7 +116,7 @@ class ForcePasswordChangeMiddleware:
 PROFESSOR_SURVEY_URL_NAMES = {
     "professor_survey", "professor_survey_submit", "skill_search", "skill_add",
     "settings", "change_password", "logout", "login", "session_ping", "help", "about",
-    "update_account", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+    "update_account", "theme_save", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
     "profile_photo", "profile_photo_upload",
 }
 
@@ -154,10 +154,10 @@ class ProfessorSurveyFirstMiddleware:
 # subjects & skills, Feedback, ...) sends them to the survey first: they register, answer
 # the survey, and only then see their dashboard. Dummy (test) students are left out.
 LEARNER_SURVEY_URL_NAMES = {
-    "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
+    "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit", "learner_about_save",
     "skill_search", "skill_add", "home", "role_skills", "check_gap", "register",
     "settings", "change_password", "logout", "login", "session_ping", "help", "about",
-    "update_account", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+    "update_account", "theme_save", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
     "profile_photo", "profile_photo_upload",
 }
 

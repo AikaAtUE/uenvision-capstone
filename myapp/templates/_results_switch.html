@@ -1,8 +1,21 @@
-{# Developers only: switch the dashboard / recommendations between real results and dummy (test) results. #}
+{% comment %}Developers only (they test both the faculty and the student side):
+   * Faculty / Student view: Dashboard and Recommendations show the faculty pages, or what a student sees
+     (the student skill gap page with its learning resources).
+   * Real / Dummy results: the faculty dashboard / recommendations from real or dummy (test) answers.
+     The student view doesn't use survey results from other people, so this one is only shown in the faculty view.{% endcomment %}
 {% if user.is_developer %}
+<div class="dev-switches">
+<form class="results-switch" method="post" action="{% url 'developer_results' %}" aria-label="Whose view to show">
+  {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <button type="submit" name="view" value="faculty" class="results-switch-btn{% if not dev_student_view %} is-active{% endif %}"{% if not dev_student_view %} aria-pressed="true"{% else %} aria-pressed="false"{% endif %}>Faculty view</button>
+  <button type="submit" name="view" value="student" class="results-switch-btn{% if dev_student_view %} is-active{% endif %}"{% if dev_student_view %} aria-pressed="true"{% else %} aria-pressed="false"{% endif %}>Student view</button>
+</form>
+{% if not dev_student_view %}
 <form class="results-switch" method="post" action="{% url 'developer_results' %}" aria-label="Which results to show">
   {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
   <button type="submit" name="results" value="real" class="results-switch-btn{% if not dev_dummy_view %} is-active{% endif %}"{% if not dev_dummy_view %} aria-pressed="true"{% else %} aria-pressed="false"{% endif %}>Real results</button>
   <button type="submit" name="results" value="dummy" class="results-switch-btn{% if dev_dummy_view %} is-active{% endif %}"{% if dev_dummy_view %} aria-pressed="true"{% else %} aria-pressed="false"{% endif %}>Dummy results</button>
 </form>
+{% endif %}
+</div>
 {% endif %}

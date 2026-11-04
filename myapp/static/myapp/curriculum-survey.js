@@ -35,6 +35,51 @@
     });
   });
 
+  /* "About you" (registered students / alumni): "Save my details" saves the edited name,
+     course, student number, ... to their account right away (student_views.learner_about_save_view),
+     then updates the summary line, so the summary, the fields and the account always match.
+     The email is changed in Settings instead (it is the login and gets confirmed again). */
+  function aboutValues() {
+    var out = {};
+    Array.prototype.forEach.call(document.querySelectorAll('[data-about-field]'), function (el) {
+      out[el.getAttribute('data-about-field')] = el.value.trim();
+    });
+    return out;
+  }
+  // The edited name parts, sent with the survey too (so edits count even without pressing Save).
+  function aboutNames() {
+    var v = aboutValues(), out = {};
+    ['first_name', 'middle_name', 'last_name'].forEach(function (k) { if (k in v) out[k] = v[k]; });
+    return out;
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-about-save]'), function (btn) {
+    var status = btn.parentNode.querySelector('.cs-about-status');
+    btn.addEventListener('click', function () {
+      var tokenInput = document.querySelector('input[name=csrfmiddlewaretoken]');
+      if (status) { status.textContent = 'Saving…'; status.classList.remove('is-error'); }
+      btn.disabled = true;
+      fetch(btn.getAttribute('data-about-save'), {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': tokenInput ? tokenInput.value : '' },
+        body: JSON.stringify(aboutValues())
+      }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok && j.ok, j: j }; }); })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.j.error || 'Could not save your details.');
+          var about = res.j.about || {};
+          Array.prototype.forEach.call(document.querySelectorAll('[data-about]'), function (el) {
+            var k = el.getAttribute('data-about');
+            if (k in about) el.textContent = about[k];
+          });
+          Array.prototype.forEach.call(document.querySelectorAll('[data-about-name]'), function (el) { el.value = about.name || el.value; });
+          if (status) status.textContent = 'Saved to your account.';
+        })
+        .catch(function (err) {
+          if (status) { status.textContent = err.message || 'Could not save your details.'; status.classList.add('is-error'); }
+        })
+        .then(function () { btn.disabled = false; });
+    });
+  });
+
   /* ---------- shared helpers ---------- */
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -208,10 +253,13 @@
   }
   // Fires change on each one so the page reacts as if it was picked by hand
   // (e.g. choosing the course lists its subjects).
+  // Fields that come from the account ([data-from-account], "About you") are never filled
+  // from a draft: the account is what counts, so an old draft can't show a different
+  // student number than the summary above it.
   function writeFields(values, ids) {
     ids.forEach(function (id) {
       var el = document.getElementById(id);
-      if (!el || !values || !(id in values)) return;
+      if (!el || !values || !(id in values) || el.hasAttribute('data-from-account')) return;
       if (el.type === 'checkbox') el.checked = !!values[id]; else el.value = values[id];
       el.dispatchEvent(new Event('change', { bubbles: true }));
     });
@@ -724,6 +772,7 @@
     surveyDraft: surveyDraft,
     readFields: readFields,
     writeFields: writeFields,
+    aboutNames: aboutNames,
     readRadios: readRadios,
     writeRadios: writeRadios,
     pickSubject: pickSubject,

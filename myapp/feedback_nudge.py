@@ -28,12 +28,12 @@ def snooze(user):
 
 def missing_surveys(user):
     """[(survey_type, label)] of the Feedback surveys this account still has to answer.
-    Students and alumni only get the SUS; everyone else also gets the UAT and test sheet."""
+    Students and alumni get the SUS and their UAT; everyone else also gets the test sheet."""
     from .models import SurveyResponse
 
-    wanted = [(SurveyResponse.SUS, "SUS evaluation")]
+    wanted = [(SurveyResponse.SUS, "SUS evaluation"), (SurveyResponse.UAT, "UAT survey")]
     if not user.is_learner:
-        wanted += [(SurveyResponse.UAT, "UAT survey"), (SurveyResponse.FUNCTIONAL, "test case sheet")]
+        wanted += [(SurveyResponse.FUNCTIONAL, "test case sheet")]
     done = set(SurveyResponse.objects.filter(user=user).values_list("survey_type", flat=True).distinct())
     return [(kind, label) for kind, label in wanted if kind not in done]
 

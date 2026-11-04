@@ -88,6 +88,23 @@
     </form>
     {% endif %}
 
+    <h2 class="section-title settings-section-gap" id="appearance">Appearance</h2>
+    {# theme.js applies a choice right away and saves it in the background; the Save button is for browsers without JavaScript. #}
+    <form class="settings-card" method="post" action="{% url 'theme_save' %}">
+      {% csrf_token %}
+      <fieldset class="theme-choices">
+        <legend>Colour theme</legend>
+        {% for value, label in theme_choices %}
+        <label class="theme-choice">
+          <input type="radio" name="theme" value="{{ value }}" data-theme-choice{% if user.theme|default:'system' == value %} checked{% endif %}>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </fieldset>
+      <small class="field-hint">System follows your phone or computer's light / dark setting. You can also switch with the moon / sun button at the top right of every page.</small>
+      <noscript><button type="submit" class="btn btn-navy">Save</button></noscript>
+    </form>
+
     <h2 class="section-title settings-section-gap">Change password</h2>
     <form class="settings-card" id="password-form" method="post" action="{% url 'change_password' %}">
       {% csrf_token %}

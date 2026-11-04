@@ -21,6 +21,33 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cb) cb();
   });
 
+  /* ---------- Filter drawer (role, status, real/dummy, sort) ---------- */
+  const drawer = $('acct-filter-drawer'), drawerBackdrop = $('acct-filter-backdrop'), filterBtn = $('acct-filter-btn');
+  if (drawer && filterBtn) {
+    const filterForm = $('acct-filter-form');
+    const selects = Array.from(filterForm.querySelectorAll('select'));
+    const applied = selects.map(s => s.value);
+    const openDrawer = () => {
+      drawer.classList.add('is-active'); drawerBackdrop.classList.add('is-active');
+      drawer.setAttribute('aria-hidden', 'false'); filterBtn.setAttribute('aria-expanded', 'true');
+      drawer.focus();
+    };
+    const closeDrawer = () => {
+      selects.forEach((s, i) => { s.value = applied[i]; });   // closing without Apply keeps what is shown
+      drawer.classList.remove('is-active'); drawerBackdrop.classList.remove('is-active');
+      drawer.setAttribute('aria-hidden', 'true'); filterBtn.setAttribute('aria-expanded', 'false');
+      filterBtn.focus();
+    };
+    filterBtn.addEventListener('click', openDrawer);
+    $('acct-filter-close').addEventListener('click', closeDrawer);
+    drawerBackdrop.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && drawer.classList.contains('is-active')) closeDrawer(); });
+    $('acct-filter-reset').addEventListener('click', () => selects.forEach(s => { s.value = ''; }));
+    // leave "any" choices out of the address so links stay short
+    filterForm.addEventListener('submit', () => selects.forEach(s => { if (!s.value) s.disabled = true; }));
+    window.addEventListener('pageshow', () => selects.forEach(s => { s.disabled = false; }));
+  }
+
   /* ---------- open / close dialogs ---------- */
   $('add-account-btn').addEventListener('click', () => { $('add-form').reset(); show('add-backdrop'); });
   document.querySelectorAll('[data-close]').forEach(btn =>

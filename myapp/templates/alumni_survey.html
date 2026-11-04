@@ -54,30 +54,49 @@
     {% if prefill.complete %}
     <div class="cs-about" id="alumni-about">
       <h3>About you</h3>
-      <p class="cs-about-line"><strong>{{ prefill.name }}</strong> · {{ prefill.email }} · Student no. {{ prefill.student_number }} · {{ prefill.course }} · Graduated {{ prefill.year_graduated }}</p>
-      <p class="muted">From your registration. <button type="button" class="link-inline" data-reveal="alumni-about-fields">Change</button></p>
+      <p class="cs-about-line"><strong data-about="name">{{ prefill.name }}</strong> · <span data-about="email">{{ prefill.email }}</span> · Student no. <span data-about="student_number">{{ prefill.student_number }}</span> · <span data-about="course">{{ prefill.course }}</span> · Graduated <span data-about="year_graduated">{{ prefill.year_graduated }}</span></p>
+      <p class="muted">Saved on your account. <button type="button" class="link-inline" data-reveal="alumni-about-fields">Edit</button></p>
     </div>
     <div id="alumni-about-fields" hidden>
     {% elif prefill %}
     <div class="cs-about"><h3>About you</h3><p class="muted">Please fill in your details below. They are saved to your account.</p></div>
     <div>
     {% endif %}
-    <div class="cs-row-2">
-      <label class="field"><span>Full name</span><input type="text" id="alumni-name" value="{{ prefill.name|default:'' }}"{% if prefill %} readonly{% endif %} required></label>
-      <label class="field"><span>Email address</span><input type="email" id="alumni-email" value="{{ prefill.email|default:'' }}"{% if prefill %} readonly{% endif %} required></label>
+    {% if prefill %}
+    {# Registered students / alumni: edit the name as on the account; Save my details saves it (with the rest) right away. #}
+    <input type="hidden" id="alumni-name" value="{{ prefill.name }}" data-about-name>
+    <div class="cs-row-3">
+      <label class="field"><span>First name</span><input type="text" id="alumni-first" value="{{ prefill.first_name }}" maxlength="100" autocomplete="given-name" data-about-field="first_name" data-from-account required></label>
+      <label class="field"><span>Middle name (optional)</span><input type="text" id="alumni-middle" value="{{ prefill.middle_name }}" maxlength="100" autocomplete="additional-name" data-about-field="middle_name" data-from-account></label>
+      <label class="field"><span>Last name</span><input type="text" id="alumni-last" value="{{ prefill.last_name }}" maxlength="100" autocomplete="family-name" data-about-field="last_name" data-from-account required></label>
     </div>
+    <label class="field cs-about-email"><span>Email address</span><input type="email" id="alumni-email" value="{{ prefill.email }}" readonly aria-describedby="alumni-email-note">
+      <small class="field-hint" id="alumni-email-note">This is the email you log in with, so it is changed in <a class="link-inline" href="{% url 'settings' %}?edit=1">Settings</a> (we send a confirmation link to the new address).</small></label>
+    {% endif %}
+    {% if not prefill %}
+    <div class="cs-row-2">
+      <label class="field"><span>Full name</span><input type="text" id="alumni-name" value="" required></label>
+      <label class="field"><span>Email address</span><input type="email" id="alumni-email" value="" required></label>
+    </div>
+    {% endif %}
     <div class="cs-row-3">
       <label class="field"><span>Course</span>
-        <select id="alumni-program" required>
+        <select id="alumni-program"{% if prefill %} data-about-field="course" data-from-account{% endif %} required>
           <option value="">Select…</option>
           <option value="BSIT"{% if prefill.course == "BSIT" %} selected{% endif %}>BS Information Technology</option>
           <option value="BSCS"{% if prefill.course == "BSCS" %} selected{% endif %}>BS Computer Science</option>
         </select>
       </label>
-      <label class="field"><span>Student number</span><input type="text" id="alumni-number" value="{{ prefill.student_number|default:'' }}" required></label>
-      <label class="field"><span>Year graduated</span><input type="number" id="alumni-year-graduated" value="{{ prefill.year_graduated|default:'' }}" min="2000" max="{{ max_grad_year }}" required></label>
+      <label class="field"><span>Student number</span><input type="text" id="alumni-number" value="{{ prefill.student_number|default:'' }}" maxlength="30"{% if prefill %} data-about-field="student_number" data-from-account{% endif %} required></label>
+      <label class="field"><span>Year graduated</span><input type="number" id="alumni-year-graduated" value="{{ prefill.year_graduated|default:'' }}" min="2000" max="{{ max_grad_year }}"{% if prefill %} data-about-field="year_graduated" data-from-account{% endif %} required></label>
     </div>
-    {% if prefill %}</div>{% endif %}
+    {% if prefill %}
+    <div class="cs-about-actions">
+      <button type="button" class="btn btn-navy btn-sm" data-about-save="{% url 'learner_about_save' %}">Save my details</button>
+      <span class="muted cs-about-status" role="status"></span>
+    </div>
+    </div>
+    {% endif %}
 
     <div class="cs-section">
       <h3>Your last semester at UE</h3>

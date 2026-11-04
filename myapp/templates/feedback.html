@@ -15,12 +15,10 @@
           <span>System Usability Scale (SUS) evaluation</span>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
-        {% if not user.is_learner %}
         <a class="feedback-item" href="#" data-survey="uat">
           <span>User Acceptance Testing survey</span>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
-        {% endif %}
         {% if not user.is_learner %}
         <a class="feedback-item" href="#" data-survey="functional">
           <span>Functional test case sheet</span>
@@ -59,7 +57,8 @@
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
 
-          <div class="likert-list" id="uat-questions"></div>
+          {# students and alumni get their own statements (UAT_QUESTIONS_STUDENT in survey.js) #}
+          <div class="likert-list" id="uat-questions" data-audience="{{ uat_audience }}"></div>
 
           <label class="field"><span>What did you like, and what would you improve? (optional)</span><textarea id="uat-comments" rows="3"></textarea></label>
           <p class="form-msg form-msg--error form-error" id="uat-error" hidden></p>

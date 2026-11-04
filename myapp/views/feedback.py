@@ -18,7 +18,8 @@ from .common import PH_TIME
 def feedback_view(request):
     audience = sus_audience(request.user)
     return render(request, "feedback.html", {"active_page": "feedback",
-                                             "sus_first_statement": SUS_FIRST_STATEMENTS[audience]})
+                                             "sus_first_statement": SUS_FIRST_STATEMENTS[audience],
+                                             "uat_audience": uat_audience(request.user)})
 
 
 @login_required
@@ -54,7 +55,12 @@ SUS_QUESTION_COUNT = 6  # must match SUS_QUESTIONS in survey.js
 # were Yes/No checks of each feature (login_worked, dashboard_worked, ...), which the
 # Functional test case sheet now covers.
 UAT_VERSION = 2
-UAT_QUESTION_COUNT = 10  # must match UAT_QUESTIONS in survey.js
+UAT_QUESTION_COUNT = 10  # must match UAT_QUESTIONS and UAT_QUESTIONS_STUDENT in survey.js
+# Students and alumni answer their own UAT: the same ten-statement Likert form and scoring,
+# with statements about their side of UEnvision (My skill gap, learning resources, their
+# survey) instead of the faculty pages. Each response saves which set it was shown as
+# "uat_audience" ("learner" or "faculty"), so the two are kept apart when averaging.
+UAT_AUDIENCES = ("learner", "faculty")
 
 
 # Statement 1 depends on who is answering. Administrators and developers get the faculty
@@ -76,6 +82,12 @@ def sus_audience(user):
     if user.role == user.Role.ALUMNI:
         return "alumni"
     return "faculty"
+
+
+def uat_audience(user):
+    """Which UAT statement set this account answers: "learner" (students and alumni) or
+    "faculty" (faculty, administrators and developers)."""
+    return "learner" if user.is_learner else "faculty"
 
 
 def _compute_sus_score(answers):
@@ -104,8 +116,8 @@ def survey_submit_view(request):
         or not all(isinstance(r, dict) for r in rows)
     ):
         return JsonResponse({"ok": False, "error": "Invalid survey data."}, status=400)
-    if request.user.is_learner and kind != SurveyResponse.SUS:
-        return JsonResponse({"ok": False, "error": "Students and alumni can only answer the SUS survey."}, status=403)
+    if request.user.is_learner and kind == SurveyResponse.FUNCTIONAL:
+        return JsonResponse({"ok": False, "error": "Students and alumni answer the SUS and UAT surveys only."}, status=403)
 
     if kind == SurveyResponse.SUS:
         for row in rows:
@@ -123,6 +135,7 @@ def survey_submit_view(request):
                 return JsonResponse({"ok": False, "error": "UAT answers must be 1-5."}, status=400)
             row["uat_score"] = round(sum(answers) / len(answers), 2)   # average rating, 1-5
             row["uat_version"] = UAT_VERSION
+            row["uat_audience"] = uat_audience(request.user)  # which statement set they were shown
 
     # Who answered comes from the account, not from the form.
     name, role = request.user.get_full_name(), request.user.role_label

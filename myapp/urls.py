@@ -17,6 +17,7 @@ urlpatterns = [
     path("me/skills/", student_views.my_skills_view, name="my_skills"),
     path("me/skills/save/", student_views.my_skills_save_view, name="my_skills_save"),
     path("me/role/", student_views.student_role_view, name="student_role"),
+    path("me/about/", student_views.learner_about_save_view, name="learner_about_save"),
     path("me/recommendations/generate/", student_views.student_generate_view, name="student_generate"),
 
     path("login/", views.login_view, name="login"),
@@ -56,6 +57,7 @@ urlpatterns = [
     path("settings/", views.settings_view, name="settings"),
     path("settings/change-password/", views.change_password_view, name="change_password"),
     path("settings/account/", views.update_account_view, name="update_account"),
+    path("settings/theme/", views.theme_save_view, name="theme_save"),
     path("settings/photo/", views.profile_photo_upload_view, name="profile_photo_upload"),
     path("photo/<int:pk>/", views.profile_photo_view, name="profile_photo"),
     path("settings/confirm-email/", views.send_my_verification_view, name="send_my_verification"),

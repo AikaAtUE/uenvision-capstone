@@ -79,6 +79,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # When the profile picture (ProfilePhoto) was last set; None = no picture. Kept here so
     # the sidebar knows whether to show one without loading the image itself.
     photo_updated = models.DateTimeField(null=True, blank=True)
+    # Colour theme picked in Settings (or with the theme button in the top bar):
+    # "light", "dark", or "system" (follow the phone / computer setting).
+    THEMES = ("light", "dark", "system")
+    theme = models.CharField(max_length=10, default="system", blank=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

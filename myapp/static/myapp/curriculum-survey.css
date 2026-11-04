@@ -21,7 +21,7 @@
 .cs-steps h3 { margin: 0 0 6px; font-size: 1rem; }
 .cs-steps ol { margin: 0; padding-left: 20px; }
 .cs-steps li + li { margin-top: 4px; }
-.cs-privacy { background: #f4f3ee; border: 1px solid #e4e2dc; border-radius: 10px; padding: 16px 18px; margin: 14px 0 18px; font-size: .92rem; }
+.cs-privacy { background: #f4f3ee; border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 14px 0 18px; font-size: .92rem; }
 .cs-privacy h3 { margin: 0 0 8px; font-size: 1rem; }
 .cs-privacy ul { margin: 6px 0 0; padding-left: 20px; }
 .cs-privacy li { margin: 4px 0; }
@@ -33,62 +33,62 @@
 .cs-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 .cs-panel form > .field, .cs-panel form > .cs-row-2, .cs-panel form > .cs-row-3, .cs-panel form > .cs-section { margin-bottom: 16px; }
 
-.cs-section { border-top: 1px solid #e4e2dc; padding-top: 16px; }
+.cs-section { border-top: 1px solid var(--line); padding-top: 16px; }
 .cs-section:empty { display: none; }
 .cs-hint { margin: 4px 0 16px; padding: 12px 14px; border-radius: 8px; background: #f3f5f9; color: #4b5263; font-size: .9rem; }
 .cs-panel:has(#student-current-subjects:not(:empty)) #student-hint { display: none; }
 /* until a subject is picked, say what will appear here instead of showing nothing */
 [id$="-subject-blocks"]:empty::before {
   content: "Pick a subject above and a skill box for it will appear here.";
-  display: block; padding: 14px; border: 1px dashed #d5d3cc; border-radius: 8px; color: #6b6f7b; font-size: .88rem;
+  display: block; padding: 14px; border: 1px dashed var(--line-strong); border-radius: 8px; color: var(--muted); font-size: .88rem;
 }
 /* professor survey: long subject lists get a filter, a running count and two columns */
 .cs-subject-tools { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 18px; margin: 0 0 16px;
-  position: sticky; top: 0; z-index: 6; background: #fff; padding: 10px 0; border-bottom: 1px solid #eee; }
+  position: sticky; top: 0; z-index: 6; background: var(--surface); padding: 10px 0; border-bottom: 1px solid var(--line); }
 .cs-subject-filter-wrap { flex: 1 1 280px; }
 .cs-subject-filter-wrap input { width: 100%; }
-.cs-picked-count { font-size: .86rem; font-weight: 600; color: var(--navy, #16233f); padding-bottom: 12px; }
+.cs-picked-count { font-size: .86rem; font-weight: 600; color: var(--navy-text); padding-bottom: 12px; }
 #professor-survey-form .cs-subject-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 .cs-subject-check.is-filtered-out { display: none; }
 .cs-subject-check:has(input:checked) { border-color: var(--navy, #1b2a4a); background: #eef1f7; }
-.cs-no-match { color: #6b6f7b; font-size: .88rem; font-style: italic; }
+.cs-no-match { color: var(--muted); font-size: .88rem; font-style: italic; }
 @media (max-width: 720px) { .cs-subject-tools { top: 57px; } }
 .cs-section h3 { margin: 0 0 4px; }
 .cs-section .muted { margin: 0 0 10px; font-size: .88rem; }
-.cs-section--empty { color: #6b6f7b; font-size: .88rem; font-style: italic; }
+.cs-section--empty { color: var(--muted); font-size: .88rem; font-style: italic; }
 
 .cs-subject-grid { display: grid; gap: 8px; }
 .cs-subject-check {
-  display: flex; align-items: flex-start; gap: 10px; border: 1px solid #d5d3cc;
-  border-radius: 8px; padding: 10px 12px; cursor: pointer; background: #fff;
+  display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--line-strong);
+  border-radius: 8px; padding: 10px 12px; cursor: pointer; background: var(--surface);
 }
 .cs-subject-check:hover { border-color: var(--navy, #1b2a4a); }
 .cs-subject-check input { margin-top: 3px; }
-.cs-subject-check .cs-subject-code { font-weight: 600; color: var(--navy, #1b2a4a); margin-right: 6px; }
-.cs-subject-check .cs-subject-units { color: #6b6f7b; font-size: .82rem; }
+.cs-subject-check .cs-subject-code { font-weight: 600; color: var(--navy-text); margin-right: 6px; }
+.cs-subject-check .cs-subject-units { color: var(--muted); font-size: .82rem; }
 
 .cs-subject-block {
-  border: 1px solid #e4e2dc; border-radius: 10px; padding: 16px; margin-bottom: 14px; background: #fafaf7;
+  border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 14px; background: #fafaf7;
 }
 .cs-subject-block h4 { margin: 0 0 2px; }
-.cs-subject-block .cs-subject-term { color: #6b6f7b; font-size: .82rem; margin: 0 0 12px; }
+.cs-subject-block .cs-subject-term { color: var(--muted); font-size: .82rem; margin: 0 0 12px; }
 
 .cs-ia-group { display: flex; gap: 4px; }
 .cs-ia-group label { cursor: pointer; }
 .cs-ia-group input { position: absolute; opacity: 0; pointer-events: none; }
-.cs-ia-group span { display: block; padding: 5px 9px; border: 1px solid #d5d3cc; border-radius: 999px; font-size: .78rem; background: #fff; }
+.cs-ia-group span { display: block; padding: 5px 9px; border: 1px solid var(--line-strong); border-radius: 999px; font-size: .78rem; background: var(--surface); }
 .cs-ia-group input:checked + span { background: var(--navy, #1b2a4a); border-color: var(--navy, #1b2a4a); color: #fff; }
 
 .cs-employment-branch[hidden] { display: none; }
 
-.cs-skip-note { font-size: .86rem; color: #6b6f7b; margin: 6px 0 0; }
+.cs-skip-note { font-size: .86rem; color: var(--muted); margin: 6px 0 0; }
 
 @media (max-width: 680px) {
   .cs-row-2, .cs-row-3 { grid-template-columns: 1fr; }
 }
 
 /* Optional earlier-semester subjects on the student survey */
-.cs-earlier summary { cursor: pointer; font-weight: 600; color: var(--navy, #16233f); padding: 4px 0; }
+.cs-earlier summary { cursor: pointer; font-weight: 600; color: var(--navy-text); padding: 4px 0; }
 .cs-earlier h4 { margin: 14px 0 8px; font-size: .9rem; }
 .cs-page--embedded { max-width: none; margin: 0; padding: 8px 0 32px; }
 
@@ -96,7 +96,7 @@
 .cs-skill-picker { position: relative; }
 .cs-tagbox {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 44px;
-  padding: 6px 8px; border: 1px solid #d5d3cc; border-radius: 8px; background: #fff; cursor: text;
+  padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); cursor: text;
 }
 .cs-tagbox:focus-within { border-color: var(--navy, #1b2a4a); box-shadow: 0 0 0 3px rgba(27,42,74,.12); }
 .cs-chips { display: contents; }
@@ -107,23 +107,23 @@
 }
 .cs-chip-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cs-chip-level {
-  font: inherit; font-size: .78rem; padding: 2px 4px; border: 1px solid #cfd5e2; border-radius: 6px; background: #fff; cursor: pointer;
+  font: inherit; font-size: .78rem; padding: 2px 4px; border: 1px solid #cfd5e2; border-radius: 6px; background: var(--surface); cursor: pointer;
 }
 .cs-chip-level.is-missing { border-color: #c8202f; box-shadow: 0 0 0 2px rgba(200,32,47,.18); }
 .cs-chip-remove {
-  width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: #6b6f7b;
+  width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: var(--muted);
   font-size: 1rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
 }
 .cs-chip-remove:hover, .cs-chip-remove:focus-visible { background: #d3d9e6; color: #c8202f; outline: none; }
 .cs-tag-input { flex: 1 1 180px; min-width: 140px; border: 0; outline: none; font: inherit; font-size: .92rem; padding: 6px 4px; background: transparent; }
 .cs-skill-results {
   position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
-  display: flex; flex-direction: column; border: 1px solid #d5d3cc; border-radius: 8px; background: #fff;
+  display: flex; flex-direction: column; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface);
   box-shadow: 0 6px 18px rgba(22,35,63,.12); max-height: 280px; overflow-y: auto;
 }
 .cs-skill-results[hidden] { display: none; }
-.cs-skill-results-head { padding: 7px 12px 4px; font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #6b6f7b; }
-.cs-skill-result { text-align: left; background: none; border: 0; border-bottom: 1px solid #eee; padding: 8px 12px; font: inherit; font-size: .9rem; cursor: pointer; }
+.cs-skill-results-head { padding: 7px 12px 4px; font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.cs-skill-result { text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 8px 12px; font: inherit; font-size: .9rem; cursor: pointer; }
 .cs-skill-result:hover, .cs-skill-result.is-active { background: #f3f4f7; }
 .cs-skill-result--new { color: #c8202f; font-weight: 600; }
 /* Level colors: one blue scale, lighter = shallower, darker = deeper. Levels are
@@ -163,10 +163,10 @@
 .ms-status { font-size: .85rem; }
 .ms-status.is-dirty { color: #8a5a00; font-weight: 600; }
 .ms-subjects { display: flex; flex-direction: column; }
-.ms-subject { background: #fff; }
+.ms-subject { background: var(--surface); }
 .ms-subject.is-new { border-color: var(--navy, #1b2a4a); box-shadow: 0 0 0 3px rgba(27,42,74,.08); }
 .ms-subject-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-.ms-remove-subject { background: none; border: 0; color: #6b6f7b; font: inherit; font-size: .82rem; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+.ms-remove-subject { background: none; border: 0; color: var(--muted); font: inherit; font-size: .82rem; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
 .ms-remove-subject:hover, .ms-remove-subject:focus-visible { color: #c8202f; text-decoration: underline; }
 .ms-overall { margin-top: 24px; }
 .ms-overall .muted { margin: 2px 0 10px; font-size: .88rem; }
@@ -206,14 +206,14 @@
 .cs-term-tag--bscs.cs-term-tag--y3 { background: #16a34a; color: #fff; }
 .cs-term-tag--bscs.cs-term-tag--y4 { background: #14532d; color: #fff; }
 .cs-other [hidden] { display: none !important; }
-.cs-skill-alias { color: #6b6f7b; font-size: .8rem; margin-left: 6px; }
+.cs-skill-alias { color: var(--muted); font-size: .8rem; margin-left: 6px; }
 /* Professor Survey as an editable record: privacy notice accepted once, save bar */
 .cs-privacy--accepted { padding: 12px 18px; }
 .cs-privacy--accepted summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .cs-privacy--accepted summary .muted { font-size: .85rem; }
 .cs-privacy--accepted[open] summary { margin-bottom: 8px; }
 .ps-save-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; gap: 14px;
-  background: #fff; padding: 12px 0; border-top: 1px solid #eee; margin-top: 8px; }
+  background: var(--surface); padding: 12px 0; border-top: 1px solid var(--line); margin-top: 8px; }
 
 /* Unfinished answers restored from this browser (logged-in, first-time surveys) */
 .cs-draft-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px;
@@ -225,7 +225,7 @@
 /* "Select all" above each semester's subjects (and one for the whole page) */
 .cs-select-all-row { display: flex; justify-content: flex-end; margin: -2px 0 6px; }
 .cs-select-all { background: none; border: 0; padding: 2px 4px; font: inherit; font-size: .84rem; font-weight: 600;
-  color: var(--navy, #16233f); text-decoration: underline; cursor: pointer; border-radius: 4px; }
+  color: var(--navy-text); text-decoration: underline; cursor: pointer; border-radius: 4px; }
 .cs-select-all:hover, .cs-select-all:focus-visible { color: #c8202f; }
 .cs-select-all:disabled { color: #9a9ca3; cursor: default; text-decoration: none; }
 .cs-select-all.cs-select-all--page { text-decoration: none; margin-bottom: 10px; }
@@ -234,16 +234,16 @@
 .cs-subject-block { position: relative; }
 .cs-subject-block > h4, .cs-subject-block > .ms-subject-head { padding-right: 36px; }
 .cs-block-x { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%;
-  border: 1px solid #d5d3cc; background: #fff; color: #6b6f7b; font-size: 1.1rem; line-height: 1; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--muted); font-size: 1.1rem; line-height: 1; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; }
 .cs-block-x:hover, .cs-block-x:focus-visible { color: #fff; background: #c8202f; border-color: #c8202f; }
 
 /* What each level means (proficiency for students/alumni, I/P/A for faculty) */
 .cs-level-guide { border: 1px solid #d6def0; background: #f5f7fc; border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; font-size: .86rem; }
-.cs-level-guide-title { margin: 0 0 6px; font-weight: 600; color: var(--navy, #16233f); }
+.cs-level-guide-title { margin: 0 0 6px; font-weight: 600; color: var(--navy-text); }
 .cs-level-guide dl { margin: 0; display: grid; gap: 6px; }
 .cs-level-guide-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
-.cs-level-guide dt { font-weight: 700; color: var(--navy, #16233f); }
+.cs-level-guide dt { font-weight: 700; color: var(--navy-text); }
 .cs-level-guide dd { margin: 0; color: #3b3f4a; }
 @media (max-width: 560px) { .cs-level-guide-row { grid-template-columns: 1fr; gap: 0; } }
 
@@ -254,3 +254,8 @@
 .cs-about .muted { margin: 0; font-size: .88rem; }
 .cs-about .link-inline { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
 .cs-consent[hidden] { display: none; }
+/* "About you": Save my details (saves to the account right away) */
+.cs-about-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 18px; }
+.cs-about-status.is-error { color: var(--red, #c8202f); }
+.cs-about-email { margin-bottom: 14px; }
+.cs-about-email input[readonly] { opacity: .75; cursor: not-allowed; }

@@ -66,7 +66,7 @@ def tracker_rows(users):
         cells = {
             "curriculum": curr,
             "sus": SurveyResponse.SUS in done,
-            "uat": None if u.is_learner else SurveyResponse.UAT in done,
+            "uat": SurveyResponse.UAT in done,   # students and alumni have their own UAT
             "functional": None if u.is_learner else SurveyResponse.FUNCTIONAL in done,
         }
         reminded = cache.get(_reminded_key(u.pk))

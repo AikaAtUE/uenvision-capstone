@@ -1,15 +1,19 @@
 {% extends "app_base.html" %}
 {% load static %}
-{% block title %}My skill gap{% endblock %}
+{% block title %}{% if active_page == "dashboard" %}Dashboard (student view){% elif active_page == "recommendations" %}Recommendations (student view){% else %}My skill gap{% endif %}{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'myapp/recommendations.css' %}?v={% now 'U' %}">
 <link rel="stylesheet" href="{% static 'myapp/student-dashboard.css' %}?v={% now 'U' %}">
 {% endblock %}
 {% block page_content %}
 <section class="page is-active" id="page-student-dashboard">
-  <header class="page-header"><h1>My skill gap</h1></header>
+  <header class="page-header"><h1>{% if active_page == "dashboard" %}Dashboard{% elif active_page == "recommendations" %}Recommendations{% else %}My skill gap{% endif %}</h1></header>
   <div class="page-body">
     {% include "_messages.html" %}
+    {% if user.is_developer %}
+    <div class="sd-switch-row">{% include "_results_switch.html" %}</div>
+    <p class="dev-view-note" role="note"><strong>Student view.</strong> This is the page students and alumni see as <em>My skill gap</em>{% if active_page == "recommendations" %}; their recommendations are the <a class="link-inline" href="#learning-resources">learning resources for their gaps</a> below{% endif %}. It uses your own subjects and skills (Data &rsaquo; My subjects &amp; skills). Switch back to Faculty view for the faculty pages.</p>
+    {% endif %}
 
     {% if not user.email_verified %}
     <div class="panel sd-callout sd-callout--verify">
@@ -47,7 +51,7 @@
       <div class="stat-card">
         <p class="stat-label">Job readiness</p>
         <p class="stat-value">{% if readiness is not None %}{{ readiness }}%{% else %}—{% endif %}</p>
-        <p class="stat-note">You have {{ have }} of the top {{ compare|length }} skills{% if role %} for {{ role.label }}{% endif %} at Intermediate or better</p>
+        <p class="stat-note">You have {{ have }} of the top {{ compare|length }} skills{% if role %} for {{ role.label }}{% endif %} at Practiced or Applied</p>
       </div>
       <div class="stat-card">
         <p class="stat-label">Skills you reported</p>
@@ -61,18 +65,26 @@
       </div>
     </div>
 
+    {# What the "You" column means: same level wording as the student / alumni survey (YOU_LEVELS in student_views.py). #}
+    <div class="sd-legend" id="you-legend">
+      <p class="sd-legend-title"><strong>What the &ldquo;You&rdquo; column means:</strong> your highest level for each skill, from your survey. Tap or point at a level in the tables to see this again.</p>
+      <ul class="sd-legend-list">
+        {% for l in you_levels %}<li><span class="sd-pill sd-pill--{{ l.status }}">{{ l.label }}</span><span>{{ l.text }}</span></li>{% endfor %}
+      </ul>
+    </div>
+
     <div class="sd-cols">
       <section class="panel">
         <h2 class="section-title">Top skills {% if role %}for {{ role.label }}{% else %}across IT/CS roles{% endif %}</h2>
         <p class="muted sd-sub">{% if role %}The grey number is the share across all IT/CS postings.{% else %}Pick a job role above to see its own top skills.{% endif %}</p>
         <table class="sd-table">
-          <thead><tr><th>Skill</th><th>In postings</th><th>You</th></tr></thead>
+          <thead><tr><th>Skill</th><th>In postings</th><th class="sd-you-th">You <span class="sd-tip sd-tip--info"><button type="button" class="sd-tip-btn sd-info-btn" aria-expanded="false" aria-label="What the You column means" aria-describedby="you-th-top">ⓘ</button><span class="sd-tip-text" role="tooltip" id="you-th-top">Your highest level for this skill, from your survey.</span></span></th></tr></thead>
           <tbody>
           {% for s in compare %}
             <tr>
               <td>{{ s.skill }}</td>
               <td>{{ s.pct }}%{% if role %} <small class="muted">vs {{ s.overall_pct }}%</small>{% endif %}</td>
-              <td><span class="sd-pill sd-pill--{{ s.status }}">{% if s.status == "missing" %}Not yet{% else %}{{ s.my_level|default:"Reported" }}{% endif %}</span></td>
+              <td>{% include "_you_pill.html" with tip_prefix="you-top" tip_n=forloop.counter %}</td>
             </tr>
           {% endfor %}
           </tbody>
@@ -84,13 +96,13 @@
         <h2 class="section-title">Compared with overall in-demand skills</h2>
         <p class="muted sd-sub">The most requested skills across all IT/CS job postings.</p>
         <table class="sd-table">
-          <thead><tr><th>Skill</th><th>In postings</th><th>You</th></tr></thead>
+          <thead><tr><th>Skill</th><th>In postings</th><th class="sd-you-th">You <span class="sd-tip sd-tip--info"><button type="button" class="sd-tip-btn sd-info-btn" aria-expanded="false" aria-label="What the You column means" aria-describedby="you-th-all">ⓘ</button><span class="sd-tip-text" role="tooltip" id="you-th-all">Your highest level for this skill, from your survey.</span></span></th></tr></thead>
           <tbody>
           {% for s in overall %}
             <tr>
               <td>{{ s.skill }}</td>
               <td>{{ s.pct }}%</td>
-              <td><span class="sd-pill sd-pill--{{ s.status }}">{% if s.status == "missing" %}Not yet{% else %}{{ s.my_level|default:"Reported" }}{% endif %}</span></td>
+              <td>{% include "_you_pill.html" with tip_prefix="you-all" tip_n=forloop.counter %}</td>
             </tr>
           {% endfor %}
           </tbody>
@@ -99,10 +111,10 @@
       </section>
     </div>
 
-    <section class="sd-section">
+    <section class="sd-section" id="learning-resources">
       <h2 class="section-title">Learning resources for your gaps</h2>
       {% if not to_build %}
-        <p class="empty-note">You already have every top skill at Intermediate or better. Try another job role above.</p>
+        <p class="empty-note">You already have every top skill at Practiced or Applied. Try another job role above.</p>
       {% else %}
       <p class="form-msg rec-caveat">Resources are suggested by AI. Links marked ✓ Link checked were opened automatically and lead to that course, but no person has reviewed them yet. Check a course before paying for it.</p>
       <form id="rec-form" method="post" action="{% url 'student_generate' %}" data-max="{{ max_per_run }}" data-verb="Find resources">
@@ -149,6 +161,27 @@
 </section>
 {% endblock %}
 {% block extra_js %}
+<script>
+  // "You" column: show a level's meaning on tap (phones) as well as hover / focus (CSS).
+  (function () {
+    function closeAll(except) {
+      document.querySelectorAll('.sd-tip.is-open').forEach(function (t) {
+        if (t === except) return;
+        t.classList.remove('is-open');
+        var b = t.querySelector('.sd-tip-btn'); if (b) b.setAttribute('aria-expanded', 'false');
+      });
+    }
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('.sd-tip-btn');
+      if (!btn) { closeAll(null); return; }
+      var tip = btn.parentNode, open = !tip.classList.contains('is-open');
+      closeAll(tip);
+      tip.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(null); });
+  })();
+</script>
 <script>
   window.__recGenerateUrl = "{% url 'student_generate' %}";
   window.__recDownloadUrl = "";

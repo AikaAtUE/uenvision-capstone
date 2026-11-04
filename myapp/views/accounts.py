@@ -1,4 +1,5 @@
 
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
@@ -53,17 +54,38 @@ ACCOUNT_TYPES = [
 DUMMY_TYPES = {"dummy_student": CustomUser.Role.STUDENT, "dummy_faculty": CustomUser.Role.FACULTY}
 
 
-# Filters on the Accounts page: (value, label, queryset filter)
-ACCOUNT_FILTERS = [
-    ("", "All accounts", {}),
-    ("pending", "Not approved yet", {"is_approved": False}),
-    ("administrator", "Administrators", {"role": CustomUser.Role.ADMINISTRATOR}),
-    ("developer", "Developers", {"role": CustomUser.Role.DEVELOPER}),
-    ("faculty", "Faculty", {"role": CustomUser.Role.FACULTY, "is_dummy": False}),
-    ("student", "Students", {"role": CustomUser.Role.STUDENT, "is_dummy": False}),
-    ("alumni", "Alumni", {"role": CustomUser.Role.ALUMNI, "is_dummy": False}),
-    ("dummy", "Dummy (test) accounts", {"is_dummy": True}),
-]
+# Filters on the Accounts page (its Filter drawer): value -> (label, queryset filter).
+ROLE_FILTERS = {
+    "": ("All roles", {}),
+    "administrator": ("Administrators", {"role": CustomUser.Role.ADMINISTRATOR}),
+    "developer": ("Developers", {"role": CustomUser.Role.DEVELOPER}),
+    "faculty": ("Faculty", {"role": CustomUser.Role.FACULTY}),
+    "student": ("Students", {"role": CustomUser.Role.STUDENT}),
+    "alumni": ("Alumni", {"role": CustomUser.Role.ALUMNI}),
+}
+STATE_FILTERS = {
+    "": ("Any status", {}),
+    "approved": ("Approved", {"is_approved": True, "is_active": True}),
+    "pending": ("Not approved yet", {"is_approved": False}),
+    "unverified": ("Email not confirmed", {"email_verified": False}),
+    "inactive": ("Deactivated", {"is_active": False}),
+}
+KIND_FILTERS = {
+    "": ("Real and dummy", {}),
+    "real": ("Real accounts only", {"is_dummy": False}),
+    "dummy": ("Dummy (test) accounts only", {"is_dummy": True}),
+}
+# The old single "Show" menu (?status=...), still accepted so saved links keep working:
+# value -> (role, state, kind).
+LEGACY_STATUS = {
+    "pending": ("", "pending", ""),
+    "administrator": ("administrator", "", ""),
+    "developer": ("developer", "", ""),
+    "faculty": ("faculty", "", "real"),
+    "student": ("student", "", "real"),
+    "alumni": ("alumni", "", "real"),
+    "dummy": ("", "", "dummy"),
+}
 
 
 # Sort options on the Accounts page: value -> (label, order_by fields)
@@ -82,12 +104,15 @@ ACCOUNT_SORTS = {
 def accounts_view(request):
     from django.db.models import Q
 
-    status = request.GET.get("status", "")
-    filters = {value: f for value, _, f in ACCOUNT_FILTERS}
-    if status not in filters:
-        status = ""
+    role, state, kind = LEGACY_STATUS.get(request.GET.get("status", ""), ("", "", ""))
+    role = request.GET.get("role", role)
+    state = request.GET.get("state", state)
+    kind = request.GET.get("kind", kind)
+    role = role if role in ROLE_FILTERS else ""
+    state = state if state in STATE_FILTERS else ""
+    kind = kind if kind in KIND_FILTERS else ""
     q = request.GET.get("q", "").strip()
-    accounts = CustomUser.objects.filter(**filters[status])
+    accounts = CustomUser.objects.filter(**ROLE_FILTERS[role][1], **STATE_FILTERS[state][1], **KIND_FILTERS[kind][1])
     for word in q.split():
         accounts = accounts.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word) |
                                    Q(middle_name__icontains=word) | Q(email__icontains=word))
@@ -95,12 +120,29 @@ def accounts_view(request):
     if sort not in ACCOUNT_SORTS:
         sort = ""
     accounts = accounts.order_by(*ACCOUNT_SORTS[sort][1])
+    # what the Filter drawer has set, as removable chips above the table: (label, link without it)
+    current = {"q": q, "role": role, "state": state, "kind": kind, "sort": sort}
+
+    def without(*keys):
+        rest = {k: v for k, v in current.items() if v and k not in keys}
+        return reverse("accounts") + ("?" + urlencode(rest) if rest else "")
+    chips = [(f"{ROLE_FILTERS[role][0]}", without("role"))] if role else []
+    chips += [(STATE_FILTERS[state][0], without("state"))] if state else []
+    chips += [(KIND_FILTERS[kind][0], without("kind"))] if kind else []
+    chips += [(f"Sorted: {ACCOUNT_SORTS[sort][0]}", without("sort"))] if sort else []
     return render(request, "accounts.html", {
         "active_page": "accounts",
         "accounts": accounts,
         "q": q,
-        "status": status,
-        "status_choices": [(v, label) for v, label, _ in ACCOUNT_FILTERS],
+        "role": role,
+        "state": state,
+        "kind": kind,
+        "filter_count": sum(1 for v in (role, state, kind, sort) if v),
+        "filter_chips": chips,
+        "clear_filters_url": without("role", "state", "kind", "sort"),
+        "role_choices": [(v, label) for v, (label, _) in ROLE_FILTERS.items()],
+        "state_choices": [(v, label) for v, (label, _) in STATE_FILTERS.items()],
+        "kind_choices": [(v, label) for v, (label, _) in KIND_FILTERS.items()],
         "sort": sort,
         "sort_choices": [(v, label) for v, (label, _) in ACCOUNT_SORTS.items()],
         "pending_count": CustomUser.objects.filter(is_approved=False).count(),
