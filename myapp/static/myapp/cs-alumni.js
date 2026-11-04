@@ -27,7 +27,9 @@
       termTagsHtml = CS.termTagsHtml,
       addSelectAll = CS.addSelectAll,
       blockCloseHtml = CS.blockCloseHtml,
-      insertLevelGuide = CS.insertLevelGuide;
+      insertLevelGuide = CS.insertLevelGuide,
+      buildOtherSubjectForm = CS.buildOtherSubjectForm,
+      addedTag = CS.addedTag;
 
   /* =====================================================================
      ALUMNI SURVEY
@@ -83,8 +85,13 @@
     }
 
     function renderSubjects() {
+      // Subjects they added themselves don't depend on the course / last semester, so they stay.
+      var added = Object.keys(pickers).filter(function (c) { return pickers[c].custom; }).map(function (c) {
+        return { code: c, name: pickers[c].name, skills: pickers[c].api.collect() };
+      });
       blocksWrap.innerHTML = '';
       pickers = {};
+      added.forEach(function (s) { addCustomBlock(s.code, s.name, s.skills); });
       var program = programSel.value;
       var termKey = termSel.value;
       if (!program || !termKey) { subjectsWrap.innerHTML = ''; earlierWrap.innerHTML = ''; return; }
@@ -122,6 +129,42 @@
       var api = buildSkillPicker(container, skillsFor(program, code), PROFICIENCY_LEVELS, blockId);
       pickers[code] = { api: api, name: name, termLabel: termLabel, termKey: termKey, bucket: bucket };
     }
+    /* A subject that isn't listed (e.g. the Professional Elective they took). */
+    function addCustomBlock(code, name, skills) {
+      if (pickers[code]) return null;
+      var blockId = 'cs-asubj-' + domId(code);
+      blocksWrap.insertAdjacentHTML('beforeend',
+        '<div class="cs-subject-block" id="' + blockId + '" data-code="' + escapeHtml(code) + '">' +
+          '<div class="ms-subject-head"><h4>' + escapeHtml(code) + ' — ' + escapeHtml(name) + ' ' + addedTag([]) + '</h4>' +
+          '<button type="button" class="ms-remove-subject cs-remove-added">Remove subject</button></div>' +
+          '<div class="cs-skill-picker"></div>' +
+        '</div>'
+      );
+      var block = document.getElementById(blockId);
+      var api = buildSkillPicker(qs('.cs-skill-picker', block), [], PROFICIENCY_LEVELS, blockId, skills || []);
+      pickers[code] = { api: api, name: name, termLabel: 'Added by you', termKey: '', bucket: 'added', custom: true };
+      return block;
+    }
+    blocksWrap.addEventListener('click', function (e) {
+      var btn = e.target.closest('.cs-remove-added');
+      if (!btn) return;
+      removeSubjectBlock(btn.closest('.cs-subject-block').getAttribute('data-code'));
+      form.dispatchEvent(new Event('change'));
+    });
+    var otherWrap = qs('#alumni-other-subject', form);
+    if (otherWrap) {
+      buildOtherSubjectForm(otherWrap, {
+        learner: true,
+        knownCodes: BOOT.knownCodes,
+        isTaken: function (code) { return !!pickers[code]; },
+        onAdd: function (subj) {
+          var block = addCustomBlock(subj.code, subj.name, []);
+          form.dispatchEvent(new Event('change'));
+          if (block) { block.scrollIntoView({ block: 'nearest' }); var inp = qs('.cs-tag-input', block); if (inp) inp.focus(); }
+        }
+      });
+    }
+
     function removeSubjectBlock(code) {
       var el = document.getElementById('cs-asubj-' + domId(code));
       if (el) el.remove();
@@ -253,7 +296,9 @@
 
       var subjects = Object.keys(pickers).map(function (code) {
         var p = pickers[code];
-        return { code: code, name: p.name, term: p.bucket, term_label: p.termLabel, skills: p.api.collect() };
+        var out = { code: code, name: p.name, term: p.bucket, term_label: p.termLabel, skills: p.api.collect() };
+        if (p.custom) out.custom = true;
+        return out;
       });
 
       var employment;
@@ -317,7 +362,9 @@
       return {
         fields: readFields(FIELDS.concat(['alumni-term'], MORE_FIELDS)),
         radios: readRadios(form, RADIOS),
-        subjects: Object.keys(pickers).map(function (code) { return { code: code, termKey: pickers[code].termKey, skills: pickers[code].api.collect() }; }),
+        subjects: Object.keys(pickers).map(function (code) {
+          return { code: code, termKey: pickers[code].termKey, skills: pickers[code].api.collect(), custom: !!pickers[code].custom, name: pickers[code].name };
+        }),
         overall: overallPicker ? overallPicker.collect() : [],
         applied: window.__alumniAppliedPicker ? window.__alumniAppliedPicker.collect() : [],
         toLearn: skillsToLearnTags.get(),
@@ -327,6 +374,7 @@
       writeFields(d.fields, FIELDS);              // the course lists its terms + overall skills
       writeFields(d.fields, ['alumni-term']);     // the last semester lists its subjects
       (d.subjects || []).forEach(function (s) {
+        if (s.custom) { addCustomBlock(s.code, s.name || '', s.skills); return; }
         var box = qsa('.cs-subject-pick', form).filter(function (c) {
           return c.value === s.code && (!s.termKey || c.getAttribute('data-term-key') === s.termKey);
         })[0];

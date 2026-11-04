@@ -416,11 +416,33 @@ def later_terms(program, current_key):
     return seq[keys.index(current_key) + 1:] if current_key in keys else []
 
 
+def learner_subjects_for_term(program, key):
+    """The subjects students and alumni pick from: the term's subjects minus the
+    "Professional Elective 1-4" placeholders. They add the elective they actually
+    took as a subject of their own (clean_custom_subject), like professors do."""
+    return [s for s in subjects_for_term(program, key) if s["code"] not in PROFESSIONAL_ELECTIVES]
+
+
+def learner_subjects_by_term():
+    """{program: {term_key: [subject, ...]}} without the elective placeholders (alumni survey)."""
+    return {program: {t["key"]: learner_subjects_for_term(program, t["key"]) for t in term_sequence(program)}
+            for program in PROGRAMS}
+
+
+def clean_learner_custom_subject(entry, program):
+    """A subject a student or alumnus added (e.g. the Professional Elective they took).
+    Same rules as a professor's, except the program is the respondent's own course."""
+    if not isinstance(entry, dict):
+        return None, "Malformed subject entry."
+    programs = [program] if program in PROGRAMS else list(PROGRAMS)
+    return clean_custom_subject({**entry, "programs": programs})
+
+
 def _term_payload(program, term):
     return {
         "term_key": term["key"],
         "term_label": term["label"],
-        "subjects": subjects_for_term(program, term["key"]),
+        "subjects": learner_subjects_for_term(program, term["key"]),
     }
 
 

@@ -95,6 +95,7 @@
     var otherWrap = document.getElementById('ms-other-subject');
     if (otherWrap) {
       buildOtherSubjectForm(otherWrap, {
+        learner: BOOT.levels !== 'ipa',
         knownCodes: BOOT.knownCodes,
         isTaken: function (code) { return !!pickers[code]; },
         onAdd: function (subj) {

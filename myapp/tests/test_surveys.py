@@ -643,11 +643,11 @@ class SurveyInstructionsTests(IsolatedDataMixin, TestCase):
     def test_privacy_notices_give_the_research_team_email(self):
         for name in ("student_survey", "alumni_survey"):
             r = self.client.get(reverse(name))
-            self.assertContains(r, "mailto:roxas.raphael@ue.edu.ph")
+            self.assertContains(r, "mailto:inquiries@uenvision.tech")
             self.assertNotContains(r, "through your course adviser")
         prof = CustomUser.objects.create_user(email="pr2@ue.edu.ph", password="secret123", first_name="P", last_name="R")
         self.client.force_login(prof)
-        self.assertContains(self.client.get(reverse("professor_survey")), "mailto:roxas.raphael@ue.edu.ph")
+        self.assertContains(self.client.get(reverse("professor_survey")), "mailto:inquiries@uenvision.tech")
 
     def test_alumni_last_semester_list_waits_for_the_course(self):
         r = self.client.get(reverse("alumni_survey"))
@@ -694,3 +694,71 @@ class CurriculumSuggestionTests(IsolatedDataMixin, TestCase):
         self.assertEqual([r["code"] for r in _curriculum_suggestions(admin, gap)], ["CFD 1101"])
         self.assertEqual(_curriculum_suggestions(admin, gap, "CCP 1101"), [])
         self.assertEqual(len(gap["by_subject"]), 2)  # the page's own gap data is left alone
+
+
+class LearnerElectiveTests(TestCase):
+    """Students and alumni don't get the "Professional Elective 1-4" placeholders; they add
+    the elective they took as a subject of their own, like professors do."""
+
+    def student_payload(self, extra):
+        from .. import curriculum_data
+        y1 = curriculum_data.build_student_eligibility()["BSIT"]["1"]
+        return {"consent": True, "has_previous": False,
+                "personal_info": {"name": "S", "ue_email": "s@ue.edu.ph", "course": "BSIT", "student_number": "1",
+                                  "year_level": 1, "section": "A"},
+                "subjects": [{"code": y1["current"]["subjects"][0]["code"], "term": "current", "skills": []}] + extra}
+
+    def test_elective_placeholders_are_not_offered(self):
+        from .. import curriculum_data
+        codes = set()
+        for years in curriculum_data.build_student_eligibility().values():
+            for e in years.values():
+                for t in [e["current"], e["previous"] or {"subjects": []}] + e["previous_summer"] + e["earlier"] + e["later"]:
+                    codes |= {s["code"] for s in t["subjects"]}
+        for terms in curriculum_data.learner_subjects_by_term().values():
+            for subs in terms.values():
+                codes |= {s["code"] for s in subs}
+        self.assertFalse(codes & curriculum_data.PROFESSIONAL_ELECTIVES)
+        self.assertNotContains(self.client.get(reverse("alumni_survey")), "Professional Elective 1")
+
+    def test_student_can_add_a_subject_that_is_not_listed(self):
+        r = self.client.post(reverse("student_survey_submit"), content_type="application/json", data=json.dumps(
+            self.student_payload([{"code": "cit  4105", "name": " Cloud  Computing ", "custom": True, "programs": ["BSCS"],
+                                   "skills": [{"name": "AWS", "level": "beginner"}]}])))
+        self.assertEqual(r.status_code, 200, r.content)
+        added = CurriculumSurveyResponse.objects.get().data["subjects"][1]
+        self.assertEqual((added["code"], added["name"], added["programs"], added["term"], added["custom"]),
+                         ("CIT 4105", "Cloud Computing", ["BSIT"], "added", True))   # their own course, not what was sent
+
+    def test_added_subject_must_not_reuse_a_listed_code(self):
+        r = self.client.post(reverse("student_survey_submit"), content_type="application/json", data=json.dumps(
+            self.student_payload([{"code": "CIT EL02", "name": "Elective", "custom": True, "skills": []}])))
+        self.assertEqual(r.status_code, 400)
+
+    def test_alumni_can_add_a_subject_and_the_page_offers_it(self):
+        self.assertContains(self.client.get(reverse("alumni_survey")), 'id="alumni-other-subject"')
+        self.assertContains(self.client.get(reverse("student_survey")), 'id="student-other-subject"')
+        from .. import curriculum_data
+        last = curriculum_data.learner_subjects_for_term("BSIT", curriculum_data.term_sequence("BSIT")[-1]["key"])[0]
+        payload = {"consent": True,
+                   "personal_info": {"name": "A", "ue_email": "a@ue.edu.ph", "course": "BSIT", "student_number": "1",
+                                     "year_graduated": "2025"},
+                   "subjects": [{"code": last["code"], "skills": []},
+                                {"code": "CIT 4199", "name": "Game Development", "custom": True, "skills": []}],
+                   "employment": {"status": "unemployed"}}
+        r = self.client.post(reverse("alumni_survey_submit"), content_type="application/json", data=json.dumps(payload))
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(CurriculumSurveyResponse.objects.get().data["subjects"][1]["programs"], ["BSIT"])
+
+    def test_my_skills_lets_a_student_add_a_subject(self):
+        user = CustomUser.objects.create_user(email="st@ue.edu.ph", password="secret123", first_name="S", last_name="T",
+                                              role=CustomUser.Role.STUDENT)
+        CurriculumSurveyResponse.objects.create(respondent_type="student", user=user, data={
+            "personal_info": {"course": "BSCS"}, "subjects": []})
+        self.client.force_login(user)
+        self.assertContains(self.client.get(reverse("my_skills")), 'id="ms-other-subject"')
+        r = self.client.post(reverse("my_skills_save"), content_type="application/json", data=json.dumps({"subjects": [
+            {"code": "CCS 4199", "name": "Game Development", "custom": True, "skills": [{"name": "Unity", "level": "beginner"}]}]}))
+        self.assertEqual(r.status_code, 200, r.content)
+        subj = CurriculumSurveyResponse.objects.get().data["subjects"][0]
+        self.assertEqual((subj["code"], subj["programs"], subj["custom"]), ("CCS 4199", ["BSCS"], True))

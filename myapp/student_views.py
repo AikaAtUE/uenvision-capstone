@@ -298,7 +298,7 @@ def _subject_options(program, professor=False):
     for prog in programs:
         for term in curriculum_data.term_sequence(prog):
             subs = []
-            for subj in curriculum_data.subjects_for_term(prog, term["key"]):
+            for subj in curriculum_data.learner_subjects_for_term(prog, term["key"]):
                 if subj["code"] in seen:
                     continue
                 seen.add(subj["code"])
@@ -417,12 +417,14 @@ def my_skills_save_view(request):
     professor = not request.user.is_learner
     levels = PROFESSOR_LEVELS if professor else LEARNER_LEVELS
     old = {s.get("code"): s for s in (response.data.get("subjects") or []) if isinstance(s, dict)}
+    learner_program = str(((response.data or {}).get("personal_info") or {}).get("course") or "")
     subjects, seen = [], set()
     for entry in payload["subjects"]:
         code = str((entry or {}).get("code") or "") if isinstance(entry, dict) else ""
-        if professor and entry.get("custom"):
-            # a subject the professor added because it isn't in the list
-            fields, error = curriculum_data.clean_custom_subject(entry)
+        if entry.get("custom"):
+            # a subject they added because it isn't in the list (an elective, ...)
+            fields, error = (curriculum_data.clean_custom_subject(entry) if professor else
+                             curriculum_data.clean_learner_custom_subject(entry, learner_program))
             if error:
                 return JsonResponse({"ok": False, "error": error}, status=400)
             code = fields["code"]

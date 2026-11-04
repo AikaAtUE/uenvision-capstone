@@ -117,9 +117,26 @@ def _ue_email_error(payload):
     return None
 
 
+def _clean_learner_custom_subjects(payload):
+    """Subjects a student / alumnus added because they aren't listed (their
+    Professional Elective, ...): checked like a professor's, tagged with their course.
+    Returns an error message or None."""
+    program = str(payload["personal_info"].get("course") or "")
+    for i, subj in enumerate(payload["subjects"]):
+        if isinstance(subj, dict) and subj.get("custom"):
+            info, error = curriculum_data.clean_learner_custom_subject(subj, program)
+            if error:
+                return error
+            payload["subjects"][i] = {**subj, **info, "term": "added", "term_label": "Added by you"}
+    return None
+
+
 @require_POST
 def student_survey_submit_view(request):
     payload, error = _parse_curriculum_submission(request)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    error = _clean_learner_custom_subjects(payload)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
     error = _ue_email_error(payload)
@@ -145,6 +162,9 @@ def student_survey_submit_view(request):
 @require_POST
 def alumni_survey_submit_view(request):
     payload, error = _parse_curriculum_submission(request)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    error = _clean_learner_custom_subjects(payload)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
     error = _ue_email_error(payload)
@@ -220,6 +240,7 @@ def student_survey_view(request):
         "currentSemLabel": period["current_label"],
         "ueEmailDomain": UE_EMAIL_DOMAIN,
         "eligibility": curriculum_data.build_student_eligibility(period["slot"]),
+        "knownCodes": sorted(curriculum_data.subject_by_code()),
         "targetRole": request.GET.get("role", ""),
         "skills": ontology.subject_skill_map(),
         "termTags": curriculum_data.subject_term_tags(),
@@ -242,7 +263,8 @@ def alumni_survey_view(request):
         "draftKey": _survey_draft_key(request, "alumni"),
         "programLabels": curriculum_data.PROGRAM_LABELS,
         "termsByProgram": terms_by_program,
-        "subjectsByProgramTerm": curriculum_data.SUBJECTS,
+        "subjectsByProgramTerm": curriculum_data.learner_subjects_by_term(),
+        "knownCodes": sorted(curriculum_data.subject_by_code()),
         "targetRole": request.GET.get("role", ""),
         "ueEmailDomain": UE_EMAIL_DOMAIN,
         "skills": ontology.subject_skill_map(),

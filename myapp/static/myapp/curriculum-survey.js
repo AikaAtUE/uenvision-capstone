@@ -525,19 +525,24 @@
 
   /* "Add a subject that isn't listed" (professors): code + title + whether it has
      BSIT/BSCS students. A subject with neither is skipped, not added.
-     opts: { knownCodes: [...], isTaken: fn(code), onAdd: fn({code, name, programs}) } */
+     opts: { knownCodes: [...], isTaken: fn(code), onAdd: fn({code, name, programs}),
+             learner: true for students / alumni: no BSIT/BSCS question (the subject
+             belongs to their own course) and elective wording } */
   function buildOtherSubjectForm(container, opts) {
     var uid = 'cs-other-' + Math.random().toString(36).slice(2, 8);
+    var learner = !!opts.learner;
     container.innerHTML =
       '<div class="cs-other">' +
         '<button type="button" class="btn btn-ghost btn-sm cs-other-toggle">+ Add a subject that isn\'t listed</button>' +
         '<div class="cs-other-form" hidden>' +
-          '<p class="muted">For example, the Professional Elective you handle. Only subjects taken by BSIT or BSCS students are part of this survey.</p>' +
+          (learner
+            ? '<p class="muted">For example, the Professional Elective you took. Use its own subject code and title from your class schedule or grades.</p>'
+            : '<p class="muted">For example, the Professional Elective you handle. Only subjects taken by BSIT or BSCS students are part of this survey.</p>') +
           '<div class="cs-other-fields">' +
             '<label class="field"><span>Subject code</span><input type="text" class="cs-other-code" maxlength="20" placeholder="e.g. CIT 4101" autocomplete="off"></label>' +
             '<label class="field cs-other-name-wrap"><span>Subject title</span><input type="text" class="cs-other-name" maxlength="120" placeholder="e.g. Cloud Computing" autocomplete="off"></label>' +
           '</div>' +
-          '<fieldset class="cs-other-programs"><legend>Does this subject have BSIT or BSCS students?</legend>' +
+          '<fieldset class="cs-other-programs"' + (learner ? ' hidden' : '') + '><legend>Does this subject have BSIT or BSCS students?</legend>' +
             '<label><input type="radio" name="' + uid + '" value="BSIT"> Yes, BSIT students</label>' +
             '<label><input type="radio" name="' + uid + '" value="BSCS"> Yes, BSCS students</label>' +
             '<label><input type="radio" name="' + uid + '" value="both"> Yes, both</label>' +
@@ -579,6 +584,12 @@
       if (known[code]) { showError(code + ' is already in the curriculum list. For an elective, use the elective\'s own subject code.'); codeIn.focus(); return; }
       if (opts.isTaken(code)) { showError('You already added ' + code + '.'); codeIn.focus(); return; }
       if (name.length < 2) { showError('Enter the subject title.'); nameIn.focus(); return; }
+      if (learner) {
+        opts.onAdd({ code: code, name: name, programs: [] });   // the server tags it with their course
+        reset();
+        open(false);
+        return;
+      }
       if (!pick) { showError('Say whether this subject has BSIT or BSCS students.'); return; }
       if (pick === 'none') return;
       opts.onAdd({ code: code, name: name, programs: pick === 'both' ? ['BSIT', 'BSCS'] : [pick] });
