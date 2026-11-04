@@ -5,7 +5,8 @@ UEnvision — the public side of the site and the student/alumni side:
 * check_gap: "are you a student or a fresh graduate?" -> registration -> the survey
 * skill_search / skill_add: the survey skill pickers' ontology search (public)
 * register: a student/alumni creates their account (with their personal information,
-  by UE email + password or with Google) before answering their survey; after the
+  by email + password or with Google; students must use their UE email, alumni may
+  use any email since they may no longer have their UE account) before answering their survey; after the
   survey they go to their dashboard. (Old "create your account" links from surveys
   answered before this, ?t=..., still work for their 3 days.)
 * student_dashboard (+ role / generate): a student's or alumni's own skill gap
@@ -178,6 +179,16 @@ def clean_learner_info(kind, post):
     return info, None
 
 
+def _valid_email(email):
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+    try:
+        validate_email(email)
+    except ValidationError:
+        return False
+    return True
+
+
 def register_view(request):
     token = request.GET.get("t") or request.POST.get("t") or ""
     if token:
@@ -216,8 +227,10 @@ def register_view(request):
     if not error and post.get("consent") != "on":
         error = "Please tick the box to agree to the Data Privacy Notice."
     if not error and not with_google:
-        if not google_auth.is_ue_email(email):
+        if kind == "student" and not google_auth.is_ue_email(email):
             error = f"Please use your UE email address (ending in @{google_auth.UE_EMAIL_DOMAIN})."
+        elif not _valid_email(email):
+            error = "Please enter a valid email address."
         elif CustomUser.objects.filter(email__iexact=email).exists():
             error = "An account with this email already exists. Please log in instead."
         elif len(password) < MIN_PASSWORD_LENGTH:

@@ -4,6 +4,8 @@
   to that account: "Continue with Google" on the login page. Their password keeps
   working too.
 * A new student / alumni can register with Google from the registration page
+  (students with their UE Google account; alumni with any Google account, since they
+  may no longer have their UE one)
   (student_views.register_view). That page checks their personal information first,
   keeps it in the session (PENDING_KEY), then sends them to Google; when Google sends
   them back, SocialAccountAdapter.save_user() makes the account from it.
@@ -93,7 +95,7 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
                 f"There is no UEnvision account for {email or 'that Google account'} yet. "
                 "Students and fresh graduates: press Check your skill gap to register first. "
                 "Faculty: sign up first, then you can use Continue with Google.")
-        if not is_ue_email(email):
+        if pending.get("role") != "alumni" and not is_ue_email(email):
             messages.error(request, f"Please choose your UE Google account (ending in @{UE_EMAIL_DOMAIN}). "
                                     f"{email or 'That account'} is not a UE email.")
             raise ImmediateHttpResponse(redirect(reverse("register") + f"?as={pending.get('role', 'student')}"))

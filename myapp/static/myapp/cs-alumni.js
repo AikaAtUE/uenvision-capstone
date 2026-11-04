@@ -23,7 +23,6 @@
       missingLevelError = CS.missingLevelError,
       LEARNER_LEVELS = CS.LEARNER_IPA_LEVELS,
       domId = CS.domId,
-      isUeEmail = CS.isUeEmail,
       termTagsHtml = CS.termTagsHtml,
       addSelectAll = CS.addSelectAll,
       blockCloseHtml = CS.blockCloseHtml,
@@ -271,8 +270,9 @@
       var yearGraduated = qs('#alumni-year-graduated', form).value.trim();
       var consent = qs('#alumni-consent', form).checked;
 
-      if (email && !isUeEmail(email)) {
-        setFormError('alumni-error', 'Please use your UE email address (ending in @' + (BOOT.ueEmailDomain || 'ue.edu.ph') + ').');
+      // Alumni may use any email: many no longer have their UE account.
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setFormError('alumni-error', 'Please enter a valid email address.');
         return;
       }
       if (!name || !email || !course || !studentNumber || !yearGraduated) {

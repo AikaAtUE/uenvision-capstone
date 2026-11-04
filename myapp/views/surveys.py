@@ -149,6 +149,14 @@ def _ue_email_error(payload):
     return None
 
 
+def _email_error(payload):
+    try:
+        validate_email(str(payload["personal_info"].get("ue_email") or "").strip())
+    except ValidationError:
+        return "Please enter a valid email address."
+    return None
+
+
 def _clean_learner_custom_subjects(payload):
     """Subjects a student / alumnus added because they aren't listed (their
     Professional Elective, ...): checked like a professor's, tagged with their course.
@@ -211,7 +219,8 @@ def alumni_survey_submit_view(request):
     error = _clean_learner_custom_subjects(payload)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
-    error = None if request.user.is_learner else _ue_email_error(payload)   # theirs is the account's
+    # theirs is the account's; alumni may use any email (they may have lost their UE one)
+    error = None if request.user.is_learner else _email_error(payload)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
     employment = payload.get("employment")

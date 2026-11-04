@@ -18,7 +18,7 @@
     <h3>How to answer</h3>
     <ol>
       {% if prefill %}<li>Check the details from your registration under <strong>About you</strong>. Press <strong>Change</strong> if something is wrong.</li>{% else %}<li>Read the Data Privacy Notice and tick the box to agree.</li>
-      <li>Fill in your name, UE email, student number, course and the year you graduated.</li>{% endif %}
+      <li>Fill in your name, email, student number, course and the year you graduated.</li>{% endif %}
       <li>Pick your course first, then your last semester at UE, and tick the subjects you took in it (<strong>Select all</strong> ticks the whole semester). You may also add subjects from your previous semesters; those are optional. For a Professional Elective, use <strong>+ Add a subject that isn’t listed</strong>.</li>
       <li>For each subject, pick the skills you learned and how far you got with each one: Introduced, Practiced or Applied (the same levels faculty use; each level is explained above the skill boxes). Press <strong>×</strong> on a subject's box to remove it.</li>
       <li>Pick the skills you learned overall at UE, then answer the questions about your current job or job search.</li>
@@ -43,7 +43,7 @@
       <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
       <ul>
         <li><strong>Purpose:</strong> to compare the technical skills taught in the BSIT/BSCS curricula against current IT/CS job market demand, including how well they carried over into your career.</li>
-        <li><strong>What is collected:</strong> your name, UE email, course, student number, year graduated, your subjects/skills, and your employment situation as you describe it.</li>
+        <li><strong>What is collected:</strong> your name, email, course, student number, year graduated, your subjects/skills, and your employment situation as you describe it.</li>
         <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
         <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
         <li><strong>Questions or concerns:</strong> email the UEnvision research team at <a class="link-inline" href="mailto:inquiries@uenvision.tech">inquiries@uenvision.tech</a>.</li>
@@ -64,7 +64,7 @@
     {% endif %}
     <div class="cs-row-2">
       <label class="field"><span>Full name</span><input type="text" id="alumni-name" value="{{ prefill.name|default:'' }}"{% if prefill %} readonly{% endif %} required></label>
-      <label class="field"><span>UE email address</span><input type="email" id="alumni-email" value="{{ prefill.email|default:'' }}"{% if prefill %} readonly{% endif %} required></label>
+      <label class="field"><span>Email address</span><input type="email" id="alumni-email" value="{{ prefill.email|default:'' }}"{% if prefill %} readonly{% endif %} required></label>
     </div>
     <div class="cs-row-3">
       <label class="field"><span>Course</span>

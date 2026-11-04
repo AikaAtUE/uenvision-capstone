@@ -292,6 +292,15 @@ class StudentFlowTests(IsolatedDataMixin, TestCase):
         self.assertEqual(dash.status_code, 200)
         self.assertContains(dash, "Job readiness")
 
+    def test_alumni_may_register_with_any_email(self):
+        r = self.register(**{"as": "alumni", "year_graduated": "2024", "email": "juan.alumni@gmail.com"})
+        self.assertRedirects(r, reverse("alumni_survey") + "?role=data-analyst", fetch_redirect_response=False)
+        self.assertEqual(CustomUser.objects.get().role, CustomUser.Role.ALUMNI)
+        self.client.logout()
+        self.assertContains(self.register(**{"as": "alumni", "year_graduated": "2024", "email": "not-an-email"}),
+                            "Please enter a valid email address.")
+        self.assertContains(self.register(email="juan@gmail.com"), "Please use your UE email address")   # students still need it
+
     def test_old_after_survey_links_still_work(self):
         from ..models import CurriculumSurveyResponse
         from ..student_views import register_url_for
