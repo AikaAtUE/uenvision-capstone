@@ -40,15 +40,21 @@
     insertLevelGuide(blocksWrap, IPA_LEVELS, 'How far each skill is taught (choose one per skill):');
     var statusEl = document.getElementById('professor-status');
     var saveBtn = document.getElementById('professor-save');
-    var editing = !!BOOT.record;
+    // With a saved record the page opens read-only; "Edit" turns editing on, then
+    // "Save changes" or "Cancel" (back to the saved record). A first answer is always editable.
+    var hasRecord = !!BOOT.record;
+    var editing = !hasRecord;
+    var savedRecord = BOOT.record ? JSON.parse(JSON.stringify(BOOT.record)) : null;
+    var savedStatus = statusEl ? statusEl.textContent : '';
     var dirty = false;
+    var askFirst = CS.askFirst || function () { return Promise.resolve(true); };
     var poolOf = {};   // code -> {subj, poolKey}
     ['current', 'previous_semester', 'previous_summer'].forEach(function (key) {
       (((BOOT.pools || {})[key]) || []).forEach(function (subj) { if (!poolOf[subj.code]) poolOf[subj.code] = { subj: subj, poolKey: key }; });
     });
 
     function markDirty() {
-      if (dirty || !editing) return;
+      if (dirty || !hasRecord || !editing) return;
       dirty = true;
       if (statusEl) { statusEl.textContent = 'Unsaved changes'; statusEl.classList.add('is-dirty'); }
     }
@@ -99,11 +105,18 @@
           addBlock(code, subj.name, [], { programs: subj.programs, termLabel: subj.term_label, bucket: poolKey });
         } else {
           var n = pickers[code] ? pickers[code].api.collect().length : 0;
-          if (n && !window.confirm('Remove ' + code + ' and its ' + n + ' skill' + (n === 1 ? '' : 's') + ' from your record?')) {
-            e.target.checked = true;
-            return;
-          }
-          removeBlock(code);
+          if (!n) { removeBlock(code); return; }
+          // keep it ticked until they confirm in the pop-up
+          var box = e.target;
+          box.checked = true;
+          askFirst('Remove ' + code + ' and its ' + n + ' skill' + (n === 1 ? '' : 's') + ' from your record?', 'Remove').then(function (yes) {
+            if (!yes) return;
+            box.checked = false;
+            removeBlock(code);
+            updatePickedCount();
+            markDirty();
+            form.dispatchEvent(new Event('change'));   // keep the saved draft in step
+          });
         }
       });
     }
@@ -150,10 +163,16 @@
       var block = btn.closest('.cs-subject-block');
       var code = block.getAttribute('data-code');
       var n = pickers[code] ? pickers[code].api.collect().length : 0;
-      if (n && !window.confirm('Remove ' + code + ' and its ' + n + ' skill' + (n === 1 ? '' : 's') + ' from your record?')) return;
-      removeBlock(code);
-      updatePickedCount();
-      markDirty();
+      var remove = function () {
+        removeBlock(code);
+        updatePickedCount();
+        markDirty();
+        form.dispatchEvent(new Event('change'));
+      };
+      if (!n) { remove(); return; }
+      askFirst('Remove ' + code + ' and its ' + n + ' skill' + (n === 1 ? '' : 's') + ' from your record?', 'Remove').then(function (yes) {
+        if (yes) remove();
+      });
     });
 
     renderPool('professor-current-subjects', 'current');
@@ -199,6 +218,67 @@
       e.returnValue = '';
     });
 
+    // Untick every subject and remove every skill block, then fill in `list` (the saved
+    // record on Cancel, nothing on "Clear all answers").
+    function resetTo(list) {
+      qsa('.cs-subject-pick', form).forEach(function (c) { c.checked = false; });
+      qsa('.cs-subject-block', blocksWrap).forEach(function (b) { b.remove(); });
+      pickers = {};
+      fillSubjects(list, false);
+      if (CS.refreshSelectAll) CS.refreshSelectAll();
+      updatePickedCount();
+    }
+
+    var editBtns = qsa('[data-ps-edit]', form);
+    var cancelBtn = document.getElementById('professor-cancel');
+    var clearBtn = document.getElementById('professor-clear');
+    function setEditing(on) {
+      editing = on;
+      form.classList.toggle('is-readonly', !on);
+      qsa('input, select, textarea, button', form).forEach(function (el) {
+        if (el.type === 'hidden' || el.hasAttribute('data-ps-action')) return;
+        el.disabled = !on;
+      });
+      editBtns.forEach(function (b) { b.hidden = on; });
+      if (saveBtn) saveBtn.hidden = !on;
+      if (cancelBtn) cancelBtn.hidden = !on;
+      if (clearBtn) clearBtn.hidden = !on;
+      if (on && CS.refreshSelectAll) CS.refreshSelectAll();   // a "Select all" with nothing to tick stays off
+    }
+    if (hasRecord) setEditing(false);
+    editBtns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        setEditing(true);
+        if (statusEl) statusEl.textContent = 'Editing: press Save changes when you are done.';
+        var first = qs('#professor-subject-filter', form);
+        if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+      });
+    });
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        var back = function () {
+          dirty = false;
+          if (statusEl) { statusEl.classList.remove('is-dirty'); statusEl.textContent = savedStatus; }
+          setFormError('professor-error', '');
+          resetTo(savedRecord);
+          setEditing(false);
+          if (editBtns.length) editBtns[editBtns.length - 1].focus();
+        };
+        if (!dirty) { back(); return; }
+        askFirst('Discard your changes? Your saved subjects and skills will be shown again.', 'Discard changes').then(function (yes) {
+          if (yes) back();
+        });
+      });
+    }
+    if (CS.wireClearAll) {
+      CS.wireClearAll(clearBtn, function () {
+        resetTo([]);
+        setFormError('professor-error', '');
+        markDirty();
+        form.dispatchEvent(new Event('change'));
+      }, draft, hasRecord ? 'Clear all your answers on this page? Nothing is saved until you press Save changes.' : null);
+    }
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('professor-error', '');
@@ -228,7 +308,7 @@
       if (saveBtn) saveBtn.textContent = 'Saving…';
 
       submitPayload(BOOT.submitUrl, form, payload, function (body) {
-        if (saveBtn) saveBtn.textContent = editing ? 'Save changes' : 'Submit survey';
+        if (saveBtn) saveBtn.textContent = hasRecord ? 'Save changes' : 'Submit survey';
         if (!body || body.ok !== true) return;   // offline fallback: nothing saved on the server
         dirty = false;
         draft.clear();
@@ -237,10 +317,15 @@
           setTimeout(function () { window.location.reload(); }, 1200);
           return;
         }
-        if (statusEl) { statusEl.classList.remove('is-dirty'); statusEl.textContent = 'Saved just now'; }
+        savedRecord = subjects.map(function (s) {
+          return { code: s.code, name: s.name, custom: !!s.custom, programs: s.programs || [], skills: s.skills };
+        });
+        savedStatus = 'Saved just now';
+        if (statusEl) { statusEl.classList.remove('is-dirty'); statusEl.textContent = savedStatus; }
+        setEditing(false);
         showToast('Your subjects and skills were saved.');
       }, function (msg) {
-        if (saveBtn) saveBtn.textContent = editing ? 'Save changes' : 'Submit survey';
+        if (saveBtn) saveBtn.textContent = hasRecord ? 'Save changes' : 'Submit survey';
         setFormError('professor-error', msg);
       });
     });

@@ -65,9 +65,9 @@
       </div>
     </div>
 
-    {# What the "You" column means: same level wording as the student / alumni survey (YOU_LEVELS in student_views.py). #}
+    {# What the "Your Skill Level" column means: same level wording as the student / alumni survey (YOU_LEVELS in student_views.py). #}
     <div class="sd-legend" id="you-legend">
-      <p class="sd-legend-title"><strong>What the &ldquo;You&rdquo; column means:</strong> your highest level for each skill, from your survey. Tap or point at a level in the tables to see this again.</p>
+      <p class="sd-legend-title"><strong>What &ldquo;Your Skill Level&rdquo; means:</strong> your highest level for each skill, from your survey. Tap or point at a level in the tables to see this again.</p>
       <ul class="sd-legend-list">
         {% for l in you_levels %}<li><span class="sd-pill sd-pill--{{ l.status }}">{{ l.label }}</span><span>{{ l.text }}</span></li>{% endfor %}
       </ul>
@@ -78,7 +78,7 @@
         <h2 class="section-title">Top skills {% if role %}for {{ role.label }}{% else %}across IT/CS roles{% endif %}</h2>
         <p class="muted sd-sub">{% if role %}The grey number is the share across all IT/CS postings.{% else %}Pick a job role above to see its own top skills.{% endif %}</p>
         <table class="sd-table">
-          <thead><tr><th>Skill</th><th>In postings</th><th class="sd-you-th">You <span class="sd-tip sd-tip--info"><button type="button" class="sd-tip-btn sd-info-btn" aria-expanded="false" aria-label="What the You column means" aria-describedby="you-th-top">ⓘ</button><span class="sd-tip-text" role="tooltip" id="you-th-top">Your highest level for this skill, from your survey.</span></span></th></tr></thead>
+          <thead><tr><th>Job Skills</th><th>In job postings</th><th class="sd-you-th">Your Skill Level <span class="sd-tip sd-tip--info"><button type="button" class="sd-tip-btn sd-info-btn" aria-expanded="false" aria-label="What the Your Skill Level column means" aria-describedby="you-th-top">ⓘ</button><span class="sd-tip-text" role="tooltip" id="you-th-top">Your highest level for this skill, from your survey.</span></span></th></tr></thead>
           <tbody>
           {% for s in compare %}
             <tr>
@@ -96,7 +96,7 @@
         <h2 class="section-title">Compared with overall in-demand skills</h2>
         <p class="muted sd-sub">The most requested skills across all IT/CS job postings.</p>
         <table class="sd-table">
-          <thead><tr><th>Skill</th><th>In postings</th><th class="sd-you-th">You <span class="sd-tip sd-tip--info"><button type="button" class="sd-tip-btn sd-info-btn" aria-expanded="false" aria-label="What the You column means" aria-describedby="you-th-all">ⓘ</button><span class="sd-tip-text" role="tooltip" id="you-th-all">Your highest level for this skill, from your survey.</span></span></th></tr></thead>
+          <thead><tr><th>Job Skills</th><th>In job postings</th><th class="sd-you-th">Your Skill Level <span class="sd-tip sd-tip--info"><button type="button" class="sd-tip-btn sd-info-btn" aria-expanded="false" aria-label="What the Your Skill Level column means" aria-describedby="you-th-all">ⓘ</button><span class="sd-tip-text" role="tooltip" id="you-th-all">Your highest level for this skill, from your survey.</span></span></th></tr></thead>
           <tbody>
           {% for s in overall %}
             <tr>

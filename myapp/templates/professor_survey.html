@@ -15,7 +15,7 @@
   <header class="cs-header">
     <h2 class="section-title">Curriculum Survey — Faculty</h2>
     {% if has_record %}
-    <p class="muted">Your subjects and the skills you cover in each. This is your saved record: change anything below whenever your subjects or lessons change, then press <strong>Save changes</strong>. The gap analysis and your subject recommendations use what's saved here.</p>
+    <p class="muted">Your subjects and the skills you cover in each. This is your saved record: press <strong>Edit</strong> whenever your subjects or lessons change, make your changes, then press <strong>Save changes</strong> (or <strong>Cancel</strong> to keep what was saved). The gap analysis and your subject recommendations use what's saved here.</p>
     {% else %}
     <p class="muted">A digital version of the Subjects and Technical Skills Survey. For each subject you teach, tell us which skills you cover and how (Introduced / Practiced / Applied). Your answers are linked to your account, so no personal details are asked. You can come back and edit them any time.</p>
     {% endif %}
@@ -27,7 +27,7 @@
       <li>Read the Data Privacy Notice and tick the box to agree.</li>
       <li>Tick every subject you teach this semester and last semester (<strong>Select all</strong> ticks a whole list). Use <strong>+ Add a subject that isn’t listed</strong> for one that is missing, like an elective.</li>
       <li>For each subject, type or pick the technical skills you cover and choose how far each one is taught: <strong>Introduced</strong>, <strong>Practiced</strong> or <strong>Applied</strong>. Each level is explained above the skill boxes. Press <strong>×</strong> on a subject's box to remove it.</li>
-      <li>Press <strong>Submit survey</strong> (or <strong>Save changes</strong> if you have answered before). You can come back and change your answers any time.</li>
+      <li>Press <strong>Submit survey</strong>. If you have answered before, your saved answers are shown first: press <strong>Edit</strong>, change them, then press <strong>Save changes</strong>. <strong>Clear all answers</strong> unticks every subject and removes every skill on the page (nothing is saved until you submit).</li>
     </ol>
   </div>
 
@@ -43,8 +43,15 @@
   <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
   {% endif %}
 
-  <form id="professor-survey-form" class="panel cs-panel" novalidate>
+  {# With a saved record the form opens read-only: "Edit" turns on editing (cs-professor.js). #}
+  <form id="professor-survey-form" class="panel cs-panel{% if has_record %} is-readonly{% endif %}" novalidate>
     {% csrf_token %}
+    {% if has_record %}
+    <div class="cs-readonly-banner" role="note">
+      <span>These are your saved answers. Press <strong>Edit</strong> to change them.</span>
+      <button type="button" class="btn btn-navy btn-sm" data-ps-action data-ps-edit>Edit</button>
+    </div>
+    {% endif %}
 
     {% if consent_at %}
     <details class="cs-privacy cs-privacy--accepted">
@@ -116,8 +123,11 @@
     <label class="cs-consent cs-consent--bottom"><input type="checkbox" data-mirror="professor-consent"> <span>I have read the <a href="#professor-privacy" class="link-inline">Data Privacy Notice</a> at the top of this page and voluntarily agree to participate. (You only need to do this once.)</span></label>
     {% endif %}
     <p class="form-msg form-msg--error" id="professor-error" hidden></p>
-    <div class="ps-save-bar">
-      <button type="submit" class="btn btn-navy" id="professor-save">{% if has_record %}Save changes{% else %}Submit survey{% endif %}</button>
+    <div class="ps-save-bar cs-submit-row">
+      {% if has_record %}<button type="button" class="btn btn-navy" id="professor-edit" data-ps-action data-ps-edit>Edit</button>{% endif %}
+      <button type="submit" class="btn btn-navy" id="professor-save" data-ps-action{% if has_record %} hidden{% endif %}>{% if has_record %}Save changes{% else %}Submit survey{% endif %}</button>
+      {% if has_record %}<button type="button" class="btn btn-ghost" id="professor-cancel" data-ps-action hidden>Cancel</button>{% endif %}
+      <button type="button" class="btn btn-ghost cs-clear-all" id="professor-clear" data-ps-action{% if has_record %} hidden{% endif %}>Clear all answers</button>
       <span class="muted ms-status" id="professor-status" role="status">{% if has_record and edited_at %}Last saved {{ edited_at|date:"M j, Y g:i A" }}{% endif %}</span>
     </div>
   </form>

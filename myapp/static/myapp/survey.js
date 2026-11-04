@@ -123,7 +123,9 @@
       body: JSON.stringify({ type: type, table: table, rows: rows })
     }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
-      return { ok: true, usedFallback: false };
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        return { ok: true, usedFallback: false, edited: !!body.edited, answers: body.answers || null };
+      });
     }).catch(function (err) {
       console.error('Survey submit failed, saving locally instead:', err);
       saveToLocalFallback(table, rows);
@@ -146,18 +148,95 @@
   }
 
   /* ---------- Likert statements (SUS and UAT) ---------- */
+  // Every point is labelled, not just the two ends.
+  var LIKERT_LABELS = ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'];
   function likertHtml(questions, prefix) {
     return questions.map(function (question, i) {
       var n = i + 1;
       var options = [1, 2, 3, 4, 5].map(function (v) {
-        return '<label class="likert-option"><input type="radio" name="' + prefix + '-q' + n + '" value="' + v + '" required><span>' + v + '</span></label>';
+        return '<label class="likert-option"><input type="radio" name="' + prefix + '-q' + n + '" value="' + v + '" required>' +
+          '<span class="likert-num">' + v + '</span><span class="likert-label">' + LIKERT_LABELS[v - 1] + '</span></label>';
       }).join('');
-      return '<div class="likert-group">' +
+      return '<div class="likert-group" role="radiogroup" aria-label="' + escapeHtml(n + '. ' + question) + '">' +
         '<p class="likert-question">' + n + '. ' + escapeHtml(question) + '</p>' +
-        '<div class="likert-scale">' +
-          '<span class="likert-end">Strongly disagree</span>' + options + '<span class="likert-end">Strongly agree</span>' +
-        '</div></div>';
+        '<div class="likert-scale">' + options + '</div></div>';
     }).join('');
+  }
+  function fillLikert(prefix, count, data) {
+    for (var n = 1; n <= count; n++) {
+      var input = qs('input[name="' + prefix + '-q' + n + '"][value="' + Number(data['q' + n]) + '"]');
+      if (input) input.checked = true;
+    }
+  }
+
+  /* ---------- answered surveys: shown filled in, read-only, with "Edit answers" ----------
+     The page gets this account's saved answers from views/feedback.py (saved_feedback).
+     Saving again replaces them on the server (one answer per account per survey). */
+  var SAVED = {};
+  try { SAVED = JSON.parse((qs('#saved-feedback') || {}).textContent || '{}') || {}; } catch (e) { SAVED = {}; }
+
+  function markAnswered(kind) {
+    var link = qs('.feedback-item[data-survey="' + kind + '"]', page);
+    if (link && !qs('.fb-done-badge', link)) {
+      var badge = document.createElement('span');
+      badge.className = 'fb-done-badge';
+      badge.textContent = 'Answered \u00b7 edit';
+      link.insertBefore(badge, link.lastElementChild);
+    }
+  }
+
+  // kind: "sus" / "uat" / "functional"; fill(saved) puts the saved answers in the form,
+  // blank() empties it (for a first answer).
+  function makeEditable(kind, form, fill, blank) {
+    var fieldset = qs('#' + kind + '-fields');
+    var bar = qs('#' + kind + '-saved');
+    var submitBtn = qs('button[type=submit]', form);
+    var cancelBtn = qs('[data-cancel="' + kind + '"]', form);
+    var editBtn = bar && qs('[data-edit="' + kind + '"]', bar);
+    var firstLabel = submitBtn.getAttribute('data-submit-label') || submitBtn.textContent;
+
+    function lock() {
+      var saved = SAVED[kind];
+      setFormError(kind + '-error', '');
+      if (!saved) {
+        if (fieldset) fieldset.disabled = false;
+        if (bar) bar.hidden = true;
+        submitBtn.hidden = false; submitBtn.textContent = firstLabel;
+        if (cancelBtn) cancelBtn.hidden = true;
+        return;
+      }
+      fill(saved);
+      if (fieldset) fieldset.disabled = true;
+      if (bar) {
+        bar.hidden = false;
+        var when = qs('.fb-saved-when', bar);
+        if (when) when.textContent = saved.edited_at ? 'Last edited ' + saved.edited_at + '.' :
+          (saved.submitted_at ? 'Submitted ' + saved.submitted_at + '.' : '');
+      }
+      submitBtn.hidden = true;
+      if (cancelBtn) cancelBtn.hidden = true;
+      markAnswered(kind);
+    }
+    function edit() {
+      if (fieldset) fieldset.disabled = false;
+      if (bar) bar.hidden = true;
+      submitBtn.hidden = false; submitBtn.textContent = 'Save changes';
+      if (cancelBtn) cancelBtn.hidden = false;
+      var first = fieldset && qs('input:not([type=hidden]), textarea', fieldset);
+      if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+    }
+    if (editBtn) editBtn.addEventListener('click', edit);
+    if (cancelBtn) cancelBtn.addEventListener('click', lock);
+    lock();
+    return {
+      // After a save: show the new answers read-only (or empty the form if the server
+      // wasn't reached and they were only kept in this browser).
+      saved: function (result) {
+        if (result && !result.usedFallback && result.answers) { SAVED[kind] = result.answers; lock(); }
+        else { blank(); lock(); }
+      },
+      wasEditing: function () { return !!SAVED[kind]; }
+    };
   }
   // -> array of answers (1-5), or null if a statement was skipped
   function readLikert(prefix, count) {
@@ -189,6 +268,11 @@
   function initSusForm() {
     renderSusQuestions();
     var form = qs('#sus-form');
+    var editor = makeEditable('sus', form, function (d) {
+      form.reset();
+      fillLikert('sus', SUS_QUESTIONS.length, d);
+      qs('#sus-comments').value = d.comments || '';
+    }, function () { form.reset(); });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('sus-error', '');
@@ -199,9 +283,10 @@
         comments: qs('#sus-comments').value.trim() || null
       };
       answers.forEach(function (value, i) { payload['q' + (i + 1)] = value; });
+      var editing = editor.wasEditing();
       saveSurveyResponse('sus', 'sus_responses', payload, form).then(function (result) {
-        form.reset();
-        showToast(result.usedFallback ? FALLBACK_MSG : 'Thanks! Your SUS evaluation was submitted.');
+        editor.saved(result);
+        showToast(result.usedFallback ? FALLBACK_MSG : (editing ? 'Your SUS answers were updated.' : 'Thanks! Your SUS evaluation was submitted.'));
         showSurveyHome();
       });
     });
@@ -213,6 +298,11 @@
     var questions = container && container.dataset.audience === 'learner' ? UAT_QUESTIONS_STUDENT : UAT_QUESTIONS;
     if (container && !container.childElementCount) container.innerHTML = likertHtml(questions, 'uat');
     var form = qs('#uat-form');
+    var editor = makeEditable('uat', form, function (d) {
+      form.reset();
+      fillLikert('uat', questions.length, d);
+      qs('#uat-comments').value = d.comments || '';
+    }, function () { form.reset(); });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('uat-error', '');
@@ -220,9 +310,10 @@
       if (!answers) { setFormError('uat-error', 'Please answer every statement before submitting.'); return; }
       var payload = { comments: qs('#uat-comments').value.trim() || null };
       answers.forEach(function (value, i) { payload['q' + (i + 1)] = value; });
+      var editing = editor.wasEditing();
       saveSurveyResponse('uat', 'uat_responses', payload, form).then(function (result) {
-        form.reset();
-        showToast(result.usedFallback ? FALLBACK_MSG : 'Thanks! Your UAT survey was submitted.');
+        editor.saved(result);
+        showToast(result.usedFallback ? FALLBACK_MSG : (editing ? 'Your UAT answers were updated.' : 'Thanks! Your UAT survey was submitted.'));
         showSurveyHome();
       });
     });
@@ -286,9 +377,40 @@
     });
   }
 
+  // Rebuild the sheet from saved rows: the given cases come back as plain text, added ones
+  // as boxes, each with its saved Yes / No and notes.
+  function fillFunctional(saved) {
+    var list = qs('#functional-rows');
+    if (!list) return;
+    list.innerHTML = '';
+    functionalRowCount = 0;
+    (saved.rows || []).forEach(function (row) {
+      var given = FUNCTIONAL_DEFAULT_ROWS.filter(function (d) { return d.feature === row.feature && d.scenario === row.scenario; })[0];
+      addFunctionalRow(given || {});
+      var card = list.lastElementChild;
+      if (!given) {
+        qs('.ft-feature', card).value = row.feature || '';
+        qs('.ft-scenario', card).value = row.scenario || '';
+      }
+      if (row.status === 'Yes' || row.status === 'No') {
+        var radio = qs('input[type=radio][value="' + row.status + '"]', card);
+        if (radio) radio.checked = true;
+      }
+      qs('.ft-actual', card).value = row.actual_result || '';
+      qs('.ft-notes', card).value = row.notes || '';
+    });
+  }
+  function blankFunctional() {
+    qs('#functional-form').reset();
+    qs('#functional-rows').innerHTML = '';
+    functionalRowCount = 0;
+    renderFunctionalTable();
+  }
+
   function initFunctionalForm() {
     renderFunctionalTable();
     var form = qs('#functional-form');
+    var editor = makeEditable('functional', form, fillFunctional, blankFunctional);
 
     qs('#functional-add-row').addEventListener('click', function () { addFunctionalRow(); });
 
@@ -315,12 +437,10 @@
         setFormError('functional-error', 'For every test case you answered No, please write what happened instead.');
         return;
       }
+      var editing = editor.wasEditing();
       saveSurveyResponse('functional', 'functional_test_results', rows, form).then(function (result) {
-        form.reset();
-        qs('#functional-rows').innerHTML = '';
-        functionalRowCount = 0;
-        renderFunctionalTable();
-        showToast(result.usedFallback ? FALLBACK_MSG : 'Thanks! Your test results were submitted.');
+        editor.saved(result);
+        showToast(result.usedFallback ? FALLBACK_MSG : (editing ? 'Your test results were updated.' : 'Thanks! Your test results were submitted.'));
         showSurveyHome();
       });
     });

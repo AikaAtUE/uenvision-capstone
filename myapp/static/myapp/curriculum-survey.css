@@ -259,3 +259,33 @@
 .cs-about-status.is-error { color: var(--red, #c8202f); }
 .cs-about-email { margin-bottom: 14px; }
 .cs-about-email input[readonly] { opacity: .75; cursor: not-allowed; }
+
+/* ---- My subjects & skills / Professor Survey: read-only until "Edit" ---- */
+.ms-readonly-note { display: none; flex: 1 1 260px; font-size: .9rem; margin: 0; }
+.ms-form.is-readonly .ms-readonly-note { display: block; }
+.ms-form.is-readonly .ms-add,
+.ms-form.is-readonly .ms-other,
+.ms-form.is-readonly .ms-remove-subject,
+.is-readonly .cs-tag-input,
+.is-readonly .cs-chip-remove,
+.is-readonly .cs-skill-results,
+.is-readonly .cs-block-close,
+.is-readonly .cs-select-all,
+.is-readonly .cs-other { display: none !important; }
+.is-readonly .cs-tagbox { pointer-events: none; background: var(--soft, #f6f7f9); }
+.is-readonly .cs-chip-level:disabled { opacity: 1; color: inherit; -webkit-appearance: none; appearance: none; background: transparent; border-color: transparent; padding-right: 4px; }
+.ms-actions [hidden] { display: none; }
+.ms-actions { flex-wrap: wrap; justify-content: flex-end; }
+.cs-clear-all { color: var(--red, #c8202f); border-color: currentColor; }
+.cs-clear-all:hover { background: rgba(200, 32, 47, .08); border-color: var(--red, #c8202f); }
+:root[data-theme="dark"] .cs-clear-all { color: #ff8b95; }
+.cs-submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.cs-submit-row [hidden] { display: none; }
+@media (max-width: 480px) {
+  .ms-actions .btn, .cs-submit-row .btn { flex: 1 1 auto; justify-content: center; }
+}
+.cs-readonly-banner { display: none; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; border: 1px solid var(--line); background: var(--soft, #f6f7f9); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; font-size: .92rem; }
+.is-readonly .cs-readonly-banner { display: flex; }
+/* read-only: only the subjects that are ticked are worth showing */
+.is-readonly .cs-subject-check:has(input:not(:checked)) { display: none; }
+.is-readonly .cs-subject-tools { display: none; }

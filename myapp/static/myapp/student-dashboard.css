@@ -81,5 +81,6 @@ button.sd-pill:focus-visible{outline:2px solid var(--navy-text); outline-offset:
   .sd-legend{padding:12px 14px;}
   .sd-legend-list li{grid-template-columns:1fr; gap:4px;}
   .sd-tip--info .sd-tip-text{left:auto; right:0;}
-  .sd-table th.sd-you-th{white-space:nowrap;}
+  /* "Your Skill Level" is longer than the old "You": let the headers wrap so the ⓘ stays inside the table */
+  .sd-table th, .sd-table th.sd-you-th{white-space:normal; line-height:1.3; overflow-wrap:break-word;}
 }

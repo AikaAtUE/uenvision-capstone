@@ -26,17 +26,22 @@
         {% endif %}
       </p>
 
-      <form id="my-skills-form" class="ms-form" novalidate>
+      {# Opens read-only; "Edit" turns on editing, then "Save changes" or "Cancel" (cs-my-skills.js). #}
+      <form id="my-skills-form" class="ms-form is-readonly" novalidate>
         {% csrf_token %}
         <div class="ms-toolbar">
           <label class="field ms-add"><span>Add a subject</span>
             <select id="ms-add-subject"><option value="">Choose a subject to add…</option></select>
           </label>
+          <p class="muted ms-readonly-note">These are your saved answers. Press <strong>Edit</strong> to change them.</p>
           <div class="ms-actions">
             <span class="muted ms-status" id="ms-status" role="status">
               {% if edited_at %}Last edited {{ edited_at|slice:":10" }}{% else %}From your survey on {{ submitted_at|date:"M j, Y" }}{% endif %}
             </span>
-            <button type="submit" class="btn btn-red" id="ms-save">Save changes</button>
+            <button type="button" class="btn btn-navy" id="ms-edit" data-ms-action>Edit</button>
+            <button type="button" class="btn btn-ghost cs-clear-all" id="ms-clear" data-ms-action hidden>Clear all answers</button>
+            <button type="button" class="btn btn-ghost" id="ms-cancel" data-ms-action hidden>Cancel</button>
+            <button type="submit" class="btn btn-red" id="ms-save" data-ms-action hidden>Save changes</button>
           </div>
         </div>
         <div id="ms-other-subject" class="ms-other"></div>

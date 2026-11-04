@@ -105,6 +105,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'myapp.context_processors.admin_notifications',
                 'myapp.feedback_nudge.banner',
+                'myapp.middleware.survey_first_context',
             ],
         },
     },

@@ -304,7 +304,10 @@ class SkillGapYouColumnTests(TestCase):
         self.assertIn('class="sd-pill sd-pill--missing sd-tip-btn"', html)
         self.assertIn("Does not count toward job readiness yet.", html)
         # the info button on the heading
-        self.assertIn('aria-label="What the You column means"', html)
+        self.assertIn('aria-label="What the Your Skill Level column means"', html)
+        self.assertIn('<th>Job Skills</th><th>In job postings</th>', html)
+        self.assertIn('Your Skill Level <span', html)
+        self.assertIn('What &ldquo;Your Skill Level&rdquo; means', html)
         self.assertIn("Your highest level for this skill, from your survey.", html)
 
     def test_readiness_wording_uses_the_new_levels(self):

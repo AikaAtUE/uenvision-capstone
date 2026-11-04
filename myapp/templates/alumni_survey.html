@@ -168,7 +168,10 @@
 
     <label class="cs-consent cs-consent--bottom"{% if prefill.complete %} hidden{% endif %}><input type="checkbox" data-mirror="alumni-consent"> <span>I have read the <a href="#alumni-privacy" class="link-inline">Data Privacy Notice</a> at the top of this page and voluntarily agree to participate.</span></label>
     <p class="form-msg form-msg--error" id="alumni-error" hidden></p>
-    <button type="submit" class="btn btn-navy">Submit survey</button>
+    <div class="cs-submit-row">
+      <button type="submit" class="btn btn-navy">Submit survey</button>
+      <button type="button" class="btn btn-ghost cs-clear-all" id="alumni-clear">Clear all answers</button>
+    </div>
   </form>
 </main>
 

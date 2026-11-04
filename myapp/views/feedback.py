@@ -2,6 +2,7 @@ import json
 
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
@@ -19,7 +20,8 @@ def feedback_view(request):
     audience = sus_audience(request.user)
     return render(request, "feedback.html", {"active_page": "feedback",
                                              "sus_first_statement": SUS_FIRST_STATEMENTS[audience],
-                                             "uat_audience": uat_audience(request.user)})
+                                             "uat_audience": uat_audience(request.user),
+                                             "saved_feedback": saved_feedback(request.user)})
 
 
 @login_required
@@ -95,6 +97,97 @@ def _compute_sus_score(answers):
     return round(sum(a - 1 for a in answers) / (4 * len(answers)) * 100, 2)
 
 
+# ---------------------------------------------------------------------------
+# Editing a submitted feedback survey
+# Each account keeps ONE answer per survey (and per version for SUS / UAT): submitting
+# again replaces it instead of adding another row, so the Feedback page can show the
+# saved answers with an "Edit answers" button. Accounts that already have several rows
+# from before this change keep them all (nothing is deleted); the latest one is the one
+# shown and the one an edit replaces.
+# ---------------------------------------------------------------------------
+def _version_filter(kind):
+    """The data__ lookup that limits a user's rows to the survey version answered now."""
+    if kind == SurveyResponse.SUS:
+        return {"data__sus_version": SUS_VERSION}
+    if kind == SurveyResponse.UAT:
+        return {"data__uat_version": UAT_VERSION}
+    return {}
+
+
+def _latest(user, kind, lock=False):
+    qs = SurveyResponse.objects.filter(user=user, survey_type=kind, **_version_filter(kind))
+    if lock:
+        qs = qs.select_for_update()
+    return qs.order_by("-created_at", "-pk").first()
+
+
+def _latest_functional_rows(user, lock=False):
+    """The rows of this account's latest functional test sheet (one submission_id), oldest first."""
+    last = _latest(user, SurveyResponse.FUNCTIONAL, lock=lock)
+    if last is None:
+        return []
+    sid = (last.data or {}).get("submission_id")
+    if not sid:
+        return [last]
+    qs = SurveyResponse.objects.filter(user=user, survey_type=SurveyResponse.FUNCTIONAL, data__submission_id=sid)
+    if lock:
+        qs = qs.select_for_update()
+    return list(qs.order_by("pk"))
+
+
+def _when(resp):
+    data = resp.data or {}
+    return {"submitted_at": timezone.localtime(resp.created_at, PH_TIME).strftime("%b %d, %Y").replace(" 0", " "),
+            "edited_at": data.get("edited_at") or ""}
+
+
+def saved_feedback(user):
+    """What this account already answered on the Feedback page, for survey.js to fill in:
+    {"sus": {...answers, submitted_at}, "uat": {...}, "functional": {"rows": [...], submitted_at}}."""
+    out = {}
+    for kind in (SurveyResponse.SUS, SurveyResponse.UAT):
+        resp = _latest(user, kind)
+        if resp is not None:
+            out[kind] = dict(resp.data or {}, **_when(resp))
+    if not user.is_learner:
+        rows = _latest_functional_rows(user)
+        if rows:
+            out[SurveyResponse.FUNCTIONAL] = dict(rows=[r.data for r in rows], **_when(rows[0]))
+    return out
+
+
+def _save_replacing(user, kind, rows):
+    """Save `rows` as this account's answer to `kind`, replacing its latest earlier answer
+    (same survey and version). Returns True if an earlier answer was replaced."""
+    dummy = user.answers_are_dummy
+    with transaction.atomic():
+        if kind in (SurveyResponse.SUS, SurveyResponse.UAT):
+            row = rows[0]
+            existing = _latest(user, kind, lock=True)
+            if existing is None:
+                SurveyResponse.objects.create(survey_type=kind, user=user, data=row, is_dummy=dummy)
+                return False
+            row["edited_at"] = timezone.localtime(timezone.now(), PH_TIME).strftime("%b %d, %Y").replace(" 0", " ")
+            existing.data, existing.is_dummy = row, dummy
+            existing.save(update_fields=["data", "is_dummy"])
+            return True
+        # Functional sheet: one row per test case, all sharing a submission_id. An edit swaps
+        # the rows of the latest sheet for the new ones and keeps its submission_id.
+        old = _latest_functional_rows(user, lock=True)
+        if old and (old[0].data or {}).get("submission_id"):
+            sid = old[0].data["submission_id"]
+            edited = timezone.localtime(timezone.now(), PH_TIME).strftime("%b %d, %Y").replace(" 0", " ")
+            for row in rows:
+                row["submission_id"], row["edited_at"] = sid, edited
+            SurveyResponse.objects.filter(pk__in=[r.pk for r in old]).delete()
+            replaced = True
+        else:
+            replaced = False
+        SurveyResponse.objects.bulk_create(
+            [SurveyResponse(survey_type=kind, user=user, data=row, is_dummy=dummy) for row in rows])
+        return replaced
+
+
 @require_POST
 def survey_submit_view(request):
     # Return JSON (not a redirect) so the fetch() in survey.js sees a real 401.
@@ -116,6 +209,8 @@ def survey_submit_view(request):
         or not all(isinstance(r, dict) for r in rows)
     ):
         return JsonResponse({"ok": False, "error": "Invalid survey data."}, status=400)
+    if kind in (SurveyResponse.SUS, SurveyResponse.UAT) and len(rows) != 1:
+        return JsonResponse({"ok": False, "error": "Send one answer at a time."}, status=400)
     if request.user.is_learner and kind == SurveyResponse.FUNCTIONAL:
         return JsonResponse({"ok": False, "error": "Students and alumni answer the SUS and UAT surveys only."}, status=403)
 
@@ -148,7 +243,5 @@ def survey_submit_view(request):
             # The day it was completed, in Philippine time (the server clock is UTC).
             row["test_date"] = timezone.localdate(timezone=PH_TIME).isoformat()
 
-    SurveyResponse.objects.bulk_create(
-        [SurveyResponse(survey_type=kind, user=request.user, data=row, is_dummy=request.user.answers_are_dummy) for row in rows]
-    )
-    return JsonResponse({"ok": True, "saved": len(rows)})
+    replaced = _save_replacing(request.user, kind, rows)
+    return JsonResponse({"ok": True, "saved": len(rows), "edited": replaced, "answers": saved_feedback(request.user).get(kind)})

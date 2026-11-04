@@ -145,7 +145,8 @@ class ProfessorSurveyFirstMiddleware:
             if match is not None and match.url_name not in PROFESSOR_SURVEY_URL_NAMES and needs_professor_survey(user):
                 if _wants_json(request):
                     return JsonResponse({"ok": False, "error": "Please answer the Professor Survey first."}, status=403)
-                return redirect(f"{reverse('professor_survey')}?first=1")
+                # required=1: the survey page shows the "answer the initial survey first" pop-up once
+                return redirect(f"{reverse('professor_survey')}?first=1&required=1")
         return self.get_response(request)
 
 
@@ -185,5 +186,34 @@ class LearnerSurveyFirstMiddleware:
             if match is not None and match.url_name not in LEARNER_SURVEY_URL_NAMES and needs_learner_survey(user):
                 if _wants_json(request):
                     return JsonResponse({"ok": False, "error": "Please answer the survey first."}, status=403)
-                return redirect("alumni_survey" if user.role == user.Role.ALUMNI else "student_survey")
+                return redirect(reverse("alumni_survey" if user.role == user.Role.ALUMNI else "student_survey") + "?required=1")
         return self.get_response(request)
+
+
+def survey_first_context(request):
+    """Context processor: for a student / alumni / faculty member who hasn't answered their
+    initial survey yet, {"survey_first": {"url": ..., "allowed": [...]}} so survey-first.js can
+    show a pop-up (instead of a silent redirect) when they click a link the middleware above
+    would bounce. "allowed" mirrors the middleware's allow-list as paths. Developers,
+    administrators and dummy accounts never get it."""
+    user = getattr(request, "user", None)
+    if user is None or not user.is_authenticated:
+        return {}
+    if user.is_learner:
+        if not needs_learner_survey(user):
+            return {}
+        url, names = reverse("alumni_survey" if user.role == user.Role.ALUMNI else "student_survey"), LEARNER_SURVEY_URL_NAMES
+    elif getattr(user, "role", "") == "faculty":
+        if not needs_professor_survey(user):
+            return {}
+        url, names = reverse("professor_survey"), PROFESSOR_SURVEY_URL_NAMES
+    else:
+        return {}
+    allowed = set()
+    for name in names:
+        try:
+            allowed.add(reverse(name))
+        except Exception:   # needs arguments (e.g. the emailed reset link): never in the menus
+            continue
+    allowed.add(url)
+    return {"survey_first": {"url": url, "allowed": sorted(allowed)}}

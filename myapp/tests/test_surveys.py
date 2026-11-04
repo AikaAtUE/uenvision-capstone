@@ -643,7 +643,7 @@ class LearnerSurveyFirstTests(IsolatedDataMixin, TestCase):
                                               last_name="T", role=CustomUser.Role.ALUMNI)
         self.client.force_login(user)
         for name in ("student_dashboard", "my_skills", "feedback"):
-            self.assertRedirects(self.client.get(reverse(name)), reverse("alumni_survey"), fetch_redirect_response=False)
+            self.assertRedirects(self.client.get(reverse(name)), reverse("alumni_survey") + "?required=1", fetch_redirect_response=False)
         self.assertRedirects(self.client.get(reverse("student_survey")), reverse("alumni_survey"),
                              fetch_redirect_response=False)   # their own survey
         page = self.client.get(reverse("alumni_survey"))
@@ -672,7 +672,7 @@ class ProfessorSurveyFirstTests(IsolatedDataMixin, TestCase):
         self.client.force_login(self.make())
         for name in ("dashboard", "recommendations", "data", "feedback"):
             r = self.client.get(reverse(name))
-            self.assertRedirects(r, reverse("professor_survey") + "?first=1", fetch_redirect_response=False)
+            self.assertRedirects(r, reverse("professor_survey") + "?first=1&required=1", fetch_redirect_response=False)
         page = self.client.get(reverse("professor_survey"))
         self.assertContains(page, "Please answer this survey once before using the rest of the site")
         self.assertEqual(self.client.get(reverse("settings")).status_code, 200)   # account basics still open

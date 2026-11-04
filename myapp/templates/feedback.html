@@ -13,15 +13,18 @@
       <div class="feedback-list">
         <a class="feedback-item" href="#" data-survey="sus">
           <span>System Usability Scale (SUS) evaluation</span>
+          {% if saved_feedback.sus %}<span class="fb-done-badge">Answered · edit</span>{% endif %}
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
         <a class="feedback-item" href="#" data-survey="uat">
           <span>User Acceptance Testing survey</span>
+          {% if saved_feedback.uat %}<span class="fb-done-badge">Answered · edit</span>{% endif %}
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
         {% if not user.is_learner %}
         <a class="feedback-item" href="#" data-survey="functional">
           <span>Functional test case sheet</span>
+          {% if saved_feedback.functional %}<span class="fb-done-badge">Answered · edit</span>{% endif %}
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a>
         {% endif %}
@@ -33,16 +36,25 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel">
         <h2 class="section-title">System Usability Scale (SUS) evaluation</h2>
-        <p class="muted survey-desc">For each statement, choose how much you agree, from 1 (Strongly disagree) to 5 (Strongly agree).</p>
+        <p class="muted survey-desc">For each statement, choose how much you agree, from 1 (Strongly disagree), 2 (Disagree), 3 (Neutral), 4 (Agree) to 5 (Strongly agree).</p>
         <form id="sus-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
 
+          <div class="fb-saved" id="sus-saved" hidden>
+            <p class="fb-saved-text"><strong>You already answered this.</strong> <span class="fb-saved-when"></span> Your answers are shown below. Press <strong>Edit answers</strong> to change them; saving replaces your earlier answers.</p>
+            <button type="button" class="btn btn-navy btn-sm fb-edit-btn" data-edit="sus">Edit answers</button>
+          </div>
+          <fieldset class="fb-fieldset" id="sus-fields">
           <div class="likert-list" id="sus-questions" data-first-statement="{{ sus_first_statement }}"></div>
 
           <label class="field"><span>Additional comments (optional)</span><textarea id="sus-comments" rows="3"></textarea></label>
+          </fieldset>
           <p class="form-msg form-msg--error form-error" id="sus-error" hidden></p>
-          <button type="submit" class="btn btn-navy">Submit evaluation</button>
+          <div class="fb-actions">
+            <button type="submit" class="btn btn-navy" data-submit-label="Submit evaluation">Submit evaluation</button>
+            <button type="button" class="btn btn-ghost fb-cancel-btn" data-cancel="sus" hidden>Cancel</button>
+          </div>
         </form>
       </div>
     </div>
@@ -52,17 +64,26 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel">
         <h2 class="section-title">User Acceptance Testing survey</h2>
-        <p class="muted survey-desc">Tell us how you felt about using UEnvision. For each statement, choose how much you agree, from 1 (Strongly disagree) to 5 (Strongly agree). There are no right or wrong answers.</p>
+        <p class="muted survey-desc">Tell us how you felt about using UEnvision. For each statement, choose how much you agree, from 1 (Strongly disagree), 2 (Disagree), 3 (Neutral), 4 (Agree) to 5 (Strongly agree). There are no right or wrong answers.</p>
         <form id="uat-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
 
           {# students and alumni get their own statements (UAT_QUESTIONS_STUDENT in survey.js) #}
+          <div class="fb-saved" id="uat-saved" hidden>
+            <p class="fb-saved-text"><strong>You already answered this.</strong> <span class="fb-saved-when"></span> Your answers are shown below. Press <strong>Edit answers</strong> to change them; saving replaces your earlier answers.</p>
+            <button type="button" class="btn btn-navy btn-sm fb-edit-btn" data-edit="uat">Edit answers</button>
+          </div>
+          <fieldset class="fb-fieldset" id="uat-fields">
           <div class="likert-list" id="uat-questions" data-audience="{{ uat_audience }}"></div>
 
           <label class="field"><span>What did you like, and what would you improve? (optional)</span><textarea id="uat-comments" rows="3"></textarea></label>
+          </fieldset>
           <p class="form-msg form-msg--error form-error" id="uat-error" hidden></p>
-          <button type="submit" class="btn btn-navy">Submit survey</button>
+          <div class="fb-actions">
+            <button type="submit" class="btn btn-navy" data-submit-label="Submit survey">Submit survey</button>
+            <button type="button" class="btn btn-ghost fb-cancel-btn" data-cancel="uat" hidden>Cancel</button>
+          </div>
         </form>
       </div>
     </div>
@@ -77,11 +98,20 @@
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
 
+          <div class="fb-saved" id="functional-saved" hidden>
+            <p class="fb-saved-text"><strong>You already answered this.</strong> <span class="fb-saved-when"></span> Your answers are shown below. Press <strong>Edit answers</strong> to change them; saving replaces your earlier answers.</p>
+            <button type="button" class="btn btn-navy btn-sm fb-edit-btn" data-edit="functional">Edit answers</button>
+          </div>
+          <fieldset class="fb-fieldset" id="functional-fields">
           <div class="ft-list" id="functional-rows"></div>
           <button type="button" class="btn btn-ghost btn-sm" id="functional-add-row">+ Add test case</button>
+          </fieldset>
 
           <p class="form-msg form-msg--error form-error" id="functional-error" hidden></p>
-          <button type="submit" class="btn btn-navy">Submit test results</button>
+          <div class="fb-actions">
+            <button type="submit" class="btn btn-navy" data-submit-label="Submit test results">Submit test results</button>
+            <button type="button" class="btn btn-ghost fb-cancel-btn" data-cancel="functional" hidden>Cancel</button>
+          </div>
         </form>
       </div>
     </div>
@@ -90,5 +120,6 @@
 </section>
 {% endblock %}
 {% block extra_js %}
+{{ saved_feedback|json_script:"saved-feedback" }}
 <script src="{% static 'myapp/survey.js' %}?v={% now 'U' %}"></script>
 {% endblock %}

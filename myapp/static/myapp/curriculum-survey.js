@@ -216,10 +216,12 @@
         '<button type="button" class="link-inline cs-draft-reset">Start over</button>';
       form.insertBefore(note, form.firstChild);
       qs('.cs-draft-reset', note).addEventListener('click', function () {
-        if (!window.confirm('Clear the answers you started and begin again?')) return;
-        stopped = true;
-        try { localStorage.removeItem(key); } catch (e) {}
-        window.location.reload();
+        askFirst('Clear the answers you started and begin again?', 'Start over').then(function (yes) {
+          if (!yes) return;
+          stopped = true;
+          try { localStorage.removeItem(key); } catch (e) {}
+          window.location.reload();
+        });
       });
       status.textContent = 'Your answers are saved on this device until you submit.';
     } else if (saved) {
@@ -238,8 +240,42 @@
         clearTimeout(timer);
         try { localStorage.removeItem(key); } catch (e) {}
         status.textContent = '';
+      },
+      // "Clear all answers": forget the saved draft but keep saving new answers from now on.
+      discard: function () {
+        clearTimeout(timer); timer = null;
+        try { localStorage.removeItem(key); } catch (e) {}
+        status.textContent = '';
+        var banner = qs('.cs-draft-banner', form);
+        if (banner) banner.remove();
       }
     };
+  }
+
+  /* ---------- on-page confirm (ue-modal.js) instead of the browser's confirm() ---------- */
+  function askFirst(message, okLabel, cancelLabel) {
+    if (window.UEModal) {
+      return window.UEModal.confirm({ message: message, okLabel: okLabel || 'OK', cancelLabel: cancelLabel || 'Cancel', danger: true });
+    }
+    return Promise.resolve(true);
+  }
+
+  /* ---------- "Clear all answers" button ----------
+     Asks first, then runs the page's own clear() (untick every subject, remove every skill
+     and level; the "About you" account fields stay) and forgets the saved draft. Nothing is
+     changed on the server until the survey is submitted / saved. */
+  function wireClearAll(button, clear, draft, message) {
+    if (!button) return;
+    button.addEventListener('click', function () {
+      askFirst(message || 'Clear all your answers on this page? Nothing is saved until you submit.', 'Clear all answers')
+        .then(function (yes) {
+          if (!yes) return;
+          clear();
+          // the page reacts to the cleared boxes with change events (which save a draft): drop it afterwards
+          setTimeout(function () { if (draft && draft.discard) draft.discard(); }, 450);
+          showToast('All your answers on this page were cleared.');
+        });
+    });
   }
 
   // Plain fields by id: text/select value, or checked for a checkbox.
@@ -770,6 +806,8 @@
     submitPayload: submitPayload,
     showLearnerDone: showLearnerDone,
     surveyDraft: surveyDraft,
+    askFirst: askFirst,
+    wireClearAll: wireClearAll,
     readFields: readFields,
     writeFields: writeFields,
     aboutNames: aboutNames,

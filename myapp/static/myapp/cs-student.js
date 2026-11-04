@@ -256,6 +256,17 @@
       });
     });
 
+    // "Clear all answers": drop the subjects they added, then redraw the subject lists for the
+    // same course and year level (every box unticked, every skill block gone).
+    CS.wireClearAll(document.getElementById('student-clear'), function () {
+      Object.keys(pickers).forEach(removeSubjectBlock);
+      pickers = {};
+      renderSubjectGroups();
+      updatePickedCount();
+      setFormError('student-error', '');
+      form.dispatchEvent(new Event('change'));
+    }, draft);
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('student-error', '');

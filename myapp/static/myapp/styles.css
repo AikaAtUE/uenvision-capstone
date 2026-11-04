@@ -829,3 +829,34 @@ a.btn { text-decoration: none; }
 :root[data-theme="dark"] img.sidebar-logo--full, :root[data-theme="dark"] img.auth-logo,
 :root[data-theme="dark"] img.about-logo, :root[data-theme="dark"] img.pub-logo{background:#f2f3f5; padding:6px 10px; border-radius:10px;}
 :root[data-theme="dark"] img.sidebar-logo--mark{background:#f2f3f5; padding:3px; border-radius:8px;}
+
+/* ============ Likert scale with a label under every point (SUS / UAT) ============ */
+.likert-scale { align-items: stretch; }
+.likert-option { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
+.likert-option .likert-num { display: block; }
+.likert-option .likert-label { display: block; border: 0; padding: 0; background: none; font-size: .74rem; line-height: 1.25; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
+.likert-option input:checked ~ .likert-label { color: var(--ink); font-weight: 600; }
+@media (max-width: 640px) {
+  .likert-scale { gap: 4px; }
+  .likert-option .likert-label { font-size: .68rem; }
+}
+
+/* ============ Feedback: answered surveys can be edited ============ */
+.fb-done-badge { margin-left: auto; margin-right: 10px; font-size: .74rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.16); white-space: nowrap; }
+.fb-saved { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; border: 1px solid var(--line); background: var(--soft); border-radius: 10px; padding: 12px 14px; margin: 0 0 16px; }
+.fb-saved[hidden] { display: none; }
+.fb-saved-text { flex: 1 1 260px; font-size: .9rem; line-height: 1.5; }
+.fb-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.fb-fieldset:disabled .likert-option, .fb-fieldset:disabled .uat-radio { cursor: default; }
+.fb-fieldset:disabled .likert-option:hover span.likert-num { border-color: var(--line); }
+.fb-fieldset:disabled textarea, .fb-fieldset:disabled input[type=text] { opacity: .85; }
+.fb-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 6px; }
+.fb-actions [hidden] { display: none; }
+
+/* ============ On-page dialog (ue-modal.js) ============ */
+.ue-modal { width: 100%; max-width: 440px; padding: 28px 24px; }
+.ue-modal-title { font-size: 1.15rem; margin-bottom: 10px; color: var(--ink); }
+.ue-modal .ue-modal-text { font-weight: 500; font-size: .98rem; margin-bottom: 22px; color: var(--ink); }
+.ue-modal .modal-actions { flex-wrap: wrap; }
+.ue-modal .modal-actions .btn { text-decoration: none; justify-content: center; }
+@media (max-width: 420px) { .ue-modal .modal-actions .btn { flex: 1 1 100%; } }

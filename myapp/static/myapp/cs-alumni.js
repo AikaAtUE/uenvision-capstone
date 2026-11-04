@@ -258,6 +258,26 @@
     var skillsToLearnTags = tagInput('alumni-skills-to-learn-input', 'alumni-skills-to-learn-list');
     var upskillTags = tagInput('alumni-upskilling-input', 'alumni-upskilling-list');
 
+    // "Clear all answers": drop the subjects they added, redraw the subject lists, the overall
+    // and "skills applied" pickers for the same course (all empty), and empty the employment
+    // answers. "About you" (name, course, student number, ...) stays as it is.
+    CS.wireClearAll(document.getElementById('alumni-clear'), function () {
+      Object.keys(pickers).forEach(removeSubjectBlock);
+      pickers = {};
+      programSel.dispatchEvent(new Event('change'));
+      skillsToLearnTags.set([]);
+      upskillTags.set([]);
+      qsa('input[name="alumni-employed"], input[name="alumni-first-job"], input[name="alumni-upskilling"]', form)
+        .forEach(function (r) { r.checked = false; });
+      ['alumni-role', 'alumni-jobs-applied', 'alumni-rejection-reason', 'alumni-skills-to-learn-input', 'alumni-upskilling-input']
+        .forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+      employedBranch.hidden = true;
+      unemployedBranch.hidden = true;
+      upskillBranch.hidden = true;
+      setFormError('alumni-error', '');
+      form.dispatchEvent(new Event('change'));
+    }, { discard: function () { if (typeof draft !== 'undefined' && draft) draft.discard(); } });
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('alumni-error', '');
