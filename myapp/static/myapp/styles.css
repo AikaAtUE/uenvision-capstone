@@ -643,3 +643,22 @@ a.btn { text-decoration: none; }
   .settings-row:has(.email-cell) { flex-direction: column; gap: 8px; }
   .settings-row dd.email-cell { justify-content: flex-start; text-align: left; }
 }
+
+/* Feedback reminder above the red header: the bell sits in the same top-right corner, so
+   keep "Answer now" / "Later" clear of it (wide screens; on phones the bell is in the top bar). */
+@media (min-width: 721px) {
+  .content:has(> .notif-bell) .feedback-nudge { padding-right: 84px; }
+}
+/* Bell outline: a dark edge around the white bell so it stays visible on light backgrounds
+   (e.g. over the feedback reminder) as well as on the red header. */
+.notif-bell-btn svg path { stroke: rgba(22, 35, 63, .75); stroke-width: 1.1; paint-order: stroke; }
+.notif-bell-btn svg { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .25)); }
+.notif-bell.is-open .notif-bell-btn svg path { stroke: currentColor; }
+
+/* First-visit introduction to the menu (welcome-tips.js) */
+.welcome-tips { margin: 0; padding: 14px 28px; border-bottom: 1px solid #d6def0; background: #eef2fa; font-size: .9rem; }
+.welcome-tips p { margin: 0 0 8px; line-height: 1.5; }
+.welcome-tips-list { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 4px; }
+.welcome-tips-list strong { color: var(--navy); }
+@media (min-width: 721px) { .content:has(> .notif-bell) .welcome-tips { padding-right: 84px; } }
+@media (max-width: 720px) { .welcome-tips { padding: 12px 16px; } }

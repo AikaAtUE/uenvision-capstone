@@ -21,7 +21,10 @@
       termTagsHtml = CS.termTagsHtml,
       wireSubjectFilter = CS.wireSubjectFilter,
       buildOtherSubjectForm = CS.buildOtherSubjectForm,
-      addedTag = CS.addedTag;
+      addedTag = CS.addedTag,
+      addSelectAll = CS.addSelectAll,
+      blockCloseHtml = CS.blockCloseHtml,
+      insertLevelGuide = CS.insertLevelGuide;
 
   /* =====================================================================
      PROFESSOR SURVEY
@@ -34,6 +37,7 @@
     // saved subjects (null on a first visit), which are pre-filled below.
     var pickers = {};
     var blocksWrap = qs('#professor-subject-blocks');
+    insertLevelGuide(blocksWrap, IPA_LEVELS, 'How far each skill is taught (choose one per skill):');
     var statusEl = document.getElementById('professor-status');
     var saveBtn = document.getElementById('professor-save');
     var editing = !!BOOT.record;
@@ -63,6 +67,7 @@
       var blockId = 'cs-psubj-' + domId(code);
       blocksWrap.insertAdjacentHTML('beforeend',
         '<div class="cs-subject-block" id="' + blockId + '" data-code="' + escapeHtml(code) + '">' +
+          (extra.removable ? '' : blockCloseHtml(code)) +
           '<div class="ms-subject-head"><h4>' + escapeHtml(code) + ' — ' + escapeHtml(name) + (extra.tag ? ' ' + extra.tag : '') + '</h4>' +
           (extra.removable ? '<button type="button" class="ms-remove-subject cs-remove-added">Remove subject</button>' : '') + '</div>' +
           '<div class="cs-skill-picker"></div>' +
@@ -85,6 +90,7 @@
       if (!wrap) return;
       var pool = ((BOOT.pools || {})[poolKey]) || [];
       wrap.innerHTML = '<div class="cs-subject-grid">' + pool.map(subjectCheckHtml).join('') + '</div>';
+      addSelectAll(wrap);
       wrap.addEventListener('change', function (e) {
         if (!e.target.classList.contains('cs-subject-pick')) return;
         var code = e.target.value;

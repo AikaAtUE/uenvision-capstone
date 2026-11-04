@@ -26,20 +26,20 @@
 
       <nav class="nav" aria-label="Main">
         {% if user.is_learner %}
-        <a class="nav-item {% if active_page == 'student_dashboard' %}is-active{% endif %}" href="{% url 'student_dashboard' %}">
+        <a class="nav-item {% if active_page == 'student_dashboard' %}is-active{% endif %}" href="{% url 'student_dashboard' %}" data-tip="Your results: how your skills compare with what employers ask for, plus resources for your gaps." title="Your results: how your skills compare with what employers ask for, plus resources for your gaps.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor"/><rect x="13" y="3" width="8" height="5" rx="1.5" fill="currentColor"/><rect x="13" y="10" width="8" height="11" rx="1.5" fill="currentColor"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="currentColor"/></svg>
           </span>
           <span>My skill gap</span>
         </a>
-        <a class="nav-item {% if active_page == 'my_skills' %}is-active{% endif %}" href="{% url 'my_skills' %}">
+        <a class="nav-item {% if active_page == 'my_skills' %}is-active{% endif %}" href="{% url 'my_skills' %}" data-tip="The subjects and skills you reported in the survey. You can edit them any time." title="The subjects and skills you reported in the survey. You can edit them any time.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
           </span>
           <span>My subjects &amp; skills</span>
         </a>
         {% if user.is_dummy %}
-        <a class="nav-item {% if active_page == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}">
+        <a class="nav-item {% if active_page == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}" data-tip="Charts of the most in-demand skills, how they change over time, and the skill gap between job postings and what UE teaches." title="Charts of the most in-demand skills, how they change over time, and the skill gap between job postings and what UE teaches.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </span>
@@ -47,45 +47,45 @@
         </a>
         {% endif %}
         {% else %}
-        <a class="nav-item {% if active_page == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}">
+        <a class="nav-item {% if active_page == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}" data-tip="Charts of the most in-demand skills, how they change over time, and the skill gap between job postings and what UE teaches." title="Charts of the most in-demand skills, how they change over time, and the skill gap between job postings and what UE teaches.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor"/><rect x="13" y="3" width="8" height="5" rx="1.5" fill="currentColor"/><rect x="13" y="10" width="8" height="11" rx="1.5" fill="currentColor"/><rect x="3" y="13" width="8" height="8" rx="1.5" fill="currentColor"/></svg>
           </span>
           <span>Dashboard</span>
         </a>
-        <a class="nav-item {% if active_page == 'recommendations' %}is-active{% endif %}" href="{% url 'recommendations' %}">
+        <a class="nav-item {% if active_page == 'recommendations' %}is-active{% endif %}" href="{% url 'recommendations' %}" data-tip="Training and learning resources for the in-demand skills the curriculum covers least." title="Training and learning resources for the in-demand skills the curriculum covers least.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
           </span>
           <span>Recommendations</span>
         </a>
-        <a class="nav-item {% if active_page == 'data' %}is-active{% endif %}" href="{% url 'data' %}">
+        <a class="nav-item {% if active_page == 'data' %}is-active{% endif %}" href="{% url 'data' %}" data-tip="The job postings, extracted skills and survey answers behind the results. Faculty also edit their Professor Survey here." title="The job postings, extracted skills and survey answers behind the results. Faculty also edit their Professor Survey here.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M6 2h9l4 4v16H6z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 2v4h4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
           </span>
           <span>Data</span>
         </a>
         {% endif %}
-        <a class="nav-item {% if active_page == 'feedback' %}is-active{% endif %}" href="{% url 'feedback' %}">
+        <a class="nav-item {% if active_page == 'feedback' %}is-active{% endif %}" href="{% url 'feedback' %}" data-tip="Evaluate UEnvision: the SUS evaluation, UAT survey and test case sheet." title="Evaluate UEnvision: the SUS evaluation, UAT survey and test case sheet.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 4h16v12H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
           </span>
           <span>Feedback</span>
         </a>
-        <a class="nav-item {% if active_page == 'about' %}is-active{% endif %}" href="{% url 'about' %}">
+        <a class="nav-item {% if active_page == 'about' %}is-active{% endif %}" href="{% url 'about' %}" data-tip="What UEnvision is and who made it." title="What UEnvision is and who made it.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="11" x2="12" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7.5" r="1.2" fill="currentColor"/></svg>
           </span>
           <span>About</span>
         </a>
-        <a class="nav-item {% if active_page == 'help' %}is-active{% endif %}" href="{% url 'help' %}">
+        <a class="nav-item {% if active_page == 'help' %}is-active{% endif %}" href="{% url 'help' %}" data-tip="A step-by-step guide to every page." title="A step-by-step guide to every page.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1.2" fill="currentColor"/></svg>
           </span>
           <span>How to use</span>
         </a>
         {% if user.is_administrator %}
-        <a class="nav-item {% if active_page == 'console' %}is-active{% endif %}" href="{% url 'console' %}">
+        <a class="nav-item {% if active_page == 'console' %}is-active{% endif %}" href="{% url 'console' %}" data-tip="Run and watch the data pipeline (scraping job postings and extracting skills)." title="Run and watch the data pipeline (scraping job postings and extracting skills).">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 9l3 3-3 3M13 15h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
@@ -93,14 +93,14 @@
         </a>
         {% endif %}
         {% if user.is_administrator %}
-        <a class="nav-item {% if active_page == 'accounts' %}is-active{% endif %}" href="{% url 'accounts' %}">
+        <a class="nav-item {% if active_page == 'accounts' %}is-active{% endif %}" href="{% url 'accounts' %}" data-tip="Add, approve, edit or remove user accounts." title="Add, approve, edit or remove user accounts.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.4c1.9.7 3 2.5 3 5.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </span>
           <span>Accounts</span>
         </a>
         {% endif %}
-        <a class="nav-item {% if active_page == 'settings' %}is-active{% endif %}" href="{% url 'settings' %}">
+        <a class="nav-item {% if active_page == 'settings' %}is-active{% endif %}" href="{% url 'settings' %}" data-tip="Your profile, profile picture, password and email settings." title="Your profile, profile picture, password and email settings.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </span>
@@ -136,6 +136,12 @@
         </div>
       </div>
       {% endif %}
+      {# First visit (per account, per browser): what each menu item does. welcome-tips.js shows it. #}
+      <div class="welcome-tips" id="welcome-tips" data-key="ue_welcome_seen:{{ user.pk }}" role="note" hidden>
+        <p><strong>Welcome to UEnvision!</strong> Here is what each page in the menu does. Point at a menu item any time to see its description again, or open <a class="link-inline" href="{% url 'help' %}">How to use</a> for the full guide.</p>
+        <ul class="welcome-tips-list" id="welcome-tips-list"></ul>
+        <button type="button" class="btn btn-navy btn-sm" id="welcome-tips-ok">Got it</button>
+      </div>
       {% block page_content %}{% endblock %}
     </main>
   </div>

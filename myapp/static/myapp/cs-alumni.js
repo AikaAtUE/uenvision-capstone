@@ -24,7 +24,10 @@
       PROFICIENCY_LEVELS = CS.PROFICIENCY_LEVELS,
       domId = CS.domId,
       isUeEmail = CS.isUeEmail,
-      termTagsHtml = CS.termTagsHtml;
+      termTagsHtml = CS.termTagsHtml,
+      addSelectAll = CS.addSelectAll,
+      blockCloseHtml = CS.blockCloseHtml,
+      insertLevelGuide = CS.insertLevelGuide;
 
   /* =====================================================================
      ALUMNI SURVEY
@@ -36,28 +39,47 @@
     var programSel = qs('#alumni-program', form);
     var termSel = qs('#alumni-term', form);
     var subjectsWrap = qs('#alumni-subjects', form);
+    var earlierWrap = qs('#alumni-earlier-subjects', form);
     var blocksWrap = qs('#alumni-subject-blocks', form);
+    insertLevelGuide(blocksWrap, PROFICIENCY_LEVELS, 'What the levels mean (choose how good you were at each skill after the subject):');
     var overallWrap = qs('#alumni-overall-skills', form);
     var pickers = {};
     var overallPicker = null;
 
-    function subjectCheckHtml(subj) {
+    function subjectCheckHtml(subj, termKey) {
       return '<label class="cs-subject-check">' +
-        '<input type="checkbox" class="cs-subject-pick" value="' + escapeHtml(subj.code) + '">' +
+        '<input type="checkbox" class="cs-subject-pick" value="' + escapeHtml(subj.code) + '" data-term-key="' + escapeHtml(termKey) + '">' +
         '<span class="cs-subject-text"><span><span class="cs-subject-code">' + escapeHtml(subj.code) + '</span>' + escapeHtml(subj.name) +
         ' <span class="cs-subject-units">(' + subj.units + ' units)</span></span>' + termTagsHtml(subj.code, programSel.value) + '</span>' +
       '</label>';
     }
 
+    function termsOf(program) { return (BOOT.termsByProgram || {})[program] || []; }
+    function termLabelOf(program, termKey) {
+      return (termsOf(program).filter(function (t) { return t.key === termKey; })[0] || {}).label || termKey;
+    }
+    function subjectsOf(program, termKey) {
+      return ((BOOT.subjectsByProgramTerm || {})[program] || {})[termKey] || [];
+    }
+
+    // Until a course is picked the list has nothing to offer, so it says so (it used to
+    // open as an empty dropdown, which looked broken).
     function renderTermOptions() {
       var program = programSel.value;
-      var terms = (BOOT.termsByProgram || {})[program] || [];
-      termSel.innerHTML = terms.map(function (t) {
+      var terms = termsOf(program);
+      termSel.innerHTML = terms.length ? terms.map(function (t) {
         return '<option value="' + t.key + '">' + escapeHtml(t.label) + '</option>';
-      }).join('');
+      }).join('') : '<option value="">Choose your course first</option>';
+      termSel.disabled = !terms.length;
       if (terms.length) termSel.value = terms[terms.length - 1].key; // default: the final term
       renderSubjects();
       renderOverallSkills();
+    }
+
+    function gridHtml(program, termKey) {
+      return '<div class="cs-subject-grid">' + subjectsOf(program, termKey).map(function (subj) {
+        return subjectCheckHtml(subj, termKey);
+      }).join('') + '</div>';
     }
 
     function renderSubjects() {
@@ -65,20 +87,32 @@
       pickers = {};
       var program = programSel.value;
       var termKey = termSel.value;
-      if (!program || !termKey) { subjectsWrap.innerHTML = ''; return; }
-      var subjects = ((BOOT.subjectsByProgramTerm || {})[program] || {})[termKey] || [];
-      var terms = (BOOT.termsByProgram || {})[program] || [];
-      var termLabel = (terms.filter(function (t) { return t.key === termKey; })[0] || {}).label || termKey;
+      if (!program || !termKey) { subjectsWrap.innerHTML = ''; earlierWrap.innerHTML = ''; return; }
       subjectsWrap.innerHTML =
-        '<h3>Subjects from your last semester <span class="muted">(' + escapeHtml(termLabel) + ')</span></h3>' +
-        '<p class="muted">Select every subject you took in that term.</p>' +
-        '<div class="cs-subject-grid">' + subjects.map(subjectCheckHtml).join('') + '</div>';
+        '<h3>Subjects from your last semester <span class="muted">(' + escapeHtml(termLabelOf(program, termKey)) + ')</span></h3>' +
+        '<p class="muted">Select every subject you took in that term. At least one is required.</p>' +
+        gridHtml(program, termKey);
+      // Every term before the last one: optional, like the student survey's earlier semesters.
+      var terms = termsOf(program);
+      var idx = terms.map(function (t) { return t.key; }).indexOf(termKey);
+      var earlier = idx > 0 ? terms.slice(0, idx) : [];
+      earlierWrap.innerHTML = earlier.length ?
+        '<details class="cs-earlier"><summary>+ Also report subjects from your previous semesters (optional)</summary>' +
+        '<p class="muted">Not required. Add the earlier subjects where you learned skills you still use.</p>' +
+        earlier.slice().reverse().map(function (t) {
+          return '<h4>' + escapeHtml(t.label) + '</h4>' + gridHtml(program, t.key);
+        }).join('') +
+        '</details>' : '';
+      addSelectAll(subjectsWrap);
+      addSelectAll(earlierWrap);
     }
 
-    function addSubjectBlock(code, name, program, termLabel) {
+    function addSubjectBlock(code, name, program, termLabel, termKey, bucket) {
+      if (pickers[code]) return;
       var blockId = 'cs-asubj-' + domId(code);
       blocksWrap.insertAdjacentHTML('beforeend',
         '<div class="cs-subject-block" id="' + blockId + '" data-code="' + escapeHtml(code) + '">' +
+          blockCloseHtml(code) +
           '<h4>' + escapeHtml(code) + ' — ' + escapeHtml(name) + '</h4>' +
           '<p class="cs-subject-term">' + escapeHtml(termLabel) + '</p>' +
           '<div class="cs-skill-picker"></div>' +
@@ -86,7 +120,7 @@
       );
       var container = qs('#' + blockId + ' .cs-skill-picker');
       var api = buildSkillPicker(container, skillsFor(program, code), PROFICIENCY_LEVELS, blockId);
-      pickers[code] = { api: api, name: name, termLabel: termLabel };
+      pickers[code] = { api: api, name: name, termLabel: termLabel, termKey: termKey, bucket: bucket };
     }
     function removeSubjectBlock(code) {
       var el = document.getElementById('cs-asubj-' + domId(code));
@@ -94,16 +128,20 @@
       delete pickers[code];
     }
 
-    subjectsWrap.addEventListener('change', function (e) {
-      if (!e.target.classList.contains('cs-subject-pick')) return;
-      var program = programSel.value;
-      var termKey = termSel.value;
-      var subjects = ((BOOT.subjectsByProgramTerm || {})[program] || {})[termKey] || [];
-      var terms = (BOOT.termsByProgram || {})[program] || [];
-      var termLabel = (terms.filter(function (t) { return t.key === termKey; })[0] || {}).label || termKey;
-      var subj = subjects.filter(function (s) { return s.code === e.target.value; })[0];
-      if (e.target.checked) addSubjectBlock(subj.code, subj.name, program, termLabel);
-      else removeSubjectBlock(subj.code);
+    [subjectsWrap, earlierWrap].forEach(function (wrap) {
+      wrap.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('cs-subject-pick')) return;
+        var program = programSel.value;
+        var termKey = e.target.getAttribute('data-term-key');
+        var subj = subjectsOf(program, termKey).filter(function (s) { return s.code === e.target.value; })[0];
+        if (!subj) return;
+        if (e.target.checked) {
+          addSubjectBlock(subj.code, subj.name, program, termLabelOf(program, termKey), termKey,
+                          wrap === subjectsWrap ? 'last' : 'earlier');
+        } else {
+          removeSubjectBlock(subj.code);
+        }
+      });
     });
 
     function renderOverallSkills() {
@@ -215,7 +253,7 @@
 
       var subjects = Object.keys(pickers).map(function (code) {
         var p = pickers[code];
-        return { code: code, name: p.name, term_label: p.termLabel, skills: p.api.collect() };
+        return { code: code, name: p.name, term: p.bucket, term_label: p.termLabel, skills: p.api.collect() };
       });
 
       var employment;
@@ -279,7 +317,7 @@
       return {
         fields: readFields(FIELDS.concat(['alumni-term'], MORE_FIELDS)),
         radios: readRadios(form, RADIOS),
-        subjects: Object.keys(pickers).map(function (code) { return { code: code, skills: pickers[code].api.collect() }; }),
+        subjects: Object.keys(pickers).map(function (code) { return { code: code, termKey: pickers[code].termKey, skills: pickers[code].api.collect() }; }),
         overall: overallPicker ? overallPicker.collect() : [],
         applied: window.__alumniAppliedPicker ? window.__alumniAppliedPicker.collect() : [],
         toLearn: skillsToLearnTags.get(),
@@ -289,7 +327,9 @@
       writeFields(d.fields, FIELDS);              // the course lists its terms + overall skills
       writeFields(d.fields, ['alumni-term']);     // the last semester lists its subjects
       (d.subjects || []).forEach(function (s) {
-        var box = qsa('.cs-subject-pick', subjectsWrap).filter(function (c) { return c.value === s.code; })[0];
+        var box = qsa('.cs-subject-pick', form).filter(function (c) {
+          return c.value === s.code && (!s.termKey || c.getAttribute('data-term-key') === s.termKey);
+        })[0];
         if (!box) return;
         pickSubject(box);
         addSkills(pickers[s.code] && pickers[s.code].api, s.skills);

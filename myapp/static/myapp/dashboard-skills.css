@@ -111,3 +111,14 @@
 .cmp-cat th{background:#f6f7f9; font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); border-bottom:1px solid var(--line);}
 .cmp-missing{color:var(--red);}
 #filter-drawer:focus{outline:none;}
+
+/* Recommended training (3-5 resources) under the stat cards */
+.training-overview{margin-bottom:18px;}
+.training-overview-head{display:flex; justify-content:space-between; align-items:baseline; gap:8px 14px; flex-wrap:wrap;}
+.training-overview-head .section-title{margin:0;}
+.training-overview > .muted{margin:4px 0 10px; font-size:.86rem;}
+.training-list{margin:0; padding-left:22px; display:grid; gap:8px;}
+.training-list li{line-height:1.4;}
+.training-skill{display:inline-block; min-width:120px; font-weight:700; color:var(--navy); margin-right:8px;}
+.training-name{font-weight:600; margin-right:8px; overflow-wrap:anywhere;}
+.training-meta{font-size:.82rem;}

@@ -348,7 +348,8 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
                      months: int = 0, program: str = "") -> dict:
     """Numbers behind the dashboard charts.
 
-    kind: 'hard' | 'soft'. top: how many skills. source / level / program ("BSCS" / "BSIT",
+    kind: 'hard' | 'soft' | 'all' (hard and soft together; a skill is still counted
+    once per posting, from that posting's own hard_skills / soft_skills). top: how many skills. source / level / program ("BSCS" / "BSIT",
     from the COMPUTER SCIENCE / INFORMATION TECHNOLOGY columns): optional filters.
     months: 0 = every month with data, otherwise only the latest N months.
     A skill is counted once per job posting that mentions it. Postings and skill
@@ -356,7 +357,10 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
     standardized names the homepage, student dashboard and gap analysis use."""
     from .. import gap_analysis, job_roles
 
-    kind = "soft" if kind == "soft" else "hard"
+    kind = kind if kind in ("soft", "all") else "hard"
+
+    def skills_of(p):
+        return {**p["soft"], **p["hard"]} if kind == "all" else p[kind]
     top = max(1, min(int(top), 30))
     everything = job_roles.it_postings()
     if everything is None:
@@ -364,7 +368,7 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
     sources = sorted({p["source"] for p in everything if p["source"]})
     levels = sorted({p["level"] for p in everything if p["level"]})
     chosen = job_roles.it_postings(source, level, program)
-    jobs = [(p["month"], p[kind]) for p in chosen]
+    jobs = [(p["month"], skills_of(p)) for p in chosen]
 
     dated = sorted({m for m, _ in jobs if m})
     month_list = _month_range(dated[0], dated[-1]) if dated else []
@@ -384,7 +388,7 @@ def skills_dashboard(kind: str = "hard", top: int = 10, source: str = "", level:
     bar_keys = {k for k, _ in ranked[:top]}
     by_source = {k: {} for k in bar_keys}
     for p in chosen:
-        for k in p[kind]:
+        for k in skills_of(p):
             if k in bar_keys:
                 by_source[k][p["source"]] = by_source[k].get(p["source"], 0) + 1
     bar_sources = sorted({s for split in by_source.values() for s in split}, key=lambda s: (not s, s))

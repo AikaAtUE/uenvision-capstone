@@ -19,7 +19,8 @@
     <ol>
       <li>Read the Data Privacy Notice and tick the box to agree.</li>
       <li>Fill in your name, UE email, student number, course and the year you graduated.</li>
-      <li>Pick your last semester at UE and tick the subjects you took in it. For each one, pick the skills you learned and how good you were at each one after the subject.</li>
+      <li>Pick your course first, then your last semester at UE, and tick the subjects you took in it (<strong>Select all</strong> ticks the whole semester). You may also add subjects from your previous semesters; those are optional.</li>
+      <li>For each subject, pick the skills you learned and how good you were at each one after the subject (each level is explained above the skill boxes). Press <strong>×</strong> on a subject's box to remove it.</li>
       <li>Pick the skills you learned overall at UE, then answer the questions about your current job or job search.</li>
       <li>Press <strong>Submit survey</strong>. You can then create an account to see your own skill gap results.</li>
     </ol>
@@ -45,7 +46,7 @@
         <li><strong>What is collected:</strong> your name, UE email, course, student number, year graduated, your subjects/skills, and your employment situation as you describe it.</li>
         <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
         <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
-        <li><strong>Questions or concerns:</strong> you may reach the UEnvision research team through your course adviser.</li>
+        <li><strong>Questions or concerns:</strong> email the UEnvision research team at <a class="link-inline" href="mailto:roxas.raphael@ue.edu.ph">roxas.raphael@ue.edu.ph</a>.</li>
       </ul>
       <label class="cs-consent"><input type="checkbox" id="alumni-consent"> <span>I have read the Data Privacy Notice above and voluntarily agree to participate.</span></label>
     </div>
@@ -69,12 +70,14 @@
     <div class="cs-section">
       <h3>Your last semester at UE</h3>
       <p class="muted">Which term was your last one? (Most students: 4th Year – 2nd Semester.)</p>
-      <label class="field"><span>Last semester</span><select id="alumni-term"></select></label>
+      <label class="field"><span>Last semester</span><select id="alumni-term" disabled><option value="">Choose your course first</option></select></label>
       <div id="alumni-subjects"></div>
+      <div id="alumni-earlier-subjects"></div>
     </div>
 
     <div class="cs-section">
       <h3>Skills per subject</h3>
+      <p class="muted">For each subject you selected above, pick the skills you learned in it and how good you were at each one after the subject.</p>
       <div id="alumni-subject-blocks"></div>
     </div>
 

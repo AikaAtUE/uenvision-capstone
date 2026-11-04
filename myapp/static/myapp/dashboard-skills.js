@@ -17,6 +17,7 @@
   const hidden = new Set();       // skills toggled off in the line chart legend
   let reqId = 0, filtersBuilt = false;
 
+  const kindWords = d => (d.kind === 'all' ? 'hard and soft' : d.kind === 'soft' ? 'soft' : 'hard');
   const monthLabel = m => MONTHS[+m.slice(5) - 1] + ' ' + m.slice(0, 4);
   const colorOf = i => COLORS[i % COLORS.length];
   const dashOf = i => (Math.floor(i / COLORS.length) % 2 ? '6 4' : null);
@@ -43,7 +44,7 @@
   }
   function setSource(id, text) { const e = $(id); if (e) e.textContent = text; }
   function setSources(d) {
-    const extracted = d.kind === 'soft' ? 'soft skills' : 'hard skills';
+    const extracted = kindWords(d) + ' skills';
     const months = d.months || [];
     const period = months.length ? ', ' + monthLabel(months[0]) + ' to ' + monthLabel(months[months.length - 1]) : '';
     setSource('src-top', 'According to ' + postingsText(d.stats.postings, d) + ', with ' + extracted +
@@ -66,7 +67,7 @@
   /* ---------------- stat cards ---------------- */
   function setStats(d) {
     const st = d.stats;
-    const kindWord = d.kind === 'soft' ? 'soft' : 'hard';
+    const kindWord = kindWords(d);
     $('stat-total').textContent = st.postings.toLocaleString();
     $('stat-total-note').textContent = 'Postings after filtering';
     $('stat-unique').textContent = st.unique_skills.toLocaleString();
@@ -117,7 +118,7 @@
   function drawBars(d) {
     const box = $('bar-chart');
     clear(box);
-    $('bar-legend').textContent = 'Number of job postings that mention the skill (' + (d.kind === 'soft' ? 'soft' : 'hard') + ' skills)';
+    $('bar-legend').textContent = 'Number of job postings that mention the skill (' + kindWords(d) + ' skills)';
     const sources = d.bar_sources || [];
     drawSourceKey(d.bars.length ? sources : []);
     if (!d.bars.length) {
@@ -219,7 +220,10 @@
   }
 
   /* ---------------- job postings vs faculty vs students ---------------- */
-  function el(tag, cls, text) {
+  // HTML elements for the comparison table. Not called htmlEl(): that name is the SVG helper
+  // above, and a second function el in this scope replaced it, so the line chart drew
+  // HTML <line>/<polyline> tags the browser doesn't show (the empty Skill trends chart).
+  function htmlEl(tag, cls, text) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
     if (text != null) e.textContent = text;
@@ -233,28 +237,28 @@
     if (!cmp) return;
     const groups = $('cmp-groups'); clear(groups);
     cmp.groups.forEach(g => {
-      const card = el('div', 'cmp-group cmp-group--' + g.key);
-      card.append(el('p', 'cmp-count', String(g.count)), el('p', 'cmp-label', g.label));
-      card.appendChild(el('p', 'cmp-skills', g.skills.length ? g.skills.join(', ') : '—'));
+      const card = htmlEl('div', 'cmp-group cmp-group--' + g.key);
+      card.append(htmlEl('p', 'cmp-count', String(g.count)), htmlEl('p', 'cmp-label', g.label));
+      card.appendChild(htmlEl('p', 'cmp-skills', g.skills.length ? g.skills.join(', ') : '—'));
       groups.appendChild(card);
     });
     const box = $('cmp-table'); clear(box);
-    const table = el('table', 'gap-subj-table cmp-table');
-    const head = el('tr');
-    ['Skill', 'Job postings', 'Faculty (taught depth)', 'Students / alumni (proficiency)', 'Reported in subject'].forEach(h => head.appendChild(el('th', null, h)));
-    const thead = el('thead'); thead.appendChild(head); table.appendChild(thead);
-    const tbody = el('tbody');
+    const table = htmlEl('table', 'gap-subj-table cmp-table');
+    const head = htmlEl('tr');
+    ['Skill', 'Job postings', 'Faculty (taught depth)', 'Students / alumni (proficiency)', 'Reported in subject'].forEach(h => head.appendChild(htmlEl('th', null, h)));
+    const thead = htmlEl('thead'); thead.appendChild(head); table.appendChild(thead);
+    const tbody = htmlEl('tbody');
     const yesNo = (reported, pct) => reported ? '✓ ' + (pct == null ? '' : pct + '%') : '✗ not reported';
     cmp.categories.forEach(c => {
-      const tr = el('tr', 'cmp-cat'); const th = el('th', null, c.category); th.colSpan = 5; tr.appendChild(th); tbody.appendChild(tr);
+      const tr = htmlEl('tr', 'cmp-cat'); const th = htmlEl('th', null, c.category); th.colSpan = 5; tr.appendChild(th); tbody.appendChild(tr);
       c.rows.forEach(r => {
-        const row = el('tr');
+        const row = htmlEl('tr');
         row.append(
-          el('td', null, r.skill),
-          el('td', null, r.industry_pct + '%'),
-          el('td', r.faculty_reported ? null : 'cmp-missing', yesNo(r.faculty_reported, r.taught_depth_pct)),
-          el('td', r.students_reported ? null : 'cmp-missing', yesNo(r.students_reported, r.learned_proficiency_pct)),
-          el('td', r.taught_in.length ? null : 'muted', r.taught_in.length ? r.taught_in.join(', ') : '—'));
+          htmlEl('td', null, r.skill),
+          htmlEl('td', null, r.industry_pct + '%'),
+          htmlEl('td', r.faculty_reported ? null : 'cmp-missing', yesNo(r.faculty_reported, r.taught_depth_pct)),
+          htmlEl('td', r.students_reported ? null : 'cmp-missing', yesNo(r.students_reported, r.learned_proficiency_pct)),
+          htmlEl('td', r.taught_in.length ? null : 'muted', r.taught_in.length ? r.taught_in.join(', ') : '—'));
         tbody.appendChild(row);
       });
     });
@@ -394,6 +398,29 @@
       + (undated ? ' ' + undated + ' posting' + (undated === 1 ? ' has' : 's have') + ' no date and ' + (undated === 1 ? 'is' : 'are') + ' left out of this chart.' : '');
   }
 
+  /* ---------------- Recommended training (3-5 items) ---------------- */
+  function drawTraining(t) {
+    const box = $('training-overview'), list = $('training-list');
+    if (!box) return;
+    const items = (t && t.items) || [];
+    box.hidden = !items.length;
+    clear(list);
+    if (!items.length) return;
+    $('training-basis').textContent = t.basis === 'under_taught'
+      ? 'One resource for each of the most under-taught skills in the Skill gap analysis.'
+      : 'One resource for each of the most in-demand skills. Under-taught skills take their place once survey answers come in.';
+    items.forEach(it => {
+      const li = document.createElement('li');
+      const skill = document.createElement('span'); skill.className = 'training-skill'; skill.textContent = it.skill;
+      const a = document.createElement('a'); a.href = it.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.className = 'training-name'; a.textContent = it.name;
+      const meta = document.createElement('span'); meta.className = 'muted training-meta';
+      meta.textContent = [it.type, it.provider].filter(Boolean).join(' · ');
+      li.append(skill, a, meta);
+      list.appendChild(li);
+    });
+  }
+
   /* ---------------- loading ---------------- */
   function buildFilters(d) {
     const fill = (sel, items, first) => {
@@ -434,7 +461,7 @@
         if (!j.exists) { showEmpty('No extracted skills yet. An administrator can create them on Data → Extract Skills.'); return; }
         data = j;
         if (!filtersBuilt) buildFilters(j);
-        setStats(j); drawBars(j); drawTrend(j); drawGaps(j); setSources(j);
+        setStats(j); drawBars(j); drawTrend(j); drawGaps(j); setSources(j); drawTraining(j.training);
       })
       .catch(() => { if (my === reqId) errEl.textContent = 'Could not reach the server. Try again.'; });
   }
@@ -462,6 +489,8 @@
     const changed = KEYS.filter(k => applied[k] !== DEFAULTS[k]).length;
     const badge = $('filter-count');
     badge.textContent = changed; badge.hidden = !changed;
+    const reset = $('filter-reset');
+    if (reset) reset.hidden = !changed;
   }
   function openDrawer() {
     drawer.classList.add('is-active'); backdrop.classList.add('is-active');
@@ -491,6 +520,9 @@
   $('filter-apply').addEventListener('click', apply);
   ctl.top.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
   $('filter-clear-all').addEventListener('click', () => { KEYS.forEach(k => { ctl[k].value = DEFAULTS[k]; }); });
+  // "Reset" next to the Filter button: back to the defaults and reload right away.
+  const resetBtn = $('filter-reset');
+  if (resetBtn) resetBtn.addEventListener('click', () => { KEYS.forEach(k => { ctl[k].value = DEFAULTS[k]; }); apply(); });
 
   // The period only matters for the trend chart, so the summary mentions it on that tab.
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setTimeout(setSummary)));

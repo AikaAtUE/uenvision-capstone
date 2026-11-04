@@ -6,7 +6,7 @@ from django.urls import reverse
 import re
 
 
-from ..models import CustomUser
+from ..models import CurriculumSurveyResponse, CustomUser
 
 from .helpers import IsolatedDataMixin
 
@@ -638,7 +638,49 @@ class SurveyInstructionsTests(IsolatedDataMixin, TestCase):
         self.client.force_login(prof)
         r = self.client.get(reverse("professor_survey"))
         self.assertContains(r, 'id="professor-steps"')
-        self.assertContains(r, "Introduced</strong> (mentioned in lectures)")
+        self.assertContains(r, "<strong>Introduced</strong>, <strong>Practiced</strong> or <strong>Applied</strong>")
+
+    def test_privacy_notices_give_the_research_team_email(self):
+        for name in ("student_survey", "alumni_survey"):
+            r = self.client.get(reverse(name))
+            self.assertContains(r, "mailto:roxas.raphael@ue.edu.ph")
+            self.assertNotContains(r, "through your course adviser")
+        prof = CustomUser.objects.create_user(email="pr2@ue.edu.ph", password="secret123", first_name="P", last_name="R")
+        self.client.force_login(prof)
+        self.assertContains(self.client.get(reverse("professor_survey")), "mailto:roxas.raphael@ue.edu.ph")
+
+    def test_alumni_last_semester_list_waits_for_the_course(self):
+        r = self.client.get(reverse("alumni_survey"))
+        self.assertContains(r, '<select id="alumni-term" disabled><option value="">Choose your course first</option></select>', html=False)
+        self.assertContains(r, 'id="alumni-earlier-subjects"')
+
+
+class HigherYearSubjectTests(TestCase):
+    def test_students_are_offered_every_later_term_as_optional(self):
+        from .. import curriculum_data
+        elig = curriculum_data.build_student_eligibility("1")
+        first = elig["BSIT"]["1"]
+        later_keys = [t["term_key"] for t in first["later"]]
+        seq = [t["key"] for t in curriculum_data.term_sequence("BSIT")]
+        self.assertEqual(later_keys, seq[seq.index(first["current"]["term_key"]) + 1:])
+        self.assertTrue(later_keys)
+        last_year = max(elig["BSIT"], key=int)
+        cur = elig["BSIT"][last_year]["current"]["term_key"]
+        self.assertEqual([t["term_key"] for t in elig["BSIT"][last_year]["later"]], seq[seq.index(cur) + 1:])
+
+    def test_a_higher_year_subject_can_be_submitted(self):
+        from .. import curriculum_data
+        elig = curriculum_data.build_student_eligibility()
+        y1 = elig["BSIT"]["1"]
+        later = y1["later"][0]["subjects"][0]
+        payload = {"consent": True, "has_previous": False,
+                   "personal_info": {"name": "S", "ue_email": "s@ue.edu.ph", "course": "BSIT", "student_number": "1",
+                                     "year_level": 1, "section": "A"},
+                   "subjects": [{"code": y1["current"]["subjects"][0]["code"], "term": "current", "skills": []},
+                                {"code": later["code"], "term": "later", "skills": [{"name": "Python", "level": "beginner"}]}]}
+        r = self.client.post(reverse("student_survey_submit"), content_type="application/json", data=json.dumps(payload))
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(CurriculumSurveyResponse.objects.get().data["subjects"][1]["term"], "later")
 
 
 class CurriculumSuggestionTests(IsolatedDataMixin, TestCase):

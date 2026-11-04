@@ -52,7 +52,36 @@ def dashboard_skills_view(request):
         except (OSError, UnicodeDecodeError) as exc:
             data["gap"] = {"exists": False, "error": str(exc)}
         _scope_gap_for(request.user, data["gap"])
+        data["training"] = _training_overview(data)
     return JsonResponse({"ok": True, **data})
+
+
+TRAINING_OVERVIEW_SIZE = 5
+
+
+def _training_overview(data):
+    """Up to 5 training resources for the Dashboard's "Recommended training" card: one per
+    skill, for the most under-taught skills (Skill gap analysis), or, before there are
+    survey answers, the most in-demand skills in the bar chart. Only resources already
+    generated on the Recommendations page are used, so this never calls Gemini."""
+    cached = recommendations.load_recommendations()
+    if not cached:
+        return {"basis": "", "items": []}
+    gap = data.get("gap") or {}
+    under = [r["skill"] for r in gap.get("under_taught") or []] if gap.get("has_survey_data") else []
+    basis, skills = ("under_taught", under) if under else ("in_demand", [b["skill"] for b in data.get("bars") or []])
+    items = []
+    for skill in skills:
+        rows = [x for x in cached.get(skill.strip().lower()) or []
+                if (x.get("link") or "").startswith(("https://", "http://"))]
+        if not rows:
+            continue
+        r = next((x for x in rows if x.get("verified") == "link checked"), rows[0])
+        items.append({"skill": skill, "name": r.get("name") or "", "link": r.get("link") or "",
+                      "type": r.get("type") or "", "provider": r.get("provider") or ""})
+        if len(items) == TRAINING_OVERVIEW_SIZE:
+            break
+    return {"basis": basis if items else "", "items": items}
 
 
 def _scope_gap_for(user, gap):

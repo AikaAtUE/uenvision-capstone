@@ -409,6 +409,13 @@ def student_eligible_terms(program, year_level, slot=None):
     return seq[idx], seq[prev_idx], seq[prev_idx + 1:idx], seq[:prev_idx]
 
 
+def later_terms(program, current_key):
+    """Every term of the program that comes after `current_key` (higher year levels)."""
+    seq = term_sequence(program)
+    keys = [t["key"] for t in seq]
+    return seq[keys.index(current_key) + 1:] if current_key in keys else []
+
+
 def _term_payload(program, term):
     return {
         "term_key": term["key"],
@@ -435,6 +442,9 @@ def build_student_eligibility(slot=None):
                 "previous": None if previous_term is None else _term_payload(program, previous_term),
                 "previous_summer": [_term_payload(program, t) for t in previous_summer],
                 "earlier": [_term_payload(program, t) for t in earlier],
+                # Terms after the current one, offered as optional for subjects taken
+                # ahead of the student's year level (irregular / advanced students).
+                "later": [_term_payload(program, t) for t in later_terms(program, current_term["key"])],
             }
     return out
 

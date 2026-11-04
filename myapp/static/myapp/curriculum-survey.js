@@ -247,7 +247,7 @@
   function buildSkillPicker(container, suggestedNames, levelOptions, idPrefix, initial) {
     var askLevel = levelOptions.length > 1;
     var optionsHtml = '<option value="">Choose level…</option>' + levelOptions.map(function (o) {
-      return '<option value="' + escapeHtml(o.value) + '">' + escapeHtml(o.label) + '</option>';
+      return '<option value="' + escapeHtml(o.value) + '"' + (o.desc ? ' title="' + escapeHtml(o.desc) + '"' : '') + '>' + escapeHtml(o.label) + '</option>';
     }).join('');
 
     var listId = idPrefix + '-options';
@@ -448,17 +448,31 @@
       (empty.length > 3 ? ', …' : '') + ').';
   }
 
+  // `desc` explains each level: shown in the level guide above the skill boxes and as the
+  // tooltip of each choice in a skill's level menu.
   var PROFICIENCY_LEVELS = [
-    { value: 'beginner', label: 'Beginner' },
-    { value: 'intermediate', label: 'Intermediate' },
-    { value: 'advanced', label: 'Advanced' },
-    { value: 'expert', label: 'Expert' }
+    { value: 'beginner', label: 'Beginner', desc: 'You know what it is and can use it with step-by-step guidance, examples or a tutorial.' },
+    { value: 'intermediate', label: 'Intermediate', desc: 'You can use it on your own for common tasks, looking things up now and then.' },
+    { value: 'advanced', label: 'Advanced', desc: 'You use it confidently on complex tasks or whole projects and can fix problems without help.' },
+    { value: 'expert', label: 'Expert', desc: 'You know it in depth: you could teach it to others or lead a project that depends on it.' }
   ];
   var IPA_LEVELS = [
-    { value: 'introduced', label: 'Introduced' },
-    { value: 'practiced', label: 'Practiced' },
-    { value: 'applied', label: 'Applied' }
+    { value: 'introduced', label: 'Introduced', desc: 'Students first meet the skill: it is explained or demonstrated in lectures or readings, but students are not yet expected to do it on their own.' },
+    { value: 'practiced', label: 'Practiced', desc: 'Students do it themselves in guided lab work, exercises, quizzes or assignments, with your help and feedback.' },
+    { value: 'applied', label: 'Applied', desc: 'Students use it independently in a graded output, such as a project, case study or capstone, where it is part of what is assessed.' }
   ];
+
+  /* "What do the levels mean?" box above the skill boxes. */
+  function levelGuideHtml(levels, intro) {
+    return '<div class="cs-level-guide">' +
+      '<p class="cs-level-guide-title">' + escapeHtml(intro) + '</p>' +
+      '<dl>' + levels.map(function (o) {
+        return '<div class="cs-level-guide-row cs-level-guide-row--' + escapeHtml(o.value) + '"><dt>' + escapeHtml(o.label) + '</dt><dd>' + escapeHtml(o.desc || '') + '</dd></div>';
+      }).join('') + '</dl></div>';
+  }
+  function insertLevelGuide(target, levels, intro) {
+    if (target) target.insertAdjacentHTML('beforebegin', levelGuideHtml(levels, intro));
+  }
 
   // Subject codes contain spaces ("CCP 1101"), which can't go into an element id as-is.
   function domId(s) { return String(s).replace(/[^A-Za-z0-9_-]/g, '_'); }
@@ -591,6 +605,81 @@
     return '<span class="cs-added-tag">Added by you' + (programs && programs.length ? ' · ' + escapeHtml(programs.join(', ')) : '') + '</span>';
   }
 
+  /* ---------- "Select all" for subject lists ----------
+     addSelectAll(wrap) puts a "Select all" button above every subject grid in `wrap`
+     (one per semester). A button with data-select-all="<css selector>" (e.g. the one for
+     the whole page) works on every grid that selector matches. Checking or unchecking
+     goes through each box's change event, so the page adds or removes the skill boxes
+     exactly as if each subject was clicked. Subjects hidden by "Find a subject" are skipped. */
+  function addSelectAll(wrap) {
+    qsa('.cs-subject-grid', wrap).forEach(function (grid) {
+      var prev = grid.previousElementSibling;
+      if (prev && prev.classList.contains('cs-select-all-row')) return;
+      grid.insertAdjacentHTML('beforebegin',
+        '<div class="cs-select-all-row"><button type="button" class="cs-select-all">Select all</button></div>');
+    });
+    refreshSelectAll();
+  }
+  function selectAllBoxes(btn) {
+    var sel = btn.getAttribute('data-select-all');
+    var grids = sel ? qsa(sel) : [btn.parentNode.nextElementSibling];
+    var boxes = [];
+    grids.forEach(function (g) {
+      if (g) qsa('.cs-subject-pick', g).forEach(function (b) { if (!b.closest('.is-filtered-out')) boxes.push(b); });
+    });
+    return boxes;
+  }
+  function refreshSelectAll() {
+    qsa('.cs-select-all').forEach(function (btn) {
+      var boxes = selectAllBoxes(btn);
+      var all = boxes.length && boxes.every(function (b) { return b.checked; });
+      btn.textContent = all ? (btn.getAttribute('data-clear-label') || 'Clear all') : (btn.getAttribute('data-label') || 'Select all');
+      btn.disabled = !boxes.length;
+      btn.setAttribute('aria-pressed', all ? 'true' : 'false');
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.cs-select-all');
+    if (!btn) return;
+    var boxes = selectAllBoxes(btn);
+    var all = boxes.length && boxes.every(function (b) { return b.checked; });
+    boxes.forEach(function (b) {
+      if (b.checked === !all) return;
+      b.checked = !all;
+      b.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    refreshSelectAll();
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('cs-subject-pick')) setTimeout(refreshSelectAll);
+  });
+  document.addEventListener('input', function (e) {
+    if (e.target.type === 'search') setTimeout(refreshSelectAll);   // "Find a subject" changes what's visible
+  });
+
+  /* ---------- × on each "Skills per subject" block ----------
+     Removes the subject without scrolling back up to its checkbox: unticks the
+     checkbox (so the page reacts as if it was clicked), or, for a subject without
+     one, presses the block's own "Remove subject" button. */
+  function blockCloseHtml(code) {
+    return '<button type="button" class="cs-block-x" aria-label="Remove ' + escapeHtml(code) + '" title="Remove this subject">×</button>';
+  }
+  document.addEventListener('click', function (e) {
+    var x = e.target.closest('.cs-block-x');
+    if (!x) return;
+    var block = x.closest('.cs-subject-block');
+    var code = block && block.getAttribute('data-code');
+    var root = block.closest('form') || document;
+    var box = qsa('.cs-subject-pick', root).filter(function (c) { return c.value === code && c.checked; })[0];
+    if (box) {
+      box.checked = false;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      var alt = qs('.cs-remove-added, .ms-remove-subject', block);
+      if (alt) alt.click();
+    }
+  });
+
   window.UECurriculumSurvey = {
     BOOT: BOOT,
     qs: qs,
@@ -619,6 +708,11 @@
     termTagsHtml: termTagsHtml,
     wireSubjectFilter: wireSubjectFilter,
     buildOtherSubjectForm: buildOtherSubjectForm,
-    addedTag: addedTag
+    addedTag: addedTag,
+    levelGuideHtml: levelGuideHtml,
+    insertLevelGuide: insertLevelGuide,
+    addSelectAll: addSelectAll,
+    refreshSelectAll: refreshSelectAll,
+    blockCloseHtml: blockCloseHtml
   };
 })();

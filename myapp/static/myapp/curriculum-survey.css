@@ -221,3 +221,28 @@
 .cs-draft-reset { background: none; border: none; padding: 0; font: inherit; font-weight: 600; cursor: pointer; }
 .cs-draft-status { font-size: .82rem; margin: 8px 0 0; }
 .cs-draft-status:empty { display: none; }
+
+/* "Select all" above each semester's subjects (and one for the whole page) */
+.cs-select-all-row { display: flex; justify-content: flex-end; margin: -2px 0 6px; }
+.cs-select-all { background: none; border: 0; padding: 2px 4px; font: inherit; font-size: .84rem; font-weight: 600;
+  color: var(--navy, #16233f); text-decoration: underline; cursor: pointer; border-radius: 4px; }
+.cs-select-all:hover, .cs-select-all:focus-visible { color: #c8202f; }
+.cs-select-all:disabled { color: #9a9ca3; cursor: default; text-decoration: none; }
+.cs-select-all.cs-select-all--page { text-decoration: none; margin-bottom: 10px; }
+
+/* × in the top-right corner of each "Skills per subject" box */
+.cs-subject-block { position: relative; }
+.cs-subject-block > h4, .cs-subject-block > .ms-subject-head { padding-right: 36px; }
+.cs-block-x { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid #d5d3cc; background: #fff; color: #6b6f7b; font-size: 1.1rem; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; }
+.cs-block-x:hover, .cs-block-x:focus-visible { color: #fff; background: #c8202f; border-color: #c8202f; }
+
+/* What each level means (proficiency for students/alumni, I/P/A for faculty) */
+.cs-level-guide { border: 1px solid #d6def0; background: #f5f7fc; border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; font-size: .86rem; }
+.cs-level-guide-title { margin: 0 0 6px; font-weight: 600; color: var(--navy, #16233f); }
+.cs-level-guide dl { margin: 0; display: grid; gap: 6px; }
+.cs-level-guide-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; }
+.cs-level-guide dt { font-weight: 700; color: var(--navy, #16233f); }
+.cs-level-guide dd { margin: 0; color: #3b3f4a; }
+@media (max-width: 560px) { .cs-level-guide-row { grid-template-columns: 1fr; gap: 0; } }

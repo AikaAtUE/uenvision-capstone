@@ -20,6 +20,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Filter <span class="filter-count" id="filter-count" hidden></span>
         </button>
+        <button type="button" class="btn btn-ghost btn-sm" id="filter-reset" hidden title="Back to the default filters">Reset</button>
       </div>
     </div>
 
@@ -49,6 +50,15 @@
         <p class="stat-value" id="stat-gaps">—</p>
         <p class="stat-note" id="stat-gaps-note">Top gap: —</p>
       </div>
+    </div>
+
+    <div class="panel training-overview" id="training-overview" hidden>
+      <div class="training-overview-head">
+        <h2 class="section-title">Recommended training</h2>
+        <a class="link-inline" href="{% url 'recommendations' %}">See all recommendations →</a>
+      </div>
+      <p class="muted" id="training-basis"></p>
+      <ol class="training-list" id="training-list"></ol>
     </div>
 
     <div class="panel" id="skills-panel" data-url="{% url 'dashboard_skills' %}">

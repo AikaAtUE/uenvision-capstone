@@ -29,6 +29,10 @@
     if (!form || BOOT.mode !== 'my_skills') return;
 
     var list = document.getElementById('ms-subjects');
+    if (CS.insertLevelGuide) {
+      CS.insertLevelGuide(list, BOOT.levels === 'ipa' ? IPA_LEVELS : PROFICIENCY_LEVELS,
+        BOOT.levels === 'ipa' ? 'How far each skill is taught:' : 'What the levels mean:');
+    }
     var addSel = document.getElementById('ms-add-subject');
     var emptyHint = document.getElementById('ms-no-subjects');
     var statusEl = document.getElementById('ms-status');

@@ -23,7 +23,10 @@
       domId = CS.domId,
       isUeEmail = CS.isUeEmail,
       termTagsHtml = CS.termTagsHtml,
-      wireSubjectFilter = CS.wireSubjectFilter;
+      wireSubjectFilter = CS.wireSubjectFilter,
+      addSelectAll = CS.addSelectAll,
+      blockCloseHtml = CS.blockCloseHtml,
+      insertLevelGuide = CS.insertLevelGuide;
 
   /* =====================================================================
      STUDENT SURVEY
@@ -37,7 +40,9 @@
     var currentWrap = qs('#student-current-subjects', form);
     var previousWrap = qs('#student-previous-subjects', form);
     var earlierWrap = qs('#student-earlier-subjects', form);
+    var laterWrap = qs('#student-later-subjects', form);
     var blocksWrap = qs('#student-subject-blocks', form);
+    insertLevelGuide(blocksWrap, PROFICIENCY_LEVELS, 'What the levels mean (choose the one that fits you now):');
     var pickers = {}; // code -> { api, term }
     var tools = qs('#student-subject-tools', form);
     var hint = qs('#student-hint', form);
@@ -79,6 +84,7 @@
       blocksWrap.innerHTML = '';
       pickers = {};
       earlierWrap.innerHTML = '';
+      if (laterWrap) laterWrap.innerHTML = '';
       if (!program || !year) {
         currentWrap.innerHTML = '';
         previousWrap.innerHTML = '';
@@ -119,6 +125,18 @@
           }).join('') +
           '</details>';
       }
+
+      // Irregular or advanced students sometimes take a higher year's subject early.
+      if (laterWrap && elig.later && elig.later.length) {
+        laterWrap.innerHTML =
+          '<details class="cs-earlier"><summary>+ Also report subjects from higher year levels (optional)</summary>' +
+          '<p class="muted">For subjects you took ahead of your year level, for example as an irregular student.</p>' +
+          elig.later.map(function (term) {
+            return '<h4>' + escapeHtml(term.term_label) + '</h4>' + termGrid(term, 'later');
+          }).join('') +
+          '</details>';
+      }
+      [currentWrap, previousWrap, earlierWrap, laterWrap].forEach(function (w) { if (w) addSelectAll(w); });
       applyFilter();
     }
 
@@ -126,6 +144,7 @@
       var blockId = 'cs-subj-' + domId(code);
       blocksWrap.insertAdjacentHTML('beforeend',
         '<div class="cs-subject-block" id="' + blockId + '" data-code="' + escapeHtml(code) + '" data-term="' + termBucket + '">' +
+          blockCloseHtml(code) +
           '<h4>' + escapeHtml(code) + ' — ' + escapeHtml(name) + '</h4>' +
           '<p class="cs-subject-term">' + escapeHtml(termLabel) + '</p>' +
           '<div class="cs-skill-picker"></div>' +
@@ -142,13 +161,14 @@
       delete pickers[code];
     }
 
-    [currentWrap, previousWrap, earlierWrap].forEach(function (wrap) {
+    [currentWrap, previousWrap, earlierWrap, laterWrap].filter(Boolean).forEach(function (wrap) {
       wrap.addEventListener('change', function (e) {
         if (!e.target.classList.contains('cs-subject-pick')) return;
         var elig = currentElig();
         var bucket = e.target.getAttribute('data-bucket');
         var termKey = e.target.getAttribute('data-term-key');
         var terms = bucket === 'earlier' ? elig.earlier
+          : bucket === 'later' ? (elig.later || [])
           : bucket === 'previous' ? [elig.previous].concat(elig.previous_summer || []) : [elig[bucket]];
         var term = terms.filter(function (t) { return t.term_key === termKey; })[0];
         var subj = term.subjects.filter(function (s) { return s.code === e.target.value; })[0];

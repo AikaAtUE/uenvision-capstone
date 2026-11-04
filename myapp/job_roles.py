@@ -81,6 +81,21 @@ def role_for(title, function="", is_tech=False):
     return None
 
 
+# Where a posting's month comes from. "date" is the column every extraction writes now;
+# data sets extracted before that still have Kalibrr's created_at / Trabajo's date_posted
+# (with "date" left blank), and some only have activation_date. Without this fallback
+# those postings all count as undated and the Skill trends chart stays empty.
+DATE_COLUMNS = ("date", "created_at", "date_posted", "activation_date")
+
+
+def _month_of(get, r):
+    for col in DATE_COLUMNS:
+        m = pipeline._MONTH_RE.match(get(r, col))
+        if m:
+            return m
+    return None
+
+
 def postings():
     """-> one dict per extracted posting, cached until data/extracted_skills.csv changes:
     {"role": role key or None, "source", "level" ("" if not given), "month" ("YYYY-MM" or None),
@@ -118,7 +133,7 @@ def postings():
 
     out = []
     for r in rows:
-        m = pipeline._MONTH_RE.match(get(r, "date"))
+        m = _month_of(get, r)
         tech = _flag(get(r, "isTechJob"))
         out.append({
             "role": role_for(get(r, "job_name"), get(r, "function"), is_tech=bool(tech)),

@@ -239,6 +239,93 @@ class TechJobColumnsTests(IsolatedDataMixin, TestCase):
         self.assertEqual(only["bar_sources"], ["trabajo"])
 
 
+    def test_all_skills_counts_hard_and_soft_once_per_posting(self):
+        from ..pipeline import manager as pipeline
+        hard = {b["skill"]: b["count"] for b in pipeline.skills_dashboard("hard", 30)["bars"]}
+        soft = {b["skill"]: b["count"] for b in pipeline.skills_dashboard("soft", 30)["bars"]}
+        both = pipeline.skills_dashboard("all", 30)
+        self.assertEqual(both["kind"], "all")
+        self.assertEqual({b["skill"]: b["count"] for b in both["bars"]}, {**hard, **soft})
+        self.assertEqual(both["stats"]["unique_skills"], len(hard) + len(soft))
+
+    def test_dashboard_filter_labels_and_reset(self):
+        admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                               last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+        self.client.force_login(admin)
+        page = self.client.get(reverse("dashboard")).content.decode()
+        self.assertIn('<option value="all">All skills</option>', page)
+        self.assertIn('<option value="">All programs</option>', page)
+        self.assertIn('id="filter-reset"', page)
+        self.assertIn('id="training-overview"', page)
+
+
+class TrendMonthTests(IsolatedDataMixin, TestCase):
+    """Data sets extracted before the "date" column was filled still have Kalibrr's
+    created_at (or Trabajo's date_posted): the trend chart reads the month from there."""
+
+    def write(self, header, rows):
+        import csv
+        from django.conf import settings
+        from .. import job_roles
+        with open(settings.DATA_DIR / "extracted_skills.csv", "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(header)
+            w.writerows(rows)
+        job_roles._CACHE.update(key=None, value=None)
+
+    def test_month_falls_back_to_the_source_date_columns(self):
+        from ..pipeline import manager as pipeline
+        self.write(["job_id", "job_name", "source", "date", "created_at", "date_posted", "hard_skills", "soft_skills", "isTechJob"], [
+            [1, "Software Developer", "kalibrr", "", "2026-03-04T05:00:00+00:00", "", "Python", "", "True"],
+            [2, "Software Developer", "trabajo", "", "", "2026-05-01", "Python", "", "True"],
+            [3, "Software Developer", "kalibrr", "2026-04-10", "2019-01-01T00:00:00+00:00", "", "Java", "", "True"],
+            [4, "Software Developer", "kalibrr", "", "", "", "Java", "", "True"],
+        ])
+        d = pipeline.skills_dashboard("hard", 10, months=0)
+        self.assertEqual(d["months"], ["2026-03", "2026-04", "2026-05"])
+        self.assertEqual(d["postings_per_month"], [1, 1, 1])
+        self.assertEqual(d["stats"]["undated"], 1)
+        series = {s["skill"]: s["counts"] for s in d["series"]}
+        self.assertEqual(series["Python"], [1, 0, 1])
+        self.assertEqual(series["Java"], [0, 1, 0])   # "date" wins over created_at
+
+
+class TrainingOverviewTests(IsolatedDataMixin, TestCase):
+    def test_one_resource_per_skill_up_to_five_and_only_web_links(self):
+        from unittest import mock
+        from ..views.dashboard import _training_overview
+        cached = {s.lower(): [{"skill": s, "name": s + " course", "link": "https://example.com/" + s, "type": "Course",
+                               "provider": "X", "verified": ""}] for s in "ABCDEFG"}
+        cached["b"] = [{"skill": "B", "name": "bad", "link": "javascript:alert(1)", "type": "Course", "provider": "", "verified": ""}]
+        cached["c"].insert(0, {"skill": "C", "name": "unchecked", "link": "https://u.example", "type": "Lesson", "provider": "", "verified": ""})
+        cached["c"].append({"skill": "C", "name": "checked", "link": "https://c.example", "type": "Lesson", "provider": "", "verified": "link checked"})
+        data = {"gap": {"has_survey_data": True, "under_taught": [{"skill": s} for s in "ABCDEFG"]}, "bars": []}
+        with mock.patch("myapp.recommendations.load_recommendations", return_value=cached):
+            out = _training_overview(data)
+            self.assertEqual(out["basis"], "under_taught")
+            self.assertEqual([i["skill"] for i in out["items"]], ["A", "C", "D", "E", "F"])
+            self.assertEqual(out["items"][1]["name"], "checked")
+            no_survey = _training_overview({"gap": {"has_survey_data": False}, "bars": [{"skill": "G"}]})
+            self.assertEqual((no_survey["basis"], [i["skill"] for i in no_survey["items"]]), ("in_demand", ["G"]))
+        with mock.patch("myapp.recommendations.load_recommendations", return_value={}):
+            self.assertEqual(_training_overview(data), {"basis": "", "items": []})
+
+
+class FirstVisitHelpTests(TestCase):
+    def test_check_gap_introduces_uenvision_and_offers_none_of_these(self):
+        page = self.client.get(reverse("check_gap"))
+        self.assertContains(page, "New to UEnvision?")
+        self.assertContains(page, 'id="none-of-these"')
+
+    def test_menu_items_describe_themselves(self):
+        admin = CustomUser.objects.create_user(email="adm2@ue.edu.ph", password="secret123", first_name="A",
+                                               last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+        self.client.force_login(admin)
+        page = self.client.get(reverse("dashboard")).content.decode()
+        self.assertIn('id="welcome-tips"', page)
+        self.assertGreaterEqual(page.count("data-tip="), 8)
+
+
 class TrabajoDedupeTests(TestCase):
     """Trabajo repeats one ad per city / feed under new job_ids; only Trabajo data is merged."""
     DESC = ("We are hiring a ServiceNow developer to design configure and build workflow automation "
