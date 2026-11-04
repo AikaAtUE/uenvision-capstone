@@ -50,23 +50,33 @@
     'I felt confident using UEnvision.'
   ];
 
-  var UAT_CHECKS = [
-    { id: 'login', label: 'Logging in (and logging out) worked as expected.' },
-    { id: 'dashboard', label: 'The dashboard stats and charts loaded correctly.' },
-    { id: 'filter', label: 'Filtering the dashboard updated the results correctly.' },
-    { id: 'export', label: 'Exporting data from the Data page worked correctly.' },
-    { id: 'settings', label: 'Editing account settings saved correctly.' }
+  // UAT: how satisfied testers are and how UEnvision felt to use (subjective), each rated
+  // 1 (Strongly disagree) to 5 (Strongly agree). Whether each feature *works* is checked
+  // on the Functional test case sheet instead. Keep the count equal to
+  // UAT_QUESTION_COUNT in views/feedback.py.
+  var UAT_QUESTIONS = [
+    'Overall, I am satisfied with UEnvision.',
+    'UEnvision meets my needs for knowing which skills the IT job market asks for.',
+    'The dashboard shows the in-demand skills in a way that is clear and easy to understand.',
+    'The skill gap analysis helps me see which skills the curriculum should cover more.',
+    'The recommendations are useful for improving the subjects I handle.',
+    'I trust the results that UEnvision shows.',
+    'The look and layout of UEnvision are pleasant.',
+    'UEnvision responds quickly when I use it.',
+    'I would recommend UEnvision to other faculty members.',
+    'I would use UEnvision as part of my work.'
   ];
 
-  // Written as short scenarios ("You open ... "), per the adviser. Logging in and out are
-  // left out: every tester has already done both just to reach this sheet.
+  // Each case is one scenario paragraph: what the tester does and what should happen,
+  // per the adviser (no separate "expected process" / "expected output" columns).
   var FUNCTIONAL_DEFAULT_ROWS = [
-    { feature: 'Dashboard', steps: 'You open the Dashboard from the sidebar.', expected: 'The stat cards and the Top in-demand skills chart load with job posting numbers.' },
-    { feature: 'Dashboard filters', steps: 'On the Dashboard, you click Filter, set Number of top skills to 5 and Program to BSIT, and click Apply filters.', expected: 'The Top in-demand skills chart updates to show 5 skills from BSIT-related postings.' },
-    { feature: 'Skill gap analysis', steps: 'On the Dashboard, you open the Skill gap analysis tab.', expected: 'The Under-taught and Well-covered skill lists are shown.' },
-    { feature: 'Recommendations', steps: 'You open Recommendations from the sidebar and choose one of your subjects.', expected: 'In-demand skills that fit the subject are listed, with suggested resources.' },
-    { feature: 'Export data', steps: 'You go to Data, choose a source, and click Export.', expected: 'A CSV file downloads with the rows of the table you are viewing.' },
-    { feature: 'Edit settings', steps: 'You go to Settings, change your name, and click Save.', expected: 'Your new name is shown in Settings and in the sidebar.' }
+    { feature: 'Login', scenario: 'You open the UEnvision login page, type the email and password of your account, and click Log in. You should be taken straight to your home page (the Dashboard for faculty and administrators, My skill gap for students and alumni) with your name shown in the sidebar. If you have a Google account with the same email, clicking Continue with Google instead should log you in to that same account.' },
+    { feature: 'Dashboard', scenario: 'You open the Dashboard from the sidebar. The stat cards and the Top in-demand skills chart should load and show the number of job postings and the most requested skills.' },
+    { feature: 'Dashboard filters', scenario: 'On the Dashboard, you click Filter, set Number of top skills to 5 and Program to BSIT, and click Apply filters. The Top in-demand skills chart should update to show 5 skills taken only from BSIT-related job postings.' },
+    { feature: 'Skill gap analysis', scenario: 'On the Dashboard, you open the Skill gap analysis tab. The Under-taught and Well-covered skill lists should appear, comparing what job postings ask for with what is taught in the subjects.' },
+    { feature: 'Recommendations', scenario: 'You open Recommendations from the sidebar and choose one of your subjects. The in-demand skills that fit that subject should be listed, each with suggested learning resources.' },
+    { feature: 'Export data', scenario: 'You go to Data, choose a source, and click Export. A CSV file should download containing the rows of the table you were viewing.' },
+    { feature: 'Edit settings', scenario: 'You go to Settings, change your name, and click Save. Your new name should be shown right away in Settings and in the sidebar.' }
   ];
 
   var functionalRowCount = 0;
@@ -120,16 +130,12 @@
     target.hidden = false;
   }
 
-  /* ---------- SUS ---------- */
-  function renderSusQuestions() {
-    var container = qs('#sus-questions');
-    if (!container || container.childElementCount) return;
-    var questions = SUS_QUESTIONS.slice();
-    if (container.dataset.firstStatement) questions[0] = container.dataset.firstStatement;
-    container.innerHTML = questions.map(function (question, i) {
+  /* ---------- Likert statements (SUS and UAT) ---------- */
+  function likertHtml(questions, prefix) {
+    return questions.map(function (question, i) {
       var n = i + 1;
       var options = [1, 2, 3, 4, 5].map(function (v) {
-        return '<label class="likert-option"><input type="radio" name="sus-q' + n + '" value="' + v + '" required><span>' + v + '</span></label>';
+        return '<label class="likert-option"><input type="radio" name="' + prefix + '-q' + n + '" value="' + v + '" required><span>' + v + '</span></label>';
       }).join('');
       return '<div class="likert-group">' +
         '<p class="likert-question">' + n + '. ' + escapeHtml(question) + '</p>' +
@@ -137,6 +143,25 @@
           '<span class="likert-end">Strongly disagree</span>' + options + '<span class="likert-end">Strongly agree</span>' +
         '</div></div>';
     }).join('');
+  }
+  // -> array of answers (1-5), or null if a statement was skipped
+  function readLikert(prefix, count) {
+    var answers = [];
+    for (var n = 1; n <= count; n++) {
+      var checked = qs('input[name="' + prefix + '-q' + n + '"]:checked');
+      if (!checked) return null;
+      answers.push(Number(checked.value));
+    }
+    return answers;
+  }
+
+  /* ---------- SUS ---------- */
+  function renderSusQuestions() {
+    var container = qs('#sus-questions');
+    if (!container || container.childElementCount) return;
+    var questions = SUS_QUESTIONS.slice();
+    if (container.dataset.firstStatement) questions[0] = container.dataset.firstStatement;
+    container.innerHTML = likertHtml(questions, 'sus');
   }
 
   function computeSusScore(answers) {
@@ -152,12 +177,8 @@
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('sus-error', '');
-      var answers = [];
-      for (var n = 1; n <= SUS_QUESTIONS.length; n++) {
-        var checked = qs('input[name="sus-q' + n + '"]:checked');
-        if (!checked) { setFormError('sus-error', 'Please answer every statement before submitting.'); return; }
-        answers.push(Number(checked.value));
-      }
+      var answers = readLikert('sus', SUS_QUESTIONS.length);
+      if (!answers) { setFormError('sus-error', 'Please answer every statement before submitting.'); return; }
       var payload = {
         sus_score: computeSusScore(answers),
         comments: qs('#sus-comments').value.trim() || null
@@ -172,41 +193,17 @@
   }
 
   /* ---------- UAT ---------- */
-  function renderUatChecks() {
-    var container = qs('#uat-checks');
-    if (!container || container.childElementCount) return;
-    container.innerHTML = UAT_CHECKS.map(function (check) {
-      return '<div class="uat-check-row">' +
-        '<p class="uat-check-label">' + escapeHtml(check.label) + '</p>' +
-        '<div class="uat-check-options">' +
-          ['Yes', 'No'].map(function (opt) {
-            return '<label class="checkbox uat-radio"><input type="radio" name="uat-' + check.id + '" value="' + opt + '" required><span>' + opt + '</span></label>';
-          }).join('') +
-        '</div></div>';
-    }).join('');
-  }
-
   function initUatForm() {
-    renderUatChecks();
+    var container = qs('#uat-questions');
+    if (container && !container.childElementCount) container.innerHTML = likertHtml(UAT_QUESTIONS, 'uat');
     var form = qs('#uat-form');
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('uat-error', '');
-      var results = {};
-      for (var i = 0; i < UAT_CHECKS.length; i++) {
-        var check = UAT_CHECKS[i];
-        var checked = qs('input[name="uat-' + check.id + '"]:checked');
-        if (!checked) { setFormError('uat-error', 'Please answer every item before submitting.'); return; }
-        results[check.id] = checked.value;
-      }
-      var payload = {
-        login_worked: results.login,
-        dashboard_worked: results.dashboard,
-        filter_worked: results.filter,
-        export_worked: results.export,
-        settings_worked: results.settings,
-        comments: qs('#uat-comments').value.trim() || null
-      };
+      var answers = readLikert('uat', UAT_QUESTIONS.length);
+      if (!answers) { setFormError('uat-error', 'Please answer every statement before submitting.'); return; }
+      var payload = { comments: qs('#uat-comments').value.trim() || null };
+      answers.forEach(function (value, i) { payload['q' + (i + 1)] = value; });
       saveSurveyResponse('uat', 'uat_responses', payload, form).then(function (result) {
         form.reset();
         showToast(result.usedFallback ? FALLBACK_MSG : 'Thanks! Your UAT survey was submitted.');
@@ -216,7 +213,7 @@
   }
 
   /* ---------- Functional test case sheet ---------- */
-  // Each test case is a card. The given cases show Feature / Steps / Expected result as
+  // Each test case is a card. The given cases show the Feature and Scenario paragraph as
   // plain text (they are not meant to be edited); only cases the tester adds have boxes.
   function functionalCaseHtml(row) {
     functionalRowCount += 1;
@@ -226,22 +223,16 @@
     var head = custom
       ? '<input type="text" class="ft-feature" placeholder="Feature being tested" aria-label="Feature">'
       : '<span class="ft-feature-text">' + escapeHtml(row.feature) + '</span>';
-    var steps = custom
-      ? '<textarea class="ft-steps" rows="2" placeholder="What the tester does, e.g. You open ..." aria-label="Scenario"></textarea>'
-      : '<p class="ft-text ft-steps-text">' + escapeHtml(row.steps) + '</p>';
-    var expected = custom
-      ? '<textarea class="ft-expected" rows="2" placeholder="What should happen" aria-label="Expected result"></textarea>'
-      : '<p class="ft-text ft-expected-text">' + escapeHtml(row.expected) + '</p>';
+    var scenario = custom
+      ? '<textarea class="ft-scenario" rows="3" placeholder="Describe the scenario as a paragraph: what you do, and what should happen, e.g. You open ... The page should ..." aria-label="Scenario"></textarea>'
+      : '<p class="ft-text ft-scenario-text">' + escapeHtml(row.scenario) + '</p>';
     var status = ['Yes', 'No'].map(function (opt) {
       return '<label class="checkbox uat-radio"><input type="radio" name="ft-status-' + idx + '" value="' + opt + '"><span>' + opt + '</span></label>';
     }).join('');
     return '<div class="ft-case" data-row="' + idx + '">' +
       '<div class="ft-case-head"><span class="ft-id">' + id + '</span>' + head +
         (custom ? '<button type="button" class="link-inline link-inline--sm ft-remove">Remove</button>' : '') + '</div>' +
-      '<div class="ft-grid">' +
-        '<div class="ft-cell"><p class="ft-label">Scenario</p>' + steps + '</div>' +
-        '<div class="ft-cell"><p class="ft-label">Expected result</p>' + expected + '</div>' +
-      '</div>' +
+      '<div class="ft-cell ft-cell--scenario"><p class="ft-label">Scenario</p>' + scenario + '</div>' +
       '<div class="ft-status-row"><span class="ft-label">Did it happen as expected?</span><div class="uat-check-options">' + status + '</div></div>' +
       '<label class="field ft-field"><span>If No, what happened instead?</span><textarea class="ft-actual" rows="2"></textarea></label>' +
       '<label class="field ft-field"><span>Comments or remarks (optional)</span><input type="text" class="ft-notes"></label>' +
@@ -271,8 +262,7 @@
         submission_id: submissionId,
         test_case_id: qs('.ft-id', card).textContent.trim(),
         feature: fieldText(card, '.ft-feature', '.ft-feature-text'),
-        steps: fieldText(card, '.ft-steps', '.ft-steps-text'),
-        expected_result: fieldText(card, '.ft-expected', '.ft-expected-text'),
+        scenario: fieldText(card, '.ft-scenario', '.ft-scenario-text'),
         actual_result: qs('.ft-actual', card).value.trim() || null,
         status: checked ? checked.value : '',
         notes: qs('.ft-notes', card).value.trim() || null
@@ -297,8 +287,8 @@
       e.preventDefault();
       setFormError('functional-error', '');
       var rows = collectFunctionalRows();
-      if (rows.some(function (r) { return !r.feature || !r.steps || !r.expected_result; })) {
-        setFormError('functional-error', 'Please fill in the feature, steps and expected result of every test case you added.');
+      if (rows.some(function (r) { return !r.feature || !r.scenario; })) {
+        setFormError('functional-error', 'Please fill in the feature and scenario of every test case you added.');
         return;
       }
       if (rows.some(function (r) { return !r.status; })) {

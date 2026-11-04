@@ -49,6 +49,13 @@ MAX_SURVEY_ROWS = 200
 SUS_VERSION = 5
 SUS_QUESTION_COUNT = 6  # must match SUS_QUESTIONS in survey.js
 
+# UAT 2 = ten Likert statements (1-5) about satisfaction and how UEnvision felt to use,
+# saved as q1..q10 with uat_score = their average. Older UAT responses (no "uat_version")
+# were Yes/No checks of each feature (login_worked, dashboard_worked, ...), which the
+# Functional test case sheet now covers.
+UAT_VERSION = 2
+UAT_QUESTION_COUNT = 10  # must match UAT_QUESTIONS in survey.js
+
 
 # Statement 1 depends on who is answering. Administrators and developers get the faculty
 # wording, since they use the same staff pages.
@@ -108,6 +115,14 @@ def survey_submit_view(request):
             row["sus_score"] = _compute_sus_score(answers)  # never trust the client's score
             row["sus_version"] = SUS_VERSION
             row["sus_audience"] = sus_audience(request.user)  # which statement 1 they were shown
+
+    if kind == SurveyResponse.UAT:
+        for row in rows:
+            answers = [row.get(f"q{n}") for n in range(1, UAT_QUESTION_COUNT + 1)]
+            if not all(isinstance(a, int) and not isinstance(a, bool) and 1 <= a <= 5 for a in answers):
+                return JsonResponse({"ok": False, "error": "UAT answers must be 1-5."}, status=400)
+            row["uat_score"] = round(sum(answers) / len(answers), 2)   # average rating, 1-5
+            row["uat_version"] = UAT_VERSION
 
     # Who answered comes from the account, not from the form.
     name, role = request.user.get_full_name(), request.user.role_label

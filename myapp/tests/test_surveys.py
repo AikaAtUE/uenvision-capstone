@@ -8,7 +8,7 @@ import re
 
 from ..models import CurriculumSurveyResponse, CustomUser
 
-from .helpers import IsolatedDataMixin
+from .helpers import IsolatedDataMixin, login_administrator
 
 
 class CurriculumCalendarTests(TestCase):
@@ -59,6 +59,14 @@ class CurriculumCalendarTests(TestCase):
 
 
 class CurriculumSurveySubmitTests(IsolatedDataMixin, TestCase):
+    # Students/alumni answer logged in as themselves (StudentFlowTests); an administrator
+    # trying the survey out types the "About you" fields, which are checked as before.
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(CustomUser.objects.create_user(
+            email="admin@ue.edu.ph", password="secret123", first_name="Ad", last_name="Min",
+            role=CustomUser.Role.ADMINISTRATOR))
+
     def payload(self, **over):
         p = {
             "consent": True,
@@ -66,8 +74,8 @@ class CurriculumSurveySubmitTests(IsolatedDataMixin, TestCase):
                               "student_number": "2023-1", "year_level": 3, "section": "TN31"},
             "has_previous": True,
             "subjects": [
-                {"code": "CIA 1102", "term": "current", "skills": [{"name": "Python", "level": "advanced"}]},
-                {"code": "CIP 1102", "term": "previous", "skills": [{"name": "SQL", "level": "beginner"}]},
+                {"code": "CIA 1102", "term": "current", "skills": [{"name": "Python", "level": "applied"}]},
+                {"code": "CIP 1102", "term": "previous", "skills": [{"name": "SQL", "level": "introduced"}]},
             ],
         }
         p.update(over)
@@ -113,6 +121,13 @@ class CurriculumSurveySubmitTests(IsolatedDataMixin, TestCase):
     def test_survey_pages_render(self):
         for name in ("student_survey", "alumni_survey"):
             self.assertEqual(self.client.get(reverse(name)).status_code, 200)
+        self.client.logout()
+        # students/alumni register first: logged out, the surveys go to registration
+        self.assertRedirects(self.client.get(reverse("student_survey"), {"role": "qa"}),
+                             reverse("register") + "?as=student&role=qa", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("alumni_survey")), reverse("register") + "?as=alumni",
+                             fetch_redirect_response=False)
+        self.assertEqual(self.post(self.payload()).status_code, 401)
         # the professor survey needs a faculty/administrator login
         self.assertEqual(self.client.get(reverse("professor_survey")).status_code, 302)
 
@@ -178,7 +193,8 @@ class PublicSiteTests(IsolatedDataMixin, TestCase):
 
     def test_check_gap_page(self):
         r = self.client.get(reverse("check_gap"), {"role": "qa"})
-        self.assertContains(r, "?role=qa")
+        self.assertContains(r, reverse("register") + "?as=student&amp;role=qa")
+        self.assertContains(r, reverse("register") + "?as=alumni&amp;role=qa")
 
     def test_homepage_dashboard_and_gap_show_the_same_numbers(self):
         from .. import gap_analysis, job_roles
@@ -225,26 +241,73 @@ class StudentFlowTests(IsolatedDataMixin, TestCase):
         payload.update(extra)
         return self.client.post(reverse(url_name), data=json.dumps(payload), content_type="application/json")
 
+    REGISTRATION = {"as": "student", "role": "data-analyst", "consent": "on", "first_name": "Juan",
+                    "last_name": "Dela Cruz", "student_number": "2023-1", "course": "BSIT",
+                    "year_level": "1", "section": "TN11", "email": "juan@ue.edu.ph",
+                    "password": "secret123", "password2": "secret123", "method": "password"}
+
+    def register(self, **over):
+        return self.client.post(reverse("register"), {**self.REGISTRATION, **over})
+
     def test_survey_register_dashboard(self):
+        """Check your skill gap -> student -> register (with personal info) -> survey -> dashboard."""
         from ..models import CurriculumSurveyResponse
-        r = self.submit()
-        reg = r.json()["register_url"]
-        self.assertContains(self.client.get(reg), "Confirm your UE email")
-        token = reg.split("t=", 1)[1]
-        bad = self.client.post(reverse("register"), {"t": token, "email": "other@ue.edu.ph",
-                                                     "password": "secret123", "password2": "secret123"})
-        self.assertContains(bad, "same UE email")
-        r = self.client.post(reverse("register"), {"t": token, "email": "JUAN@ue.edu.ph",
-                                                   "password": "secret123", "password2": "secret123"})
-        self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)
+        gap = self.client.get(reverse("check_gap"), {"role": "data-analyst"})
+        self.assertContains(gap, reverse("register") + "?as=student&amp;role=data-analyst")
+        page = self.client.get(reverse("register"), {"as": "student", "role": "data-analyst"})
+        self.assertContains(page, "Create your account")
+        self.assertContains(page, 'name="student_number"')
+        self.assertContains(page, "Data Privacy Notice")
+        self.assertContains(self.register(email="juan@gmail.com"), "Please use your UE email address")
+        self.assertContains(self.register(consent=""), "Data Privacy Notice")
+        self.assertContains(self.register(section=""), "Please enter your section.")
+        kept = self.register(password2="different")
+        self.assertContains(kept, "Passwords do not match.")
+        self.assertContains(kept, 'value="2023-1"')        # what they typed stays
+        self.assertFalse(CustomUser.objects.exists())
+
+        r = self.register()
+        self.assertRedirects(r, reverse("student_survey") + "?role=data-analyst", fetch_redirect_response=False)
         user = CustomUser.objects.get(email="juan@ue.edu.ph")
-        self.assertEqual(user.role, CustomUser.Role.STUDENT)
-        self.assertEqual(user.target_role, "data-analyst")
-        self.assertEqual(CurriculumSurveyResponse.objects.get().user, user)
+        self.assertEqual((user.role, user.get_full_name(), user.target_role),
+                         (CustomUser.Role.STUDENT, "Juan Dela Cruz", "data-analyst"))
+        self.assertEqual(user.learner_info, {"student_number": "2023-1", "course": "BSIT",
+                                             "year_level": "1", "section": "TN11"})
+        survey = self.client.get(reverse("student_survey"))
+        self.assertContains(survey, "From your registration.")
+        self.assertContains(survey, 'value="2023-1"')
+        self.assertContains(self.register(email="other@ue.edu.ph"), "", status_code=302)   # logged in: straight to the survey
+
+        r = self.submit(personal_info={"name": "Someone Else", "ue_email": "x@ue.edu.ph", "course": "BSIT",
+                                       "student_number": "2023-1", "year_level": 2, "section": "TN21"})
+        self.assertEqual(r.json()["next_url"], reverse("student_dashboard"))
+        saved = CurriculumSurveyResponse.objects.get()
+        self.assertEqual(saved.user, user)
+        info = saved.data["personal_info"]
+        self.assertEqual((info["name"], info["ue_email"], info["year_level"], info["section"]),
+                         ("Juan Dela Cruz", "juan@ue.edu.ph", 2, "TN21"))   # name/email from the account
+        user.refresh_from_db()
+        self.assertEqual(user.learner_info["year_level"], "2")              # corrected details are kept
         dash = self.client.get(reverse("student_dashboard"))
         self.assertEqual(dash.status_code, 200)
         self.assertContains(dash, "Job readiness")
-        # the link can't be used twice
+
+    def test_old_after_survey_links_still_work(self):
+        from ..models import CurriculumSurveyResponse
+        from ..student_views import register_url_for
+        resp = CurriculumSurveyResponse.objects.create(respondent_type="student", data={
+            "personal_info": {"name": "Juan Dela Cruz", "ue_email": "juan@ue.edu.ph", "student_number": "2023-1",
+                              "course": "BSIT", "year_level": 1, "section": "TN11"}, "target_role": "data-analyst"})
+        reg = register_url_for(resp)
+        self.assertContains(self.client.get(reg), "Confirm your UE email")
+        bad = self.client.post(reverse("register"), {"t": reg.split("t=", 1)[1], "email": "other@ue.edu.ph",
+                                                     "password": "secret123", "password2": "secret123"})
+        self.assertContains(bad, "same UE email")
+        r = self.client.post(reverse("register"), {"t": reg.split("t=", 1)[1], "email": "JUAN@ue.edu.ph",
+                                                   "password": "secret123", "password2": "secret123"})
+        self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)
+        resp.refresh_from_db()
+        self.assertEqual(resp.user.learner_info["section"], "TN11")
         self.assertContains(self.client.get(reg), "already")
 
     def test_learners_are_kept_out_of_staff_pages(self):
@@ -437,12 +500,12 @@ class MySkillsTests(IsolatedDataMixin, TestCase):
     def test_edit_replaces_the_latest_response(self):
         from ..models import CurriculumSurveyResponse
         r = self.save({"subjects": [
-            {"code": "CCP 1101", "skills": [{"name": "Python", "level": "expert"}]},
-            {"code": "CFD 1101", "skills": [{"name": "SQL", "level": "intermediate"}]}]})
+            {"code": "CCP 1101", "skills": [{"name": "Python", "level": "applied"}]},
+            {"code": "CFD 1101", "skills": [{"name": "SQL", "level": "practiced"}]}]})
         self.assertEqual(r.status_code, 200, r.content)
         self.resp.refresh_from_db()
         subs = {s["code"]: s for s in self.resp.data["subjects"]}
-        self.assertEqual(subs["CCP 1101"]["skills"], [{"name": "Python", "level": "expert"}])
+        self.assertEqual(subs["CCP 1101"]["skills"], [{"name": "Python", "level": "applied"}])
         self.assertEqual(subs["CCP 1101"]["term_label"], "1st Sem")      # earlier details are kept
         self.assertEqual(subs["CFD 1101"]["name"], "Fundamentals of Database Systems")
         self.assertEqual(self.resp.data["target_role"], "data-analyst")
@@ -451,6 +514,8 @@ class MySkillsTests(IsolatedDataMixin, TestCase):
 
     def test_bad_input_is_refused(self):
         self.assertEqual(self.save({"subjects": [{"code": "NOPE 1", "skills": []}]}).status_code, 400)
+        # students/alumni use Introduced / Practiced / Applied now, like faculty
+        self.assertEqual(self.save({"subjects": [{"code": "CCP 1101", "skills": [{"name": "Python", "level": "expert"}]}]}).status_code, 400)
         self.assertEqual(self.save({"subjects": [{"code": "CCP 1101", "skills": [{"name": "Python", "level": ""}]}]}).status_code, 400)
         self.assertEqual(self.save({"nothing": 1}).status_code, 400)
 
@@ -542,17 +607,43 @@ class StudentRegisterVerificationTests(StudentFlowTests):
 
     def test_survey_register_dashboard(self):
         from django.core import mail
-        reg = self.submit().json()["register_url"]
-        token = reg.split("t=", 1)[1]
-        r = self.client.post(reverse("register"), {"t": token, "email": "juan@ue.edu.ph",
-                                                   "password": "secret123", "password2": "secret123"})
-        self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)
+        r = self.register()
+        self.assertRedirects(r, reverse("student_survey") + "?role=data-analyst", fetch_redirect_response=False)
         self.assertIn("_auth_user_id", self.client.session)
         self.assertEqual(mail.outbox[-1].to, ["juan@ue.edu.ph"])
+        self.submit()
         self.assertContains(self.client.get(reverse("student_dashboard")), "Please confirm your email.")
         link = mail.outbox[-1].body.split("http://testserver", 1)[1].split()[0]
         self.assertContains(self.client.get(link), "Email confirmed")
         self.assertNotContains(self.client.get(reverse("student_dashboard")), "Please confirm your email.")
+
+    def test_old_after_survey_links_still_work(self):
+        pass
+
+
+@override_settings(REQUIRE_LEARNER_SURVEY=True)
+class LearnerSurveyFirstTests(IsolatedDataMixin, TestCase):
+    """A registered student/alumni answers their survey before anything else opens."""
+
+    def test_survey_before_dashboard(self):
+        from ..models import CurriculumSurveyResponse
+        user = CustomUser.objects.create_user(email="s@ue.edu.ph", password="secret123", first_name="S",
+                                              last_name="T", role=CustomUser.Role.ALUMNI)
+        self.client.force_login(user)
+        for name in ("student_dashboard", "my_skills", "feedback"):
+            self.assertRedirects(self.client.get(reverse(name)), reverse("alumni_survey"), fetch_redirect_response=False)
+        self.assertRedirects(self.client.get(reverse("student_survey")), reverse("alumni_survey"),
+                             fetch_redirect_response=False)   # their own survey
+        page = self.client.get(reverse("alumni_survey"))
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "Please fill in your details below")   # made by an administrator: no details yet
+        self.assertEqual(self.client.get(reverse("settings")).status_code, 200)
+        CurriculumSurveyResponse.objects.create(respondent_type="alumni", user=user, data={})
+        self.assertEqual(self.client.get(reverse("student_dashboard")).status_code, 200)
+        dummy = CustomUser.objects.create_user(email="d@ue.edu.ph", password="secret123", first_name="D",
+                                               last_name="U", role=CustomUser.Role.STUDENT, is_dummy=True)
+        self.client.force_login(dummy)
+        self.assertEqual(self.client.get(reverse("student_dashboard")).status_code, 200)
 
 
 @override_settings(REQUIRE_PROFESSOR_SURVEY=True)
@@ -589,6 +680,10 @@ class ProfessorSurveyFirstTests(IsolatedDataMixin, TestCase):
 
 class PrivacyConsentTests(TestCase):
     def test_consent_checkbox_is_at_the_top_and_above_submit(self):
+        # students/alumni agree on the registration page, before the survey
+        self.assertContains(self.client.get(reverse("register"), {"as": "student"}), 'name="consent"')
+        self.assertContains(self.client.get(reverse("register"), {"as": "alumni"}), 'name="consent"')
+        login_administrator(self.client)
         for name, main in (("student_survey", "student-consent"), ("alumni_survey", "alumni-consent")):
             page = self.client.get(reverse(name))
             self.assertContains(page, f'id="{main}"')
@@ -609,16 +704,20 @@ class SurveyDraftKeyTests(IsolatedDataMixin, TestCase):
         m = re.search(r'<script type="application/json" id="cs-bootstrap">(.*?)</script>', r.content.decode(), re.S)
         return json.loads(m.group(1))
 
-    def test_no_drafts_when_logged_out(self):
-        self.assertIsNone(self.boot("student_survey")["draftKey"])
-        self.assertIsNone(self.boot("alumni_survey")["draftKey"])
+    def test_no_survey_when_logged_out(self):
+        # logged out, the student/alumni surveys send you to register first
+        self.assertEqual(self.client.get(reverse("student_survey")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("alumni_survey")).status_code, 302)
 
     def test_logged_in_learners_get_a_key_of_their_own(self):
         user = CustomUser.objects.create_user(email="s@ue.edu.ph", password="secret123", first_name="S",
                                               last_name="T", role=CustomUser.Role.STUDENT)
         self.client.force_login(user)
         self.assertEqual(self.boot("student_survey")["draftKey"], f"ue_survey_draft:student:{user.pk}")
-        self.assertEqual(self.boot("alumni_survey")["draftKey"], f"ue_survey_draft:alumni:{user.pk}")
+        alumnus = CustomUser.objects.create_user(email="a@ue.edu.ph", password="secret123", first_name="A",
+                                                 last_name="T", role=CustomUser.Role.ALUMNI)
+        self.client.force_login(alumnus)
+        self.assertEqual(self.boot("alumni_survey")["draftKey"], f"ue_survey_draft:alumni:{alumnus.pk}")
 
     def test_professor_draft_only_before_the_first_answer(self):
         prof = CustomUser.objects.create_user(email="p@ue.edu.ph", password="secret123", first_name="P",
@@ -632,6 +731,7 @@ class SurveyDraftKeyTests(IsolatedDataMixin, TestCase):
 
 class SurveyInstructionsTests(IsolatedDataMixin, TestCase):
     def test_each_survey_says_how_to_answer(self):
+        login_administrator(self.client)
         self.assertContains(self.client.get(reverse("student_survey")), 'id="student-steps"')
         self.assertContains(self.client.get(reverse("alumni_survey")), 'id="alumni-steps"')
         prof = CustomUser.objects.create_user(email="pr@ue.edu.ph", password="secret123", first_name="P", last_name="R")
@@ -641,6 +741,8 @@ class SurveyInstructionsTests(IsolatedDataMixin, TestCase):
         self.assertContains(r, "<strong>Introduced</strong>, <strong>Practiced</strong> or <strong>Applied</strong>")
 
     def test_privacy_notices_give_the_research_team_email(self):
+        self.assertContains(self.client.get(reverse("register"), {"as": "student"}), "mailto:inquiries@uenvision.tech")
+        login_administrator(self.client)
         for name in ("student_survey", "alumni_survey"):
             r = self.client.get(reverse(name))
             self.assertContains(r, "mailto:inquiries@uenvision.tech")
@@ -650,6 +752,7 @@ class SurveyInstructionsTests(IsolatedDataMixin, TestCase):
         self.assertContains(self.client.get(reverse("professor_survey")), "mailto:inquiries@uenvision.tech")
 
     def test_alumni_last_semester_list_waits_for_the_course(self):
+        login_administrator(self.client)
         r = self.client.get(reverse("alumni_survey"))
         self.assertContains(r, '<select id="alumni-term" disabled><option value="">Choose your course first</option></select>', html=False)
         self.assertContains(r, 'id="alumni-earlier-subjects"')
@@ -677,7 +780,8 @@ class HigherYearSubjectTests(TestCase):
                    "personal_info": {"name": "S", "ue_email": "s@ue.edu.ph", "course": "BSIT", "student_number": "1",
                                      "year_level": 1, "section": "A"},
                    "subjects": [{"code": y1["current"]["subjects"][0]["code"], "term": "current", "skills": []},
-                                {"code": later["code"], "term": "later", "skills": [{"name": "Python", "level": "beginner"}]}]}
+                                {"code": later["code"], "term": "later", "skills": [{"name": "Python", "level": "introduced"}]}]}
+        login_administrator(self.client)
         r = self.client.post(reverse("student_survey_submit"), content_type="application/json", data=json.dumps(payload))
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(CurriculumSurveyResponse.objects.get().data["subjects"][1]["term"], "later")
@@ -699,6 +803,9 @@ class CurriculumSuggestionTests(IsolatedDataMixin, TestCase):
 class LearnerElectiveTests(TestCase):
     """Students and alumni don't get the "Professional Elective 1-4" placeholders; they add
     the elective they took as a subject of their own, like professors do."""
+
+    def setUp(self):
+        login_administrator(self.client)
 
     def student_payload(self, extra):
         from .. import curriculum_data
@@ -724,7 +831,7 @@ class LearnerElectiveTests(TestCase):
     def test_student_can_add_a_subject_that_is_not_listed(self):
         r = self.client.post(reverse("student_survey_submit"), content_type="application/json", data=json.dumps(
             self.student_payload([{"code": "cit  4105", "name": " Cloud  Computing ", "custom": True, "programs": ["BSCS"],
-                                   "skills": [{"name": "AWS", "level": "beginner"}]}])))
+                                   "skills": [{"name": "AWS", "level": "introduced"}]}])))
         self.assertEqual(r.status_code, 200, r.content)
         added = CurriculumSurveyResponse.objects.get().data["subjects"][1]
         self.assertEqual((added["code"], added["name"], added["programs"], added["term"], added["custom"]),
@@ -758,7 +865,7 @@ class LearnerElectiveTests(TestCase):
         self.client.force_login(user)
         self.assertContains(self.client.get(reverse("my_skills")), 'id="ms-other-subject"')
         r = self.client.post(reverse("my_skills_save"), content_type="application/json", data=json.dumps({"subjects": [
-            {"code": "CCS 4199", "name": "Game Development", "custom": True, "skills": [{"name": "Unity", "level": "beginner"}]}]}))
+            {"code": "CCS 4199", "name": "Game Development", "custom": True, "skills": [{"name": "Unity", "level": "practiced"}]}]}))
         self.assertEqual(r.status_code, 200, r.content)
         subj = CurriculumSurveyResponse.objects.get().data["subjects"][0]
         self.assertEqual((subj["code"], subj["programs"], subj["custom"]), ("CCS 4199", ["BSCS"], True))

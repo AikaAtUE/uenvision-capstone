@@ -58,12 +58,22 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'myapp'
+    'myapp',
+    # Google sign-in (django-allauth). See myapp/google_auth.py and deploy/DEPLOY.md.
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
 ]
 
 AUTH_USER_MODEL = 'myapp.CustomUser'
 
 LOGIN_URL = 'login'
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',               # email + password (login page)
+    'allauth.account.auth_backends.AuthenticationBackend',     # Google sign-in
+]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -75,6 +85,8 @@ MIDDLEWARE = [
     'myapp.middleware.LearnerAccessMiddleware',
     'myapp.middleware.ForcePasswordChangeMiddleware',
     'myapp.middleware.ProfessorSurveyFirstMiddleware',
+    'myapp.middleware.LearnerSurveyFirstMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -203,6 +215,8 @@ DEFAULT_FROM_EMAIL = f"UEnvision <{os.environ.get('EMAIL_HOST_USER') or 'noreply
 REQUIRE_EMAIL_VERIFICATION = _env_bool('REQUIRE_EMAIL_VERIFICATION', bool(EMAIL_HOST))
 # Faculty must answer the Professor Survey once before they can use the rest of the site.
 REQUIRE_PROFESSOR_SURVEY = _env_bool('REQUIRE_PROFESSOR_SURVEY', True)
+# Students and alumni register first, then must answer their survey before their dashboard.
+REQUIRE_LEARNER_SURVEY = _env_bool('REQUIRE_LEARNER_SURVEY', True)
 # How long a confirmation link works (Django uses this for its token links).
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24  # 1 day
 
@@ -243,3 +257,39 @@ GEMINI_API_KEYS_ENV = "GEMINI_API_KEYS"
 
 # Importing a folder of job JSONs can post hundreds of files at once (Django's default is 100).
 DATA_UPLOAD_MAX_NUMBER_FILES = 5000
+
+
+# ---------------------------------------------------------------------------
+# Google sign-in (django-allauth). Turned on by putting the OAuth client from
+# Google Cloud Console in .env (see deploy/DEPLOY.md, "Google sign-in"):
+#   GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+#   GOOGLE_CLIENT_SECRET=...
+# Without them the "Continue with Google" buttons are hidden.
+# A Google account whose email already has a UEnvision account logs in to that
+# account; new students/alumni can register with Google from the registration page
+# (myapp/google_auth.py decides who may sign up).
+# ---------------------------------------------------------------------------
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {'client_id': GOOGLE_CLIENT_ID, 'secret': GOOGLE_CLIENT_SECRET, 'key': ''},
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'prompt': 'select_account'},
+        'EMAIL_AUTHENTICATION': True,
+    },
+}
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*']
+ACCOUNT_EMAIL_VERIFICATION = 'none'        # Google already confirmed the address
+ACCOUNT_ADAPTER = 'myapp.google_auth.AccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'myapp.google_auth.SocialAccountAdapter'
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True  # Google email = existing account -> log in to it
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_STORE_TOKENS = False
+# Google sends people back to https://<your domain>/auth/google/login/callback/
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https' if (not DEBUG and _env_bool('DJANGO_HTTPS', False)) else 'http'
+SOCIALACCOUNT_ONLY = True                   # no allauth password pages; ours are used

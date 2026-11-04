@@ -19,7 +19,7 @@
       addSkills = CS.addSkills,
       buildSkillPicker = CS.buildSkillPicker,
       missingLevelError = CS.missingLevelError,
-      PROFICIENCY_LEVELS = CS.PROFICIENCY_LEVELS,
+      LEARNER_LEVELS = CS.LEARNER_IPA_LEVELS,
       domId = CS.domId,
       isUeEmail = CS.isUeEmail,
       termTagsHtml = CS.termTagsHtml,
@@ -44,7 +44,7 @@
     var earlierWrap = qs('#student-earlier-subjects', form);
     var laterWrap = qs('#student-later-subjects', form);
     var blocksWrap = qs('#student-subject-blocks', form);
-    insertLevelGuide(blocksWrap, PROFICIENCY_LEVELS, 'What the levels mean (choose the one that fits you now):');
+    insertLevelGuide(blocksWrap, LEARNER_LEVELS, 'What the levels mean (choose how far you got with each skill in the subject):');
     var pickers = {}; // code -> { api, term }
     var tools = qs('#student-subject-tools', form);
     var hint = qs('#student-hint', form);
@@ -158,7 +158,7 @@
         '</div>'
       );
       var container = qs('#' + blockId + ' .cs-skill-picker');
-      var api = buildSkillPicker(container, skillsFor(program, code), PROFICIENCY_LEVELS, blockId);
+      var api = buildSkillPicker(container, skillsFor(program, code), LEARNER_LEVELS, blockId);
       pickers[code] = { api: api, name: name, termLabel: termLabel, termBucket: termBucket };
     }
 
@@ -174,7 +174,7 @@
         '</div>'
       );
       var block = document.getElementById(blockId);
-      var api = buildSkillPicker(qs('.cs-skill-picker', block), [], PROFICIENCY_LEVELS, blockId, skills || []);
+      var api = buildSkillPicker(qs('.cs-skill-picker', block), [], LEARNER_LEVELS, blockId, skills || []);
       pickers[code] = { api: api, name: name, termLabel: 'Added by you', termBucket: 'added', custom: true };
       return block;
     }
@@ -228,6 +228,9 @@
 
     programSel.addEventListener('change', renderSubjectGroups);
     yearSel.addEventListener('change', renderSubjectGroups);
+
+    // Course (and year level) already filled in from registration: list the subjects now.
+    if (programSel.value) programSel.dispatchEvent(new Event('change'));
 
     var FIELDS = ['student-name', 'student-email', 'student-program', 'student-number', 'student-year', 'student-section', 'student-consent'];
     var draft = surveyDraft(form, function () {

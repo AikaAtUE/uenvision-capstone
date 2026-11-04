@@ -17,11 +17,22 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from django.views.generic import RedirectView
+
 from myapp import views
 
 urlpatterns = [
     # before admin.site.urls so the admin's own login form (no attempt limits) is never used
     path('admin/login/', views.admin_login_view, name='admin_login'),
     path('admin/', admin.site.urls),
+    # Google sign-in (django-allauth). Only Google's login + callback and allauth's
+    # inactive-account page are its own; its other pages go to UEnvision's.
+    path('auth/login/', RedirectView.as_view(pattern_name='login', query_string=True)),
+    path('auth/logout/', RedirectView.as_view(pattern_name='logout')),
+    path('auth/3rdparty/', RedirectView.as_view(pattern_name='settings')),
+    path('auth/3rdparty/signup/', RedirectView.as_view(pattern_name='check_gap')),
+    path('auth/3rdparty/login/cancelled/', views.google_cancelled_view, name='google_cancelled'),
+    path('auth/3rdparty/login/error/', views.google_error_view, name='google_error'),
+    path('auth/', include('allauth.urls')),
     path('', include('myapp.urls'))
 ]

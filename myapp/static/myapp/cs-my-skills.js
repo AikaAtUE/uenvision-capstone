@@ -14,7 +14,7 @@
       postJson = CS.postJson,
       buildSkillPicker = CS.buildSkillPicker,
       missingLevelError = CS.missingLevelError,
-      PROFICIENCY_LEVELS = CS.PROFICIENCY_LEVELS,
+      LEARNER_LEVELS = CS.LEARNER_IPA_LEVELS,
       IPA_LEVELS = CS.IPA_LEVELS,
       domId = CS.domId,
       buildOtherSubjectForm = CS.buildOtherSubjectForm,
@@ -30,7 +30,7 @@
 
     var list = document.getElementById('ms-subjects');
     if (CS.insertLevelGuide) {
-      CS.insertLevelGuide(list, BOOT.levels === 'ipa' ? IPA_LEVELS : PROFICIENCY_LEVELS,
+      CS.insertLevelGuide(list, BOOT.levels === 'ipa' ? IPA_LEVELS : LEARNER_LEVELS,
         BOOT.levels === 'ipa' ? 'How far each skill is taught:' : 'What the levels mean:');
     }
     var addSel = document.getElementById('ms-add-subject');
@@ -80,7 +80,7 @@
         '<button type="button" class="ms-remove-subject" aria-label="Remove ' + escapeHtml(code) + '">Remove subject</button></div>' +
         '<div class="cs-skill-picker"></div>';
       if (isNew) list.insertBefore(block, list.firstChild); else list.appendChild(block);
-      pickers[code] = buildSkillPicker(qs('.cs-skill-picker', block), skillsFor('', code), (BOOT.levels === 'ipa' ? IPA_LEVELS : PROFICIENCY_LEVELS), blockId, skills || []);
+      pickers[code] = buildSkillPicker(qs('.cs-skill-picker', block), skillsFor('', code), (BOOT.levels === 'ipa' ? IPA_LEVELS : LEARNER_LEVELS), blockId, skills || []);
       if (isNew) {
         block.classList.add('is-new');
         block.scrollIntoView({ block: 'nearest' });
@@ -114,7 +114,7 @@
       Object.keys(pickers).forEach(function (code) {
         skillsFor('', code).forEach(function (n) { if (pool.indexOf(n) === -1) pool.push(n); });
       });
-      overallPicker = buildSkillPicker(document.getElementById('ms-overall-picker'), pool.slice(0, 24), PROFICIENCY_LEVELS, 'ms-overall', BOOT.overallSkills || []);
+      overallPicker = buildSkillPicker(document.getElementById('ms-overall-picker'), pool.slice(0, 24), LEARNER_LEVELS, 'ms-overall', BOOT.overallSkills || []);
     }
     refreshAddOptions();
 

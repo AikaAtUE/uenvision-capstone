@@ -10,6 +10,7 @@
 
     <form class="auth-form" id="login-form" method="post" action="{% url 'login' %}">
       {% csrf_token %}
+      {% include "_messages.html" %}
       {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
       <label class="field">
         <span>Email address</span>
@@ -23,9 +24,16 @@
       <p class="form-msg is-error" id="login-msg" role="alert">{% if error %}{{ error }}{% endif %}</p>
       <a class="link-inline" href="{% url 'forgot_password' %}">Forgot password</a>
       <button type="submit" class="btn btn-navy btn-block">Log in</button>
+      {% if google_enabled %}
+      <div class="auth-or"><span>or</span></div>
+      <button type="submit" class="btn btn-google btn-block" form="google-login-form">{% include "_google_icon.html" %}<span>Continue with Google</span></button>
+      {% endif %}
       <p class="auth-foot">Don't have an account? <a class="link-inline" href="{% url 'signup' %}">Sign up</a> (faculty)</p>
       <p class="auth-foot">Student or fresh graduate? <a class="link-inline" href="{% url 'check_gap' %}">Check your skill gap</a></p>
     </form>
+    {% if google_enabled %}
+    <form id="google-login-form" method="post" action="{% url 'google_login' %}" hidden>{% csrf_token %}<input type="hidden" name="process" value="login"></form>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

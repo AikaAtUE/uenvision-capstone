@@ -1,36 +1,90 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}Create your account{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'myapp/curriculum-survey.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">
+{% endblock %}
 {% block content %}
 {% include "_public_header.html" %}
 <main class="pub-main pub-main--narrow">
+  <ol class="reg-steps" aria-label="Steps">
+    <li class="is-done">{% if kind == "alumni" %}Fresh graduate{% else %}Student{% endif %}</li>
+    <li class="is-current">Create your account</li>
+    <li>Answer the survey</li>
+    <li>See your results</li>
+  </ol>
   <div class="panel pub-register">
-  {% if invalid %}
-    <h1 class="pub-h2">This link has expired</h1>
-    <p>Account links from the survey work for 3 days. Please <a class="link-inline" href="{% url 'check_gap' %}">take the survey again</a>, or <a class="link-inline" href="{% url 'login' %}">log in</a> if you already have an account.</p>
-  {% elif already %}
-    <h1 class="pub-h2">You already have an account</h1>
-    <p>These survey answers are already linked to an account. <a class="link-inline" href="{% url 'login' %}">Log in</a> to see your results.</p>
-  {% else %}
     <h1 class="pub-h2">Create your account</h1>
-    <p class="muted">Thanks{% if name %}, {{ name }}{% endif %}! Confirm your UE email and choose a password to see your skill gap and learning recommendations.</p>
-    <form method="post" action="{% url 'register' %}" class="auth-form">
+    <p class="muted">Register first with your details, then answer the {% if kind == "alumni" %}alumni{% else %}student{% endif %} survey. When you finish it, your dashboard shows your skill gap{% if role_label %} for <strong>{{ role_label }}</strong> jobs{% endif %}. <a class="link-inline" href="{% url 'check_gap' %}">Not a {% if kind == "alumni" %}fresh graduate{% else %}current student{% endif %}?</a></p>
+    {% include "_messages.html" %}
+
+    <form method="post" action="{% url 'register' %}" class="auth-form reg-form" id="register-form">
       {% csrf_token %}
-      <input type="hidden" name="t" value="{{ token }}">
-      <label class="field"><span>Confirm your UE email</span>
-        <input type="email" name="email" value="{{ form.email|default:'' }}" autocomplete="username" placeholder="{{ email }}" required>
-        <span class="field-hint">Type the email you used in the survey: {{ email }}</span></label>
+      <input type="hidden" name="as" value="{{ kind }}">
+      {% if target_role %}<input type="hidden" name="role" value="{{ target_role }}">{% endif %}
+
+      <div class="cs-privacy" id="register-privacy">
+        <h3>Data Privacy Notice</h3>
+        <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
+        <ul>
+          <li><strong>Purpose:</strong> to compare the technical skills taught in the BSIT/BSCS curricula against current IT/CS job market demand{% if kind == "alumni" %}, including how well they carried over into your career{% endif %}.</li>
+          <li><strong>What is collected:</strong> your name, UE email, course, student number, {% if kind == "alumni" %}year graduated, your subjects/skills, and your employment situation as you describe it{% else %}year level, section, the subjects you've taken, and the skills and levels you report for each{% endif %}.</li>
+          <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
+          <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
+          <li><strong>Questions or concerns:</strong> email the UEnvision research team at <a class="link-inline" href="mailto:inquiries@uenvision.tech">inquiries@uenvision.tech</a>.</li>
+        </ul>
+        <label class="cs-consent"><input type="checkbox" name="consent" {% if form.consent %}checked{% endif %}> <span>I have read the Data Privacy Notice above and voluntarily agree to participate.</span></label>
+      </div>
+
+      <h2 class="reg-h">Your details</h2>
+      <div class="cs-row-2">
+        <label class="field"><span>First name</span><input type="text" name="first_name" value="{{ form.first_name|default:'' }}" autocomplete="given-name" maxlength="100" required></label>
+        <label class="field"><span>Last name</span><input type="text" name="last_name" value="{{ form.last_name|default:'' }}" autocomplete="family-name" maxlength="100" required></label>
+      </div>
+      <div class="cs-row-2">
+        <label class="field"><span>Student number</span><input type="text" name="student_number" value="{{ form.student_number|default:'' }}" maxlength="30" required></label>
+        <label class="field"><span>Course</span>
+          <select name="course" required>
+            <option value="">Select…</option>
+            {% for code, label in programs %}<option value="{{ code }}"{% if form.course == code %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      {% if kind == "alumni" %}
+      <label class="field"><span>Year graduated</span><input type="number" name="year_graduated" value="{{ form.year_graduated|default:'' }}" min="{{ min_grad_year }}" max="{{ max_grad_year }}" required></label>
+      {% else %}
+      <div class="cs-row-2">
+        <label class="field"><span>Year level</span>
+          <select name="year_level" required>
+            <option value="">Select…</option>
+            {% for y in year_levels %}<option value="{{ y }}"{% if form.year_level == y|stringformat:"d" %} selected{% endif %}>{% if y == 1 %}1st{% elif y == 2 %}2nd{% elif y == 3 %}3rd{% else %}{{ y }}th{% endif %} Year</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>Section</span><input type="text" name="section" value="{{ form.section|default:'' }}" maxlength="30" placeholder="As shown on your class schedule" autocomplete="off" required></label>
+      </div>
+      {% endif %}
+
+      {% if google_enabled %}
+      <h2 class="reg-h">Sign in with Google</h2>
+      <button type="submit" class="btn btn-google btn-block" name="method" value="google" formnovalidate data-google>{% include "_google_icon.html" %}<span>Continue with Google</span></button>
+      <p class="field-hint">Choose your UE Google account (@{{ ue_email_domain }}). You won't need a password.</p>
+      <div class="auth-or"><span>or use a password</span></div>
+      {% else %}
+      <h2 class="reg-h">Your account</h2>
+      {% endif %}
+      <label class="field"><span>UE email address</span>
+        <input type="email" name="email" value="{{ form.email|default:'' }}" autocomplete="username" placeholder="juan.delacruz@{{ ue_email_domain }}" data-account></label>
       <label class="field"><span>Password</span>
-        <input type="password" name="password" value="{{ form.password|default:'' }}" autocomplete="new-password" minlength="{{ min_password_length }}" required
-               data-password-rules aria-describedby="register-password-rules"></label>
+        <input type="password" name="password" autocomplete="new-password" minlength="{{ min_password_length }}"
+               data-password-rules data-account aria-describedby="register-password-rules"></label>
       <ul class="pw-rules" id="register-password-rules" aria-live="polite"><li data-min-length="{{ min_password_length }}">At least {{ min_password_length }} characters</li></ul>
       <label class="field"><span>Confirm password</span>
-        <input type="password" name="password2" value="{{ form.password2|default:'' }}" autocomplete="new-password" required></label>
+        <input type="password" name="password2" autocomplete="new-password" data-account></label>
       {% if error %}<p class="form-msg is-error" role="alert">{{ error }}</p>{% endif %}
-      <button type="submit" class="btn btn-red btn-block">Create account and see my results</button>
+      <button type="submit" class="btn btn-red btn-block" name="method" value="password">Create account and start the survey</button>
+      <p class="auth-foot">Already registered? <a class="link-inline" href="{% url 'login' %}">Log in</a></p>
     </form>
-  {% endif %}
   </div>
 </main>
 {% endblock %}

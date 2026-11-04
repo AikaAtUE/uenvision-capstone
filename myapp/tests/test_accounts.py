@@ -177,7 +177,7 @@ class DummyAccountTests(IsolatedDataMixin, TestCase):
                                   "student_number": "2099-1", "year_level": 1, "section": "TN11"},
                 "has_previous": False, "target_role": "data-analyst",
                 "subjects": [{"code": "CCP 1101", "term": "current",
-                              "skills": [{"name": "Python", "level": "advanced"}]}]}
+                              "skills": [{"name": "Python", "level": "applied"}]}]}
 
     def test_admin_can_create_dummy_accounts(self):
         ds = self.make("dummy_student", "ds@ue.edu.ph")
@@ -201,8 +201,10 @@ class DummyAccountTests(IsolatedDataMixin, TestCase):
         self.assertEqual(CurriculumSurveyResponse.objects.filter(is_dummy=True).count(), 2)
         self.assertEqual(CurriculumSurveyResponse.objects.get(user=ds).is_dummy, True)
 
-        # a real public answer
-        self.client.logout()
+        # a real student's answer (students register before answering)
+        real_student = CustomUser.objects.create_user(email="real@ue.edu.ph", password="secret123", first_name="R",
+                                                      last_name="S", role=CustomUser.Role.STUDENT)
+        self.client.force_login(real_student)
         self.client.post(reverse("student_survey_submit"), data=json.dumps(self.student_payload("real@ue.edu.ph")),
                          content_type="application/json")
         real = CurriculumSurveyResponse.objects.get(is_dummy=False)
@@ -211,7 +213,7 @@ class DummyAccountTests(IsolatedDataMixin, TestCase):
         _, dummy_counts = gap_analysis._academic_responses(dummy=True)
         self.assertEqual(real_counts, {"student": 1, "alumni": 0, "professor": 0})
         self.assertEqual(dummy_counts, {"student": 1, "alumni": 0, "professor": 1})
-        self.assertEqual(real.user, None)
+        self.assertEqual(real.user, real_student)
 
     def test_dashboard_uses_the_users_data_set(self):
         from unittest import mock

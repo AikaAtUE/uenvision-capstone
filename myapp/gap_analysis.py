@@ -57,9 +57,10 @@ MAX_TAUGHT_IN = 4  # subject codes listed per skill in the three-source comparis
 # Survey level -> weight in 0..1. An unknown or missing level counts in full, the
 # same as the original unweighted mention count.
 LEVEL_WEIGHTS = {
-    # Professor survey: how the skill is taught
+    # Introduced / Practiced / Applied: the Professor Survey (how the skill is taught)
+    # and, since the adviser's change, the student / alumni surveys too
     "introduced": 1 / 3, "practiced": 2 / 3, "applied": 1.0,
-    # Student / alumni surveys: proficiency after the subject
+    # Older student / alumni answers: proficiency after the subject
     "beginner": 0.25, "intermediate": 0.5, "advanced": 0.75, "expert": 1.0,
 }
 LEARNER_TYPES = ("student", "alumni")

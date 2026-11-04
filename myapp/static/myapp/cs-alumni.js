@@ -21,7 +21,7 @@
       addSkills = CS.addSkills,
       buildSkillPicker = CS.buildSkillPicker,
       missingLevelError = CS.missingLevelError,
-      PROFICIENCY_LEVELS = CS.PROFICIENCY_LEVELS,
+      LEARNER_LEVELS = CS.LEARNER_IPA_LEVELS,
       domId = CS.domId,
       isUeEmail = CS.isUeEmail,
       termTagsHtml = CS.termTagsHtml,
@@ -43,7 +43,7 @@
     var subjectsWrap = qs('#alumni-subjects', form);
     var earlierWrap = qs('#alumni-earlier-subjects', form);
     var blocksWrap = qs('#alumni-subject-blocks', form);
-    insertLevelGuide(blocksWrap, PROFICIENCY_LEVELS, 'What the levels mean (choose how good you were at each skill after the subject):');
+    insertLevelGuide(blocksWrap, LEARNER_LEVELS, 'What the levels mean (choose how far you got with each skill in the subject):');
     var overallWrap = qs('#alumni-overall-skills', form);
     var pickers = {};
     var overallPicker = null;
@@ -126,7 +126,7 @@
         '</div>'
       );
       var container = qs('#' + blockId + ' .cs-skill-picker');
-      var api = buildSkillPicker(container, skillsFor(program, code), PROFICIENCY_LEVELS, blockId);
+      var api = buildSkillPicker(container, skillsFor(program, code), LEARNER_LEVELS, blockId);
       pickers[code] = { api: api, name: name, termLabel: termLabel, termKey: termKey, bucket: bucket };
     }
     /* A subject that isn't listed (e.g. the Professional Elective they took). */
@@ -141,7 +141,7 @@
         '</div>'
       );
       var block = document.getElementById(blockId);
-      var api = buildSkillPicker(qs('.cs-skill-picker', block), [], PROFICIENCY_LEVELS, blockId, skills || []);
+      var api = buildSkillPicker(qs('.cs-skill-picker', block), [], LEARNER_LEVELS, blockId, skills || []);
       pickers[code] = { api: api, name: name, termLabel: 'Added by you', termKey: '', bucket: 'added', custom: true };
       return block;
     }
@@ -203,7 +203,7 @@
         '<h3>Overall skills learned throughout your stay at UE</h3>' +
         '<p class="muted">Not tied to one subject — the skills you feel you came away from the whole program with.</p>' +
         '<div class="cs-skill-picker" id="alumni-overall-picker"></div>';
-      overallPicker = buildSkillPicker(qs('#alumni-overall-picker', overallWrap), names.slice(0, 24), PROFICIENCY_LEVELS, 'alumni-overall');
+      overallPicker = buildSkillPicker(qs('#alumni-overall-picker', overallWrap), names.slice(0, 24), LEARNER_LEVELS, 'alumni-overall');
     }
 
     programSel.addEventListener('change', renderTermOptions);
@@ -354,6 +354,9 @@
       codes.forEach(function (code) { skillsFor(program, code).forEach(function (n) { if (names.indexOf(n) === -1) names.push(n); }); });
       window.__alumniAppliedPicker = buildSkillPicker(wrap, names.slice(0, 24), [{ value: 'applied', label: 'Applied' }], 'alumni-applied');
     });
+
+    // Course (and year level) already filled in from registration: list the subjects now.
+    if (programSel.value) programSel.dispatchEvent(new Event('change'));
 
     var FIELDS = ['alumni-name', 'alumni-email', 'alumni-program', 'alumni-number', 'alumni-year-graduated', 'alumni-consent'];
     var MORE_FIELDS = ['alumni-role', 'alumni-jobs-applied', 'alumni-rejection-reason'];

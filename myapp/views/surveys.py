@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -20,8 +20,8 @@ from .common import _safe_json
 # ---------------------------------------------------------------------------
 # Curriculum-mapping surveys (Student / Fresh Grad Alumni / Professor)
 #
-# Public (no login required) — these are filled out by outside respondents,
-# not app users. Each one is a single page: pick your program/year (or, for
+# Students and alumni register first (student_views.register_view), then answer
+# their survey logged in; faculty/administrators may open both to try them out. Each one is a single page: pick your program/year (or, for
 # professors, just the subjects you teach), pick the subjects that apply,
 # then tag the skills taught/learned per subject — curriculum_survey.js
 # drives all of that dynamically from the JSON blobs below; the view's job
@@ -92,16 +92,48 @@ def _is_dummy(request):
 
 
 def _learner_survey_saved(request, response):
-    """After a student/alumni survey: a logged-in student/alumni is linked right
-    away; anyone else gets a signed link to register and see their results."""
-    from .. import student_views
-
+    """After a student/alumni survey: it is linked to their account and they go to
+    their dashboard. (Faculty / administrators trying the survey out just get a thank-you.)"""
     user = request.user
-    if user.is_authenticated and user.is_learner:
+    if user.is_learner:
         response.user = user
         response.save(update_fields=["user"])
         return JsonResponse({"ok": True, "next_url": reverse("student_dashboard")})
-    return JsonResponse({"ok": True, "register_url": student_views.register_url_for(response)})
+    return JsonResponse({"ok": True})
+
+
+def _learner_submit_check(request, kind):
+    """Students and alumni register before answering (student_views.register_view).
+    -> JsonResponse error, or None."""
+    user = request.user
+    if not user.is_authenticated:
+        return JsonResponse({"ok": False, "error": "Please create your account or log in first.",
+                             "register_url": reverse("register") + f"?as={kind}"}, status=401)
+    if user.is_learner and user.role != kind:
+        return JsonResponse({"ok": False, "error": "This survey is for the other group. Please open your own survey."}, status=403)
+    return None
+
+
+def _apply_account_info(request, payload, kind):
+    """A registered student/alumni answers as their account: name and email come from it,
+    and the rest of "About you" (which they may have corrected) is checked and saved back
+    to the account. -> error message or None."""
+    from ..student_views import clean_learner_info
+
+    user = request.user
+    if not user.is_learner:
+        return None
+    sent = payload["personal_info"]
+    info, error = clean_learner_info(kind, sent)
+    if error:
+        return error
+    payload["personal_info"] = {**sent, **info, "name": user.get_full_name(), "ue_email": user.email}
+    if kind == "student":
+        payload["personal_info"]["year_level"] = int(info["year_level"])
+    if user.learner_info != info:
+        user.learner_info = info
+        user.save(update_fields=["learner_info"])
+    return None
 
 
 def _clean_target_role(payload):
@@ -133,13 +165,19 @@ def _clean_learner_custom_subjects(payload):
 
 @require_POST
 def student_survey_submit_view(request):
+    refused = _learner_submit_check(request, "student")
+    if refused:
+        return refused
     payload, error = _parse_curriculum_submission(request)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    error = _apply_account_info(request, payload, "student")
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
     error = _clean_learner_custom_subjects(payload)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
-    error = _ue_email_error(payload)
+    error = None if request.user.is_learner else _ue_email_error(payload)   # theirs is the account's
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
     terms = {s.get("term") for s in payload["subjects"] if isinstance(s, dict)}
@@ -161,13 +199,19 @@ def student_survey_submit_view(request):
 
 @require_POST
 def alumni_survey_submit_view(request):
+    refused = _learner_submit_check(request, "alumni")
+    if refused:
+        return refused
     payload, error = _parse_curriculum_submission(request)
+    if error:
+        return JsonResponse({"ok": False, "error": error}, status=400)
+    error = _apply_account_info(request, payload, "alumni")
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
     error = _clean_learner_custom_subjects(payload)
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
-    error = _ue_email_error(payload)
+    error = None if request.user.is_learner else _ue_email_error(payload)   # theirs is the account's
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
     employment = payload.get("employment")
@@ -231,7 +275,50 @@ def _survey_draft_key(request, survey):
     return f"ue_survey_draft:{survey}:{request.user.pk}"
 
 
+def _learner_survey_gate(request, kind):
+    """Students / alumni register first: someone not logged in goes to registration,
+    and a student opening the alumni survey (or the other way round) to their own.
+    Faculty / administrators may still open both to try them out. -> redirect or None."""
+    from ..student_views import survey_url_for
+
+    user = request.user
+    role = request.GET.get("role", "")
+    if not user.is_authenticated:
+        url = reverse("register") + f"?as={kind}"
+        from .. import job_roles
+        return redirect(url + (f"&role={role}" if role in job_roles.ROLE_LABELS else ""))
+    if user.is_learner and user.role != kind:
+        return redirect(survey_url_for(user.role, role))
+    return None
+
+
+def _prefill(user):
+    """The survey's "About you", filled in from the student's / alumni's registration."""
+    if not user.is_learner:
+        return None
+    info = dict(user.learner_info or {})
+    year = str(info.get("year_level") or "")
+    suffix = {"1": "st", "2": "nd", "3": "rd"}.get(year, "th")
+    needed = ("student_number", "course") + (("year_graduated",) if user.role == user.Role.ALUMNI
+                                             else ("year_level", "section"))
+    return {**info, "name": user.get_full_name(), "email": user.email,
+            "year_label": f"{year}{suffix} Year" if year else "",
+            # accounts an administrator made have no details yet: then the fields show open
+            "complete": all(info.get(k) for k in needed)}
+
+
+def _target_role(request):
+    """?role=... from the homepage, or the job role saved on their account."""
+    role = request.GET.get("role", "")
+    if not role and request.user.is_authenticated:
+        role = request.user.target_role or ""
+    return role
+
+
 def student_survey_view(request):
+    gate = _learner_survey_gate(request, "student")
+    if gate:
+        return gate
     period = curriculum_data.current_period()
     bootstrap = {
         "draftKey": _survey_draft_key(request, "student"),
@@ -241,7 +328,7 @@ def student_survey_view(request):
         "ueEmailDomain": UE_EMAIL_DOMAIN,
         "eligibility": curriculum_data.build_student_eligibility(period["slot"]),
         "knownCodes": sorted(curriculum_data.subject_by_code()),
-        "targetRole": request.GET.get("role", ""),
+        "targetRole": _target_role(request),
         "skills": ontology.subject_skill_map(),
         "termTags": curriculum_data.subject_term_tags(),
         "submitUrl": reverse("student_survey_submit"),
@@ -249,12 +336,17 @@ def student_survey_view(request):
         "skillAddUrl": reverse("skill_add"),
     }
     return render(request, "student_survey.html", {
+        "prefill": _prefill(request.user),
         "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,
         "bootstrap_json": _safe_json(bootstrap),
     })
 
 
 def alumni_survey_view(request):
+    gate = _learner_survey_gate(request, "alumni")
+    if gate:
+        return gate
+    from ..student_views import max_grad_year
     terms_by_program = {
         program: curriculum_data.term_sequence(program)
         for program in curriculum_data.PROGRAMS
@@ -265,7 +357,7 @@ def alumni_survey_view(request):
         "termsByProgram": terms_by_program,
         "subjectsByProgramTerm": curriculum_data.learner_subjects_by_term(),
         "knownCodes": sorted(curriculum_data.subject_by_code()),
-        "targetRole": request.GET.get("role", ""),
+        "targetRole": _target_role(request),
         "ueEmailDomain": UE_EMAIL_DOMAIN,
         "skills": ontology.subject_skill_map(),
         "termTags": curriculum_data.subject_term_tags(),
@@ -274,6 +366,8 @@ def alumni_survey_view(request):
         "skillAddUrl": reverse("skill_add"),
     }
     return render(request, "alumni_survey.html", {
+        "prefill": _prefill(request.user),
+        "max_grad_year": max_grad_year(),
         "is_placeholder_curriculum": curriculum_data.CURRICULUM_IS_PLACEHOLDER,
         "bootstrap_json": _safe_json(bootstrap),
     })

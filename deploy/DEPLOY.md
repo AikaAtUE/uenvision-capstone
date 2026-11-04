@@ -341,3 +341,33 @@ systemctl reload nginx             # after editing the nginx file
 On your PC nothing new is needed: with no `.env`, Django uses `DEBUG=True`, the old development
 secret key, `localhost`, and `api_keys.txt` exactly as before. `python manage.py runserver`
 works the same way.
+
+## Google sign-in
+
+"Continue with Google" shows on the login page and on the student/alumni registration
+page once the server has a Google OAuth client. Google only accepts a real domain with
+HTTPS (not `http://201.18.219.201`), so do Step 8 first.
+
+1. Open <https://console.cloud.google.com/>, sign in, and create a project (for example
+   "UEnvision").
+2. **APIs & Services → OAuth consent screen** (also called "Google Auth Platform → Branding"):
+   app name `UEnvision`, your support email, audience **External**, then save. Add the
+   authorized domain (e.g. `uenvision.tech`). Under **Audience**, press **Publish app** so
+   anyone can sign in (while it says "Testing", only test users you list can).
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**:
+   - Application type: **Web application**
+   - Authorized JavaScript origins: `https://yourdomain.com` (and `https://www.yourdomain.com`)
+   - Authorized redirect URIs: `https://yourdomain.com/auth/google/login/callback/`
+     (and the same with `www.` if people use it)
+4. Copy the **Client ID** and **Client secret** into the server's `.env`:
+   ```
+   GOOGLE_CLIENT_ID=1234-abcd.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=GOCSPX-...
+   ```
+5. Run `sudo bash /home/uenvision/uenvision-capstone/deploy/update.sh` (it installs
+   django-allauth, migrates, and restarts).
+
+Who can use it: anyone whose Google email already has a UEnvision account logs in to that
+account (their password still works). New students/alumni register with Google from the
+registration page and must pick their `@ue.edu.ph` Google account. Faculty sign up on the
+sign-up page first, then can use Google to log in.

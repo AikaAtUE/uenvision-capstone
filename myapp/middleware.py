@@ -147,3 +147,43 @@ class ProfessorSurveyFirstMiddleware:
                     return JsonResponse({"ok": False, "error": "Please answer the Professor Survey first."}, status=403)
                 return redirect(f"{reverse('professor_survey')}?first=1")
         return self.get_response(request)
+
+
+# What a registered student/alumni with no survey answer yet can open: their survey (and
+# the skill search it uses), plus account basics. Everything else (their dashboard, My
+# subjects & skills, Feedback, ...) sends them to the survey first: they register, answer
+# the survey, and only then see their dashboard. Dummy (test) students are left out.
+LEARNER_SURVEY_URL_NAMES = {
+    "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit",
+    "skill_search", "skill_add", "home", "role_skills", "check_gap", "register",
+    "settings", "change_password", "logout", "login", "session_ping", "help", "about",
+    "update_account", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",
+    "profile_photo", "profile_photo_upload",
+}
+
+
+def needs_learner_survey(user):
+    from .models import CurriculumSurveyResponse
+
+    return (getattr(settings, "REQUIRE_LEARNER_SURVEY", True)
+            and user.is_learner and not user.is_dummy
+            and not CurriculumSurveyResponse.objects.filter(
+                user=user, respondent_type__in=[CurriculumSurveyResponse.STUDENT, CurriculumSurveyResponse.ALUMNI]).exists())
+
+
+class LearnerSurveyFirstMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated and getattr(user, "is_learner", False):
+            try:
+                match = resolve(request.path_info)
+            except Resolver404:
+                match = None
+            if match is not None and match.url_name not in LEARNER_SURVEY_URL_NAMES and needs_learner_survey(user):
+                if _wants_json(request):
+                    return JsonResponse({"ok": False, "error": "Please answer the survey first."}, status=403)
+                return redirect("alumni_survey" if user.role == user.Role.ALUMNI else "student_survey")
+        return self.get_response(request)

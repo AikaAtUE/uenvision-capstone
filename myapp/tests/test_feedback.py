@@ -23,6 +23,19 @@ class SurveyAndLogoutTests(TestCase):
         row.update({"respondent_role": "Student", "sus_score": 999, "comments": None})
         return row
 
+    def uat_row(self, value=4):
+        return {f"q{n}": value for n in range(1, 11)}
+
+    def test_uat_is_a_likert_satisfaction_survey(self):
+        self.client.force_login(self.user)
+        resp = self.post({"type": "uat", "rows": [self.uat_row(4)]})
+        self.assertEqual(resp.status_code, 200)
+        uat = SurveyResponse.objects.get(survey_type="uat")
+        self.assertEqual((uat.data["uat_score"], uat.data["uat_version"]), (4.0, 2))
+        bad = self.uat_row(); bad["q10"] = 6
+        self.assertEqual(self.post({"type": "uat", "rows": [bad]}).status_code, 400)
+        self.assertEqual(self.post({"type": "uat", "rows": [{"login_worked": "Yes"}]}).status_code, 400)
+
     def test_requires_login(self):
         resp = self.post({"type": "sus", "rows": [self.sus_row()]})
         self.assertEqual(resp.status_code, 401)
@@ -69,7 +82,7 @@ class SurveyAndLogoutTests(TestCase):
         saved = SurveyResponse.objects.get()
         self.assertEqual(saved.data["respondent_role"], "Faculty")
         self.assertEqual(saved.data["respondent_name"], "Jose Rizal")
-        self.post({"type": "uat", "rows": [{"tester_name": "Someone else", "login_worked": "Yes"}]})
+        self.post({"type": "uat", "rows": [{"tester_name": "Someone else", **self.uat_row()}]})
         uat = SurveyResponse.objects.get(survey_type="uat")
         self.assertEqual((uat.data["tester_name"], uat.data["tester_role"]), ("Jose Rizal", "Faculty"))
 
@@ -84,7 +97,7 @@ class SurveyAndLogoutTests(TestCase):
         from django.utils import timezone
         from ..views import PH_TIME
         self.client.force_login(self.user)
-        self.post({"type": "uat", "rows": [{"test_date": "2001-01-01", "login_worked": "Yes"}]})
+        self.post({"type": "uat", "rows": [{"test_date": "2001-01-01", **self.uat_row()}]})
         uat = SurveyResponse.objects.get(survey_type="uat")
         today = timezone.localdate(timezone=PH_TIME).isoformat()
         self.assertEqual(uat.data["test_date"], today)  # the form's date is ignored
@@ -192,13 +205,23 @@ class FunctionalSheetTests(TestCase):
         from pathlib import Path
         return (Path(__file__).resolve().parent.parent / "static" / "myapp" / "survey.js").read_text(encoding="utf-8")
 
-    def test_no_login_or_logout_cases_and_yes_no_answers(self):
+    def test_login_case_paragraph_scenarios_and_yes_no_answers(self):
         js = self.js()
         block = js[js.index("var FUNCTIONAL_DEFAULT_ROWS"):js.index("var functionalRowCount")]
-        self.assertNotIn("Log in", block)
+        self.assertIn("feature: 'Login'", block)        # the login case is back, per the adviser
         self.assertNotIn("Log out", block)
+        # one scenario paragraph per case, no separate steps / expected result
+        self.assertIn("scenario:", block)
+        self.assertNotIn("steps:", block)
+        self.assertNotIn("expected:", block)
         self.assertIn("['Yes', 'No']", js)
         self.assertNotIn("Blocked", js)
+
+    def test_uat_has_no_login_question(self):
+        js = self.js()
+        block = js[js.index("var UAT_QUESTIONS"):js.index("var FUNCTIONAL_DEFAULT_ROWS")]
+        self.assertNotIn("Logging in", block)
+        self.assertEqual(block.count("'") // 2, 10)    # ten Likert statements
 
     def test_sheet_explains_what_it_is_for(self):
         user = CustomUser.objects.create_user(email="f@ue.edu.ph", password="secret123", first_name="F", last_name="A")

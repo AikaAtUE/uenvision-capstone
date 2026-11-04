@@ -25,6 +25,16 @@
     main.addEventListener('change', function () { copy.checked = main.checked; });
   });
 
+  /* "About you" box (students/alumni filled it in when they registered): its Change
+     button shows the fields so they can fix their year level, section, ... */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-reveal]'), function (btn) {
+    btn.addEventListener('click', function () {
+      var target = document.getElementById(btn.getAttribute('data-reveal'));
+      if (target) target.hidden = false;
+      btn.hidden = true;
+    });
+  });
+
   /* ---------- shared helpers ---------- */
   function qs(sel, root) { return (root || document).querySelector(sel); }
   function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
@@ -462,6 +472,14 @@
     { value: 'applied', label: 'Applied', desc: 'Students use it independently in a graded output, such as a project, case study or capstone, where it is part of what is assessed.' }
   ];
 
+  // Students and alumni use the same Introduced / Practiced / Applied levels as the
+  // Professor Survey (so answers line up), described from the learner's side.
+  var LEARNER_IPA_LEVELS = [
+    { value: 'introduced', label: 'Introduced', desc: 'You first met the skill: it was explained or shown in lectures or readings, but you did not do it on your own yet.' },
+    { value: 'practiced', label: 'Practiced', desc: 'You did it yourself in guided lab work, exercises, quizzes or assignments, with your teacher\u2019s help and feedback.' },
+    { value: 'applied', label: 'Applied', desc: 'You used it on your own in a graded output, such as a project, case study or capstone, where it was part of what was assessed.' }
+  ];
+
   /* "What do the levels mean?" box above the skill boxes. */
   function levelGuideHtml(levels, intro) {
     return '<div class="cs-level-guide">' +
@@ -714,6 +732,7 @@
     missingLevelError: missingLevelError,
     PROFICIENCY_LEVELS: PROFICIENCY_LEVELS,
     IPA_LEVELS: IPA_LEVELS,
+    LEARNER_IPA_LEVELS: LEARNER_IPA_LEVELS,
     domId: domId,
     isUeEmail: isUeEmail,
     termTagsHtml: termTagsHtml,

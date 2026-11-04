@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from ..models import (CustomUser, MIN_PASSWORD_LENGTH)
 from .. import email_verification, notifications
 from .. import login_limits
+from ..google_auth import google_enabled
 from .common import home_url_for
 
 
@@ -30,7 +31,8 @@ def login_view(request):
             if wants_json:
                 return JsonResponse({"ok": False, "error": error}, status=status)
             # keep the typed email (never the password) so they only retype the password
-            return render(request, "login.html", {"error": error, "email": email or ""}, status=status)
+            return render(request, "login.html", {"error": error, "email": email or "",
+                                                  "google_enabled": google_enabled()}, status=status)
 
         wait = login_limits.blocked_for(request, email)
         if wait:
@@ -53,7 +55,19 @@ def login_view(request):
         return failed("Invalid email or password.")
     if request.user.is_authenticated:
         return redirect(home_url_for(request.user))
-    return render(request, "login.html", {"timed_out": request.GET.get("timeout") == "1"})
+    return render(request, "login.html", {"timed_out": request.GET.get("timeout") == "1",
+                                          "google_enabled": google_enabled()})
+
+
+def google_cancelled_view(request):
+    """They closed or cancelled Google's account chooser."""
+    messages.info(request, "Google sign-in was cancelled. You can log in with your email and password instead.")
+    return redirect("login")
+
+
+def google_error_view(request):
+    messages.error(request, "Google sign-in didn't work just now. Please try again, or log in with your email and password.")
+    return redirect("login")
 
 
 def signup_view(request):
@@ -92,7 +106,7 @@ def signup_view(request):
             is_approved=False,
         )
         notifications.notify_faculty_signup(request, user)
-        login(request, user)
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
         return redirect(home_url_for(user))
     return render(request, "signup.html", {"min_password_length": MIN_PASSWORD_LENGTH})
 

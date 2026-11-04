@@ -33,6 +33,8 @@ from .auth import (  # noqa: F401
     forgot_password_view,
     reset_password_view,
     reset_password_confirm_view,
+    google_cancelled_view,
+    google_error_view,
 )
 from .dashboard import (  # noqa: F401
     dashboard_view,

@@ -246,3 +246,11 @@
 .cs-level-guide dt { font-weight: 700; color: var(--navy, #16233f); }
 .cs-level-guide dd { margin: 0; color: #3b3f4a; }
 @media (max-width: 560px) { .cs-level-guide-row { grid-template-columns: 1fr; gap: 0; } }
+
+/* "About you" (filled in from the student's / alumni's registration) */
+.cs-about { background: #f4f6fa; border: 1px solid #dfe3ea; border-radius: 10px; padding: 14px 18px; margin: 14px 0 18px; }
+.cs-about h3 { margin: 0 0 6px; font-size: 1rem; }
+.cs-about-line { margin: 0 0 4px; line-height: 1.5; overflow-wrap: anywhere; }
+.cs-about .muted { margin: 0; font-size: .88rem; }
+.cs-about .link-inline { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+.cs-consent[hidden] { display: none; }

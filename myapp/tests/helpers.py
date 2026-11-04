@@ -1,3 +1,15 @@
+def login_administrator(client):
+    """Students/alumni answer their survey logged in as themselves; tests that only look at
+    the survey pages or post made-up "About you" answers do it as an administrator
+    trying the survey out (who sees and fills in every field)."""
+    from ..models import CustomUser
+    user = CustomUser.objects.filter(email="tester-admin@ue.edu.ph").first() or CustomUser.objects.create_user(
+        email="tester-admin@ue.edu.ph", password="secret123", first_name="Test", last_name="Admin",
+        role=CustomUser.Role.ADMINISTRATOR)
+    client.force_login(user)
+    return user
+
+
 class IsolatedDataMixin:
     """Points DATA_DIR at a temporary copy of data/ (ontology + extracted skills) so
     tests that add custom skills or seed curated ones never touch the real files."""

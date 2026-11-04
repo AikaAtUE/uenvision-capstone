@@ -2,14 +2,17 @@
 UEnvision — the public side of the site and the student/alumni side:
 
 * home: public homepage with the top in-demand skills, overall and per job role
-* check_gap: "are you a student or a fresh graduate?" -> the matching survey
+* check_gap: "are you a student or a fresh graduate?" -> registration -> the survey
 * skill_search / skill_add: the survey skill pickers' ontology search (public)
-* register: after a student/alumni survey, create an account to see the results
+* register: a student/alumni creates their account (with their personal information,
+  by UE email + password or with Google) before answering their survey; after the
+  survey they go to their dashboard. (Old "create your account" links from surveys
+  answered before this, ?t=..., still work for their 3 days.)
 * student_dashboard (+ role / generate): a student's or alumni's own skill gap
   against their chosen job role, with Gemini-found learning resources
 * my_skills (+ save): a user's own subject -> skills record, editable any time --
-  students/alumni (proficiency levels) and faculty/administrators (Introduced /
-  Practiced / Applied, shown under the Data tab). It edits their latest survey
+  students/alumni and faculty/administrators alike rate each skill Introduced /
+  Practiced / Applied (faculty edit theirs on the Professor Survey page). It edits their latest survey
   response in place, and only that latest response counts (here, on the
   Recommendations page and in the gap analysis), so an edit replaces, never adds.
 """
@@ -31,7 +34,9 @@ REGISTER_SALT = "uenvision-register"
 REGISTER_MAX_AGE = 3 * 24 * 3600   # a survey's "create your account" link works for 3 days
 TOP_SKILLS = 10
 MAX_TO_BUILD = 6
-STRONG_WEIGHT = 0.5   # Intermediate or better counts as "have it"; Beginner is still "building"
+# Practiced or Applied counts as "have it"; Introduced is still "building". (Older answers
+# rated Beginner..Expert: Intermediate or better counts as "have it".)
+STRONG_WEIGHT = 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +76,12 @@ def check_gap_view(request):
     role = request.GET.get("role", "")
     if role not in job_roles.ROLE_LABELS:
         role = ""
-    return render(request, "check_gap.html", {"role": role, "role_label": job_roles.ROLE_LABELS.get(role, "")})
+    user = request.user
+    learner_survey = None
+    if user.is_authenticated and user.is_learner:
+        learner_survey = reverse("alumni_survey" if user.role == CustomUser.Role.ALUMNI else "student_survey")
+    return render(request, "check_gap.html", {"role": role, "role_label": job_roles.ROLE_LABELS.get(role, ""),
+                                              "learner_survey": learner_survey})
 
 
 # ---------------------------------------------------------------------------
@@ -121,19 +131,135 @@ def _split_name(full):
     return " ".join(parts[:-1]), parts[-1]
 
 
+LEARNER_KINDS = {"student": CustomUser.Role.STUDENT, "alumni": CustomUser.Role.ALUMNI}
+MAX_STUDENT_NUMBER_LENGTH = 30
+MAX_NAME_LENGTH = 100
+MIN_GRAD_YEAR = 2000
+PASSWORD_BACKEND = "django.contrib.auth.backends.ModelBackend"
+
+
+def survey_url_for(kind, target_role=""):
+    url = reverse("alumni_survey" if kind == "alumni" else "student_survey")
+    return url + (f"?role={target_role}" if target_role in job_roles.ROLE_LABELS else "")
+
+
+def max_grad_year():
+    return datetime.now(timezone.utc).year
+
+
+def clean_learner_info(kind, post):
+    """The personal information a student / alumni gives when registering (and may fix on
+    their survey's "About you"). -> (info dict, error message or None)."""
+    from .views.surveys import MAX_SECTION_LENGTH
+
+    info = {"student_number": " ".join(str(post.get("student_number") or "").split()),
+            "course": str(post.get("course") or "")}
+    if not info["student_number"]:
+        return info, "Please enter your student number."
+    if len(info["student_number"]) > MAX_STUDENT_NUMBER_LENGTH:
+        return info, "That student number is too long."
+    if info["course"] not in curriculum_data.PROGRAM_LABELS:
+        return info, "Please choose your course."
+    if kind == "student":
+        year = str(post.get("year_level") or "")
+        info["year_level"] = year
+        info["section"] = " ".join(str(post.get("section") or "").split())
+        if not year.isdigit() or int(year) not in curriculum_data.YEAR_LEVELS:
+            return info, "Please choose your year level."
+        if not info["section"]:
+            return info, "Please enter your section."
+        if len(info["section"]) > MAX_SECTION_LENGTH:
+            return info, "That section is too long."
+    else:
+        grad = str(post.get("year_graduated") or "").strip()
+        info["year_graduated"] = grad
+        if not grad.isdigit() or not MIN_GRAD_YEAR <= int(grad) <= max_grad_year():
+            return info, f"Please enter the year you graduated ({MIN_GRAD_YEAR}-{max_grad_year()})."
+    return info, None
+
+
 def register_view(request):
     token = request.GET.get("t") or request.POST.get("t") or ""
+    if token:
+        return _register_after_survey(request, token)
+    from . import google_auth
+
+    kind = request.GET.get("as") or request.POST.get("as") or ""
+    if kind not in LEARNER_KINDS:
+        return redirect("check_gap")
+    target_role = request.GET.get("role") or request.POST.get("role") or ""
+    if target_role not in job_roles.ROLE_LABELS:
+        target_role = ""
+    user = request.user
+    if user.is_authenticated:
+        if user.is_learner:
+            return redirect(survey_url_for("alumni" if user.role == CustomUser.Role.ALUMNI else "student", target_role))
+        return redirect("home")
+
+    ctx = {"kind": kind, "target_role": target_role, "role_label": job_roles.ROLE_LABELS.get(target_role, ""),
+           "programs": curriculum_data.PROGRAM_LABELS.items(), "year_levels": curriculum_data.YEAR_LEVELS,
+           "min_grad_year": MIN_GRAD_YEAR, "max_grad_year": max_grad_year(),
+           "min_password_length": MIN_PASSWORD_LENGTH, "google_enabled": google_auth.google_enabled(),
+           "ue_email_domain": google_auth.UE_EMAIL_DOMAIN, "form": {}}
+    if request.method != "POST":
+        return render(request, "register.html", ctx)
+
+    post = request.POST
+    with_google = post.get("method") == "google" and google_auth.google_enabled()
+    first = " ".join(str(post.get("first_name") or "").split())[:MAX_NAME_LENGTH]
+    last = " ".join(str(post.get("last_name") or "").split())[:MAX_NAME_LENGTH]
+    email = str(post.get("email") or "").strip()
+    password, password2 = post.get("password", ""), post.get("password2", "")
+    info, error = clean_learner_info(kind, post)
+    if not error and (not first or not last):
+        error = "Please enter your first and last name."
+    if not error and post.get("consent") != "on":
+        error = "Please tick the box to agree to the Data Privacy Notice."
+    if not error and not with_google:
+        if not google_auth.is_ue_email(email):
+            error = f"Please use your UE email address (ending in @{google_auth.UE_EMAIL_DOMAIN})."
+        elif CustomUser.objects.filter(email__iexact=email).exists():
+            error = "An account with this email already exists. Please log in instead."
+        elif len(password) < MIN_PASSWORD_LENGTH:
+            error = f"Password must be at least {MIN_PASSWORD_LENGTH} characters."
+        elif password != password2:
+            error = "Passwords do not match."
+    if error:
+        # what they typed stays in the form (never the passwords), so only the problem needs fixing
+        form = {k: v for k, v in post.items() if k not in ("password", "password2", "csrfmiddlewaretoken")}
+        return render(request, "register.html", {**ctx, "error": error, "form": form})
+
+    if with_google:
+        # Google confirms the email; google_auth.SocialAccountAdapter makes the account.
+        request.session[google_auth.PENDING_KEY] = {"role": kind, "first_name": first, "last_name": last,
+                                                    "info": info, "target_role": target_role}
+        return google_auth.start_google_login(request, next_url=survey_url_for(kind, target_role))
+
+    user = CustomUser.objects.create_user(
+        email=email, password=password, first_name=first, last_name=last, role=LEARNER_KINDS[kind],
+        target_role=target_role, learner_info=info,
+        email_verified=not email_verification.verification_required(),
+    )
+    if not user.email_verified:
+        # They can use UEnvision right away; the dashboard reminds them to confirm.
+        email_verification.send_verification_email(request, user)
+    login(request, user, backend=PASSWORD_BACKEND)
+    return redirect(survey_url_for(kind, target_role))
+
+
+def _register_after_survey(request, token):
+    """Old flow: a survey answered before registering came first, with a signed link."""
     response = _response_from_token(token)
     if response is None:
-        return render(request, "register.html", {"invalid": True})
+        return render(request, "register_link.html", {"invalid": True})
     if response.user_id:
-        return render(request, "register.html", {"already": True})
+        return render(request, "register_link.html", {"already": True})
     info = response.data.get("personal_info") or {}
     survey_email = str(info.get("ue_email") or "").strip()
     ctx = {"token": token, "email": survey_email, "name": info.get("name", ""),
            "min_password_length": MIN_PASSWORD_LENGTH}
     if request.method != "POST":
-        return render(request, "register.html", ctx)
+        return render(request, "register_link.html", ctx)
 
     email = request.POST.get("email", "").strip()
     password = request.POST.get("password", "")
@@ -148,23 +274,23 @@ def register_view(request):
     elif password != password2:
         error = "Passwords do not match."
     if error:
-        # what they typed stays in the form, so only the problem needs fixing
-        return render(request, "register.html", {**ctx, "error": error, "form": request.POST})
+        return render(request, "register_link.html", {**ctx, "error": error, "form": request.POST})
 
     first, last = _split_name(info.get("name"))
     role = (CustomUser.Role.ALUMNI if response.respondent_type == CurriculumSurveyResponse.ALUMNI
             else CustomUser.Role.STUDENT)
+    keep = ("student_number", "course", "year_level", "section", "year_graduated")
     user = CustomUser.objects.create_user(
         email=survey_email, password=password, first_name=first or survey_email.split("@")[0],
         last_name=last, role=role, target_role=response.data.get("target_role") or "",
+        learner_info={k: str(info[k]) for k in keep if info.get(k) not in (None, "")},
         email_verified=not email_verification.verification_required(),
     )
     response.user = user
     response.save(update_fields=["user"])
     if not user.email_verified:
-        # They can use UEnvision right away; the dashboard reminds them to confirm.
         email_verification.send_verification_email(request, user)
-    login(request, user)
+    login(request, user, backend=PASSWORD_BACKEND)
     return redirect("student_dashboard")
 
 
@@ -279,8 +405,11 @@ def student_generate_view(request):
 # ---------------------------------------------------------------------------
 # My subjects & skills (editable survey record)
 # ---------------------------------------------------------------------------
-LEARNER_LEVELS = {"beginner", "intermediate", "advanced", "expert"}
+# Students and alumni rate their skills with the same Introduced / Practiced / Applied
+# levels as the Professor Survey. Answers saved before used beginner..expert; those still
+# count (gap_analysis.LEVEL_WEIGHTS) but must be re-rated when the record is edited.
 PROFESSOR_LEVELS = {"introduced", "practiced", "applied"}
+LEARNER_LEVELS = PROFESSOR_LEVELS
 MAX_EDIT_SUBJECTS = 80
 MAX_EDIT_SKILLS = 40
 MAX_EDIT_BODY = 300_000
@@ -376,7 +505,7 @@ def my_skills_view(request):
     bootstrap = {
         "mode": "my_skills",
         "isAlumni": is_alumni,
-        "levels": "ipa" if professor else "proficiency",
+        "levels": "ipa" if professor else "learner_ipa",
         "subjects": subjects,
         "overallSkills": [s for s in (data.get("overall_skills") or []) if isinstance(s, dict)],
         "subjectOptions": _subject_options(program, professor),

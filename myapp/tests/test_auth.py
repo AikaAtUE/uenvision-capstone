@@ -366,15 +366,12 @@ class KeepFormInputsTests(IsolatedDataMixin, TestCase):
         self.assertContains(r, 'minlength="8"')
 
     def test_failed_register_keeps_the_typed_values(self):
-        payload = {"consent": True, "personal_info": {"name": "Juan Dela Cruz", "ue_email": "juan@ue.edu.ph",
-                   "course": "BSIT", "student_number": "2023-1", "year_level": 1, "section": "TN11"}, "has_previous": False,
-                   "subjects": [{"code": "CCP 1101", "term": "current", "skills": []}]}
-        reg = self.client.post(reverse("student_survey_submit"), data=json.dumps(payload),
-                               content_type="application/json").json()["register_url"]
-        token = reg.split("t=", 1)[1]
-        r = self.client.post(reverse("register"), {"t": token, "email": "juan@ue.edu.ph",
-                                                   "password": "secret123", "password2": "secret124"})
+        r = self.client.post(reverse("register"), {
+            "as": "student", "consent": "on", "first_name": "Juan", "last_name": "Dela Cruz",
+            "student_number": "2023-1", "course": "BSIT", "year_level": "1", "section": "TN11",
+            "email": "juan@ue.edu.ph", "password": "secret123", "password2": "secret124", "method": "password"})
         self.assertContains(r, "Passwords do not match.")
-        self.assertContains(r, 'value="juan@ue.edu.ph"')
-        self.assertContains(r, 'value="secret123"')
+        for value in ("juan@ue.edu.ph", "Juan", "Dela Cruz", "2023-1", "TN11"):
+            self.assertContains(r, f'value="{value}"')
+        self.assertNotContains(r, 'value="secret123"')   # passwords are never sent back
         self.assertContains(r, 'data-min-length="8">At least 8 characters</li>')

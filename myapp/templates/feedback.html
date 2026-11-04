@@ -54,14 +54,14 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel">
         <h2 class="section-title">User Acceptance Testing survey</h2>
-        <p class="muted survey-desc">Tell us whether UEnvision's core features worked as expected during your test session.</p>
+        <p class="muted survey-desc">Tell us how you felt about using UEnvision. For each statement, choose how much you agree, from 1 (Strongly disagree) to 5 (Strongly agree). There are no right or wrong answers.</p>
         <form id="uat-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
 
-          <div class="uat-checks" id="uat-checks"></div>
+          <div class="likert-list" id="uat-questions"></div>
 
-          <label class="field"><span>Comments (optional)</span><textarea id="uat-comments" rows="3"></textarea></label>
+          <label class="field"><span>What did you like, and what would you improve? (optional)</span><textarea id="uat-comments" rows="3"></textarea></label>
           <p class="form-msg form-msg--error form-error" id="uat-error" hidden></p>
           <button type="submit" class="btn btn-navy">Submit survey</button>
         </form>

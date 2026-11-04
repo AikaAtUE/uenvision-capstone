@@ -47,6 +47,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     middle_name = models.CharField(max_length=100, blank=True)  # optional, per signup.html
     # Students/alumni only: the job role picked on their dashboard (job_roles.ROLES key).
     target_role = models.CharField(max_length=60, blank=True)
+    # Students/alumni only: the personal information they gave when they registered
+    # (student_number, course, and year_level + section for students or year_graduated
+    # for alumni). The student/alumni survey fills its "About you" part from this.
+    learner_info = models.JSONField(default=dict, blank=True)
 
     # False only for self sign-ups that haven't clicked the link in their
     # confirmation email yet (see email_verification.py). Accounts made by an

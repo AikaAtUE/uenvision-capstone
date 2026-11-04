@@ -8,3 +8,4 @@ tqdm
 google-genai
 rapidfuzz
 gunicorn
+django-allauth[socialaccount]>=65.0,<66
