@@ -86,6 +86,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (btn.dataset.action === 'approve'){
       confirmThen(`Approve ${label} as faculty? Only approve people you know are UE faculty.`,
         'Yes, approve', false, () => submitAction(d.approveUrl));
+    } else if (btn.dataset.action === 'move'){
+      confirmThen(`Move ${label} to Student? Use this for a student who signed up as faculty by mistake. `
+        + `Their account becomes a Student account and their Professor Survey answers become a Student Survey answer `
+        + `(same subjects and skills). They'll fill in their student number, course, year level and section the next time they open the survey.`,
+        'Yes, move to Student', false, () => submitAction(d.moveUrl));
     } else if (btn.dataset.action === 'reset'){
       confirmThen(`Reset the password for ${label}? A temporary password will be emailed to them, and they'll choose a new one when they log in.`,
         'Yes, reset', false, () => submitAction(d.resetUrl));
@@ -113,6 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const wasDummy = dummyAnswers(before), isDummy = dummyAnswers(after);
       if (isDummy && !wasDummy) extra += ' Their survey answers will move to dummy (test) data and stop counting in the real results.';
       if (!isDummy && wasDummy) extra += ' Their survey answers will move back into the real results.';
+      const learner = t => ['student', 'alumni', 'dummy_student'].includes(t);
+      if (before.endsWith('faculty') && learner(after)) extra += ' Their Professor Survey answers will move to the ' + (after === 'alumni' ? 'Alumni' : 'Student') + ' Survey.';
       if (after === 'administrator') extra += ' Administrators can manage every account and all data.';
       if (after === 'developer') extra += ' Developers can manage every account and all data, like an administrator.';
     }

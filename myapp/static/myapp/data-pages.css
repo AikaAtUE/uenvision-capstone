@@ -172,3 +172,11 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
   padding: 5px 8px; border: 1px solid rgba(90, 16, 23, .25); border-radius: 6px; background: var(--surface); color: var(--ink);
 }
 #view-table .col-filter:focus { outline: none; border-color: var(--navy); }
+
+/* Data -> Ghost Jobs */
+.ghost-weak{margin-top:10px;}
+.ghost-weak .field{margin-top:8px;}
+.pill--ghost{background:#fbe3c8; color:#7a3d00;}
+[data-theme="dark"] .pill--ghost{background:#4a3018; color:#f5c48e;}
+.ghost-reasons{margin:6px 0 0; padding-left:18px; font-size:.84rem;}
+.ghost-table td:last-child{white-space:nowrap;}

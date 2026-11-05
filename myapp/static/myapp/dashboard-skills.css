@@ -16,6 +16,11 @@
 .filter-count[hidden]{display:none;}
 .filter-summary{font-size:.82rem; color:var(--muted); margin:-6px 0 18px;}
 .filter-summary strong{color:var(--ink); font-weight:600;}
+/* "N postings marked as possible ghost jobs" under the filter summary */
+.ghost-note{font-size:.82rem; color:var(--muted); margin:-12px 0 18px;}
+.ghost-note[hidden]{display:none;}
+.ghost-note strong{color:var(--ink); font-weight:600;}
+#filter-drawer .ghost-toggle{font-weight:600; color:var(--ink);}
 
 .bars--wide .bar-row{grid-template-columns:minmax(110px,230px) 1fr 92px;}
 .bars--wide .bar-label{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}

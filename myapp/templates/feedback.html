@@ -9,7 +9,7 @@
   <div class="page-body page-body--photo">
 
     <div id="feedback-home">
-      <p class="feedback-intro">For the improvement of UEnvision, we're asking a moment of your time to evaluate the system through the following surveys.</p>
+      <p class="feedback-intro">For the improvement of UEnvision, we're asking a moment of your time to evaluate the system through the following surveys. Each one starts with what it is for.</p>
       <div class="feedback-list">
         <a class="feedback-item" href="#" data-survey="sus">
           <span>System Usability Scale (SUS) evaluation</span>
@@ -36,6 +36,7 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel">
         <h2 class="section-title">System Usability Scale (SUS) evaluation</h2>
+        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> to measure how easy UEnvision is to use. The System Usability Scale is a standard 10-question test that gives UEnvision a usability score from 0 to 100.</div>
         <p class="muted survey-desc">For each statement, choose how much you agree, from 1 (Strongly disagree), 2 (Disagree), 3 (Neutral), 4 (Agree) to 5 (Strongly agree).</p>
         <form id="sus-form" novalidate>
           {% csrf_token %}
@@ -64,6 +65,7 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel">
         <h2 class="section-title">User Acceptance Testing survey</h2>
+        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> to check whether UEnvision meets the needs of its users (students, alumni and faculty) and is acceptable for use at UE, based on your own experience with it.</div>
         <p class="muted survey-desc">Tell us how you felt about using UEnvision. For each statement, choose how much you agree, from 1 (Strongly disagree), 2 (Disagree), 3 (Neutral), 4 (Agree) to 5 (Strongly agree). There are no right or wrong answers.</p>
         <form id="uat-form" novalidate>
           {% csrf_token %}
@@ -93,6 +95,7 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel survey-panel--wide">
         <h2 class="section-title">Functional test case sheet</h2>
+        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> to confirm that every feature of UEnvision works as it should. Your results show the team which parts work and which need fixing.</div>
         <p class="muted survey-desc">A functional test checks that each part of UEnvision does what it is supposed to do. For each test case, do what the scenario says, then answer whether it happened as expected. If it didn't, write what happened instead. Comments or remarks about your experience are welcome on any test case.</p>
         <form id="functional-form" novalidate>
           {% csrf_token %}

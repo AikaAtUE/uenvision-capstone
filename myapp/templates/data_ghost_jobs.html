@@ -1,0 +1,74 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Ghost Jobs{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-data-ghost">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
+    <h2 class="section-title">Ghost job detection</h2>
+    <p class="muted data-lede">Postings that look like ghost jobs (not a real, open position) are only <strong>marked</strong> here. Nothing is removed from the data sets, and every result still counts them unless someone turns on <em>Exclude possible ghost jobs</em> in the Dashboard's Filter.</p>
+
+    {% if can_edit %}
+    <form class="data-card-wide" method="post" action="{% url 'data_ghost_jobs' %}" id="ghost-form">
+      {% csrf_token %}
+      <div class="settings-card data-card">
+        <h3 class="card-title">Settings</h3>
+        <label class="checkbox"><input type="checkbox" name="flag_duplicates" id="g-dup"{% if form.flag_duplicates %} checked{% endif %}>
+          <span><strong>Flag the same job posted twice</strong><br><small class="field-hint">Same company and same job title under a different job ID, on Kalibrr or Trabajo. This alone marks a posting. When excluded, the newest copy is kept so the job still counts once.</small></span></label>
+
+        <fieldset class="field-group ghost-weak">
+          <legend>Weak signs</legend>
+          <label class="checkbox"><input type="checkbox" name="flag_hidden_salary" id="g-salary"{% if form.flag_hidden_salary %} checked{% endif %}>
+            <span><strong>Salary is hidden</strong></span></label>
+          <label class="checkbox"><input type="checkbox" name="flag_unverified" id="g-verified"{% if form.flag_unverified %} checked{% endif %}>
+            <span><strong>Company is not verified</strong> <small class="muted">(Kalibrr only)</small></span></label>
+          <label class="field"><span>Description shorter than (characters)</span>
+            <input type="number" name="min_description_chars" id="g-chars" value="{{ form.min_description_chars }}" min="0" max="{{ max_chars }}" step="1" required>
+            <small class="field-hint">0 turns this check off. The description is read from the compiled Kalibrr / Trabajo files.</small>
+          </label>
+          <label class="field"><span>Weak signs needed to mark a posting</span>
+            <select name="weak_signs_needed" id="g-needed">
+              <option value="1"{% if form.weak_signs_needed == 1 %} selected{% endif %}>1 sign</option>
+              <option value="2"{% if form.weak_signs_needed == 2 %} selected{% endif %}>2 signs</option>
+            </select>
+          </label>
+        </fieldset>
+        <button type="submit" class="btn btn-navy">Save settings</button>
+      </div>
+    </form>
+    {% else %}
+    <p class="muted">Only Administrators can change how ghost jobs are detected.</p>
+    {% endif %}
+
+    <h2 class="section-title settings-section-gap">Marked postings</h2>
+    {% if not has_data %}
+      <p class="muted">No extracted skills yet, so there's nothing to check.</p>
+    {% else %}
+      <p class="muted table-count"><strong>{{ flagged|length }}</strong> of {{ total }} posting{{ total|pluralize }} marked as possible ghost jobs. With the exclude switch on, {{ excluded_count }} of them are left out of the results.</p>
+      {% if flagged %}
+      <div class="table-wrap">
+        <table class="sr-table ghost-table">
+          <thead><tr><th>Job</th><th>Company</th><th>Source</th><th>Why it's marked</th><th>When excluded</th></tr></thead>
+          <tbody>
+          {% for r in flagged %}
+            <tr>
+              <td>{% if r.job_url %}<a href="{{ r.job_url }}" target="_blank" rel="noopener noreferrer">{{ r.job_name }}</a>{% else %}{{ r.job_name }}{% endif %}<br><span class="muted">#{{ r.job_id }}{% if r.date %} · {{ r.date|slice:":10" }}{% endif %}</span></td>
+              <td>{{ r.company_name|default:"—" }}</td>
+              <td>{{ r.source|capfirst }}</td>
+              <td><span class="pill pill--ghost">Possible ghost job</span><ul class="ghost-reasons">{% for reason in r.reasons %}<li>{{ reason }}</li>{% endfor %}</ul></td>
+              <td>{% if r.excluded %}Left out{% else %}Kept (newest copy){% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted">No postings match the current settings.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

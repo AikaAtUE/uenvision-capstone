@@ -85,7 +85,7 @@ class EmailVerificationTests(TestCase):
         cache.clear()
 
     def signup(self, email="new@ue.edu.ph"):
-        return self.client.post(reverse("signup"), {"last_name": "Cruz", "first_name": "Ana", "email": email,
+        return self.client.post(reverse("signup"), {"as": "faculty", "last_name": "Cruz", "first_name": "Ana", "email": email,
                                                     "password": "longenough1", "password2": "longenough1"})
 
     def link_from_outbox(self):
@@ -359,7 +359,7 @@ class KeepFormInputsTests(IsolatedDataMixin, TestCase):
         self.assertIn("Too many login attempts", r.json()["error"])
 
     def test_failed_signup_keeps_every_field(self):
-        r = self.client.post(reverse("signup"), {
+        r = self.client.post(reverse("signup"), {"as": "faculty",
             "last_name": "Cruz", "first_name": "Ana", "middle_name": "Reyes", "email": "keep@ue.edu.ph",
             "password": "long-enough1", "password2": "long-enough1"})
         self.assertContains(r, "An account with this email already exists.")
@@ -367,7 +367,7 @@ class KeepFormInputsTests(IsolatedDataMixin, TestCase):
             self.assertContains(r, f'value="{value}"')
 
     def test_signup_and_register_show_the_password_requirement(self):
-        r = self.client.get(reverse("signup"))
+        r = self.client.get(reverse("signup"), {"as": "faculty"})
         self.assertContains(r, 'data-min-length="8">At least 8 characters</li>')
         self.assertContains(r, 'minlength="8"')
 

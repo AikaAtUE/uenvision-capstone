@@ -73,45 +73,78 @@ def google_error_view(request):
     return redirect("login")
 
 
+SIGNUP_KINDS = ("student", "alumni", "faculty")
+
+
 def signup_view(request):
-    if request.method == "POST":
-        last_name = request.POST.get("last_name")
-        first_name = request.POST.get("first_name")
-        middle_name = request.POST.get("middle_name", "")
-        email = request.POST.get("email")
-        password = request.POST.get("password")
-        password2 = request.POST.get("password2")
+    """Sign up: everyone first says whether they are a student, an alumni or faculty
+    (signup.html's chooser), so nobody becomes faculty by mistake. Students and alumni go
+    on to the registration page (student_views.register_view); faculty fill in the form
+    here, with a password or with Google."""
+    from .. import google_auth
 
-        def failed(error):
-            # everything they typed stays in the form, so only the problem needs fixing
-            return render(request, "signup.html", {"error": error, "form": request.POST,
-                                                   "min_password_length": MIN_PASSWORD_LENGTH})
+    kind = request.POST.get("as") if request.method == "POST" else request.GET.get("as")
+    kind = kind if kind in SIGNUP_KINDS else ""
+    if kind in ("student", "alumni"):
+        return redirect(reverse("register") + f"?as={kind}")
+    if request.user.is_authenticated:
+        return redirect(home_url_for(request.user))
+    ctx = {"kind": kind, "min_password_length": MIN_PASSWORD_LENGTH,
+           "google_enabled": google_auth.google_enabled()}
+    if request.method != "POST":
+        return render(request, "signup.html", ctx)
+    if not kind:
+        return render(request, "signup.html", {**ctx, "error": "Please choose whether you are a student, an alumni or faculty."})
 
-        if password != password2:
-            return failed("Passwords do not match.")
+    last_name = " ".join(str(request.POST.get("last_name") or "").split())
+    first_name = " ".join(str(request.POST.get("first_name") or "").split())
+    middle_name = " ".join(str(request.POST.get("middle_name") or "").split())
+    email = str(request.POST.get("email") or "").strip()
+    password = request.POST.get("password") or ""
+    password2 = request.POST.get("password2") or ""
 
-        if len(password or "") < MIN_PASSWORD_LENGTH:
-            return failed(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    def failed(error):
+        # everything they typed stays in the form, so only the problem needs fixing
+        return render(request, "signup.html", {**ctx, "error": error, "form": request.POST})
 
-        if CustomUser.objects.filter(email=email).exists():
-            return failed("An account with this email already exists.")
+    if not first_name or not last_name:
+        return failed("Please enter your first and last name.")
 
-        user = CustomUser.objects.create_user(
-            email=email,
-            password=password,
-            first_name=first_name,
-            middle_name=middle_name,
-            last_name=last_name,
-            role=CustomUser.Role.FACULTY,  # self-signups are always Faculty; only an admin can create admins
-            email_verified=True,  # faculty can use UEnvision right away, without confirming their email
-            # They can use everything right away too. An administrator still approves them on the
-            # Accounts page, or removes them (with their answers) if they aren't faculty.
-            is_approved=False,
-        )
-        notifications.notify_faculty_signup(request, user)
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-        return redirect(home_url_for(user))
-    return render(request, "signup.html", {"min_password_length": MIN_PASSWORD_LENGTH})
+    if request.POST.get("method") == "google" and google_auth.google_enabled():
+        # Google confirms the email; google_auth.SocialAccountAdapter makes the faculty account.
+        request.session[google_auth.PENDING_KEY] = {"role": "faculty", "first_name": first_name,
+                                                    "middle_name": middle_name, "last_name": last_name}
+        return google_auth.start_google_login(request, next_url=reverse("professor_survey"))
+
+    try:
+        validate_email(email)
+    except ValidationError:
+        return failed("Please enter a valid email address.")
+
+    if password != password2:
+        return failed("Passwords do not match.")
+
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return failed(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+
+    if CustomUser.objects.filter(email__iexact=email).exists():
+        return failed("An account with this email already exists.")
+
+    user = CustomUser.objects.create_user(
+        email=email,
+        password=password,
+        first_name=first_name,
+        middle_name=middle_name,
+        last_name=last_name,
+        role=CustomUser.Role.FACULTY,  # only those who chose "faculty"; only an admin can create admins
+        email_verified=True,  # faculty can use UEnvision right away, without confirming their email
+        # They can use everything right away too. An administrator still approves them on the
+        # Accounts page, removes them, or moves them to Student if they aren't faculty.
+        is_approved=False,
+    )
+    notifications.notify_faculty_signup(request, user)
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+    return redirect(home_url_for(user))
 
 
 def admin_login_view(request):

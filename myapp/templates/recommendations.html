@@ -13,6 +13,9 @@
       Skill Gap Analysis tab for the full comparison. For any skill here, Gemini can search for real
       training resources (courses, certifications, docs, video series) to help close that gap.
     </p>
+    {% if ghost.excluded %}
+    <p class="muted rec-intro"><strong>{{ ghost.hidden }} possible ghost job{{ ghost.hidden|pluralize }} excluded</strong> from the job-market demand, as set in the Dashboard's Filter.</p>
+    {% endif %}
 
     <form class="rec-subject-form" method="get" action="{% url 'recommendations' %}">
       <label class="select-field select-field--grow"><span>Show recommendations for</span>

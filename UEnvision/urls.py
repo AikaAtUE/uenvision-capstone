@@ -30,7 +30,7 @@ urlpatterns = [
     path('auth/login/', RedirectView.as_view(pattern_name='login', query_string=True)),
     path('auth/logout/', RedirectView.as_view(pattern_name='logout')),
     path('auth/3rdparty/', RedirectView.as_view(pattern_name='settings')),
-    path('auth/3rdparty/signup/', RedirectView.as_view(pattern_name='check_gap')),
+    path('auth/3rdparty/signup/', RedirectView.as_view(pattern_name='signup')),
     path('auth/3rdparty/login/cancelled/', views.google_cancelled_view, name='google_cancelled'),
     path('auth/3rdparty/login/error/', views.google_error_view, name='google_error'),
     path('auth/', include('allauth.urls')),

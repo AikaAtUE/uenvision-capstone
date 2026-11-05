@@ -30,6 +30,13 @@
     </div>
 
     <div class="drawer-section">
+      <h4>Ghost jobs</h4>
+      <label class="checkbox ghost-toggle"><input type="checkbox" id="ctl-ghost"{% if exclude_ghost_jobs %} checked{% endif %}>
+        <span>Exclude possible ghost jobs</span></label>
+      <p class="drawer-hint">Off by default, so every posting in the data set counts. When on, postings marked as possible ghost jobs are left out (the newest copy of a job posted twice is kept). Also applies to Recommendations while you're logged in.</p>
+    </div>
+
+    <div class="drawer-section">
       <h4>Skill trends over time</h4>
       <label class="select-field" id="ctl-months-wrap"><span>Period</span>
         <select id="ctl-months">

@@ -23,6 +23,7 @@ the same number wherever it is shown.
 """
 import re
 
+from . import ghost_jobs
 from .pipeline import manager as pipeline
 from .pipeline.skills_schema import split_skills
 
@@ -140,6 +141,7 @@ def postings():
             "tech": tech,
             **{prog: _flag(get(r, col)) for prog, col in PROGRAM_COLUMNS.items()},
             "source": get(r, "source"),
+            "job_id": get(r, "job_id"),
             "level": get(r, "experience_level"),
             "month": f"{m.group(1)}-{m.group(2)}" if m else None,
             "hard": skills(get(r, "hard_skills")),
@@ -159,18 +161,40 @@ def fits_program(p, program):
     return not program or p.get(program) is not False
 
 
-def it_postings(source="", level="", program=""):
+def it_postings(source="", level="", program="", exclude_ghosts=None):
     """The postings every result counts: tech jobs only (non-tech postings that the job
     boards also return, such as accountants or pharmacists, are left out), optionally
     narrowed to one source / experience level ("Not specified" = blank) / program
     ("BSCS" = COMPUTER SCIENCE is true, "BSIT" = INFORMATION TECHNOLOGY is true).
+    exclude_ghosts: leave out possible ghost jobs (ghost_jobs.py), keeping the newest copy
+    of a job posted twice. None (the default) = whatever the viewer's "Exclude possible
+    ghost jobs" switch says; it is off unless they turned it on, so by default every
+    posting in the data set counts.
     -> list, or None when there's no extracted data yet."""
     all_postings = postings()
     if all_postings is None:
         return None
-    return [p for p in all_postings if is_counted(p) and fits_program(p, program)
-            and (not source or p["source"] == source)
-            and (not level or (p["level"] or "Not specified") == level)]
+    chosen = [p for p in all_postings if is_counted(p) and fits_program(p, program)
+              and (not source or p["source"] == source)
+              and (not level or (p["level"] or "Not specified") == level)]
+    if exclude_ghosts is None:
+        exclude_ghosts = ghost_jobs.EXCLUDE.get()
+    if exclude_ghosts:
+        found = ghost_jobs.detect() or {}
+        chosen = [p for p in chosen
+                  if found.get((p["source"], p["job_id"]), {}).get("keep_when_excluding", True)]
+    return chosen
+
+
+def ghost_summary(source="", level="", program=""):
+    """How many of the postings a result counts are marked as possible ghost jobs, and
+    how many the viewer's exclude switch leaves out. -> {"marked", "hidden", "excluded"}"""
+    every = it_postings(source, level, program, exclude_ghosts=False) or []
+    found = ghost_jobs.detect() or {}
+    marked = sum(1 for p in every if found.get((p["source"], p["job_id"]), {}).get("flagged"))
+    excluded = ghost_jobs.EXCLUDE.get()
+    hidden = len(every) - len(it_postings(source, level, program, exclude_ghosts=True) or []) if excluded else 0
+    return {"marked": marked, "hidden": hidden, "excluded": excluded}
 
 
 def _top(postings, top):

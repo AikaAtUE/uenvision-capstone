@@ -202,6 +202,7 @@ def account_edit_view(request, pk):
         setattr(target, field, value)
     notes = []
     old_label = target.role_label
+    old_role = target.role
     answers_were_dummy = target.answers_are_dummy
     role = DUMMY_TYPES.get(account_type, account_type)
     is_dummy = account_type in DUMMY_TYPES
@@ -220,6 +221,15 @@ def account_edit_view(request, pk):
         where = "dummy (test) data" if dummy_now else "the real results"
         if moved:
             notes.append(f"{moved} survey answer{'' if moved == 1 else 's'} moved to {where}.")
+    if old_role == CustomUser.Role.FACULTY and target.is_learner:
+        # faculty changed to Student / Alumni here: their Professor Survey answers go with them
+        moved = move_faculty_answers_to_learner(target, target.role)
+        if not target.is_approved:
+            target.is_approved = True
+            data["is_approved"] = True
+            notifications.mark_read_about(target)
+        if moved:
+            notes.append(f"Professor Survey answer{'' if moved == 1 else 's'} moved to the {target.get_role_display()} Survey.")
     if target.role_label != old_label:
         notes.insert(0, f"Role changed from {old_label} to {target.role_label}.")
     target.save(update_fields=list(data))
@@ -330,3 +340,54 @@ def account_delete_view(request, pk):
             target.delete()
             messages.success(request, f"Account {email} was removed.")
     return redirect("accounts")
+
+
+def move_faculty_answers_to_learner(target, kind="student"):
+    """Someone who signed up as faculty by mistake: their Professor Survey answers become a
+    Student (or Alumni) Survey answer. The two surveys now ask the same thing (subjects, and
+    the skills in each at Introduced / Practiced / Applied), so the subjects and skills are
+    kept as they are. Student number, course, year level and section were never asked of
+    faculty, so the survey's "About you" opens empty for them to fill in. -> number moved."""
+    new_type = CurriculumSurveyResponse.ALUMNI if kind == "alumni" else CurriculumSurveyResponse.STUDENT
+    moved = 0
+    for resp in target.curriculum_survey_responses.filter(respondent_type=CurriculumSurveyResponse.PROFESSOR):
+        data = dict(resp.data or {})
+        data["subjects"] = [{**subj, "term": subj.get("term") or "added"}
+                            for subj in data.get("subjects") or [] if isinstance(subj, dict)]
+        data["personal_info"] = {**(target.learner_info or {}), "name": target.get_full_name(), "ue_email": target.email}
+        data.setdefault("target_role", target.target_role or "")
+        data["moved_from"] = CurriculumSurveyResponse.PROFESSOR
+        data["moved_at"] = timezone.now().isoformat(timespec="seconds")
+        resp.respondent_type = new_type
+        resp.data = data
+        resp.save(update_fields=["respondent_type", "data"])
+        moved += 1
+    return moved
+
+
+@administrator_required
+@require_POST
+def account_move_to_student_view(request, pk):
+    """The Accounts page's "Move to Student" (faculty accounts only): for students who signed up
+    as faculty by mistake. The account becomes a Student (a Dummy Faculty becomes a Dummy
+    Student) and their Professor Survey answers move to the Student Survey."""
+    from django.db import transaction
+
+    target = get_object_or_404(CustomUser, pk=pk)
+    next_url = request.POST.get("next")
+    if not (next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()})):
+        next_url = reverse("accounts")
+    if target.role != CustomUser.Role.FACULTY:
+        messages.error(request, "Only faculty accounts can be moved to Student.")
+        return redirect(next_url)
+    with transaction.atomic():
+        target.role = CustomUser.Role.STUDENT
+        target.is_approved = True   # nothing left to approve: they aren't faculty
+        target.save(update_fields=["role", "is_approved"])
+        moved = move_faculty_answers_to_learner(target, "student")
+    notifications.mark_read_about(target)
+    answers = (f" Their Professor Survey answer{'' if moved == 1 else 's'} moved to the Student Survey; "
+               "they fill in their student number, course, year level and section the next time they open it."
+               if moved else " They had no Professor Survey answers to move.")
+    messages.success(request, f"{target.get_full_name()} ({target.email}) is now a {target.role_label}." + answers)
+    return redirect(next_url)

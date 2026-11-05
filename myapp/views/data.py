@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse
@@ -276,3 +277,31 @@ def api_keys_save_view(request):
         n = pipeline.count_api_keys()
         messages.success(request, f"api_keys.txt saved ({n} key{'s' if n != 1 else ''}).")
     return redirect("data_extract")
+
+
+# ---------------------------------------------------------------------------
+# Ghost Jobs: the detection settings (Administrators) and the postings they mark (everyone)
+# ---------------------------------------------------------------------------
+@login_required
+def data_ghost_jobs_view(request):
+    from .. import ghost_jobs
+
+    form, error = ghost_jobs.get_settings(), None
+    if request.method == "POST":
+        if not request.user.is_administrator:
+            raise PermissionDenied
+        form, error = ghost_jobs.parse_settings_form(request.POST)
+        if error:
+            messages.error(request, error)
+        else:
+            ghost_jobs.save_settings(form)
+            messages.success(request, "Ghost job settings saved. The marked postings below are updated.")
+            return redirect("data_ghost_jobs")
+    pipeline.ensure_skill_csvs()
+    found = ghost_jobs.detect()
+    flagged = ghost_jobs.flagged_postings()
+    return render(request, "data_ghost_jobs.html", _data_ctx(
+        request, "ghost", form=form, flagged=flagged, total=len(found or {}), has_data=found is not None,
+        excluded_count=sum(1 for r in flagged if r["excluded"]),
+        max_chars=ghost_jobs.MAX_DESCRIPTION_CHARS, can_edit=request.user.is_administrator,
+        form_error=error))

@@ -8,6 +8,9 @@
 
   const $ = id => document.getElementById(id);
   const ctl = { kind: $('ctl-kind'), top: $('ctl-top'), source: $('ctl-source'), level: $('ctl-level'), months: $('ctl-months'), program: $('ctl-program') };
+  // "Exclude possible ghost jobs" (a checkbox, so it's kept apart from the select / number controls).
+  const ghostBox = $('ctl-ghost');
+  const ghostOn = () => !!(ghostBox && ghostBox.checked);
   const errEl = $('skills-error');
   const SVGNS = 'http://www.w3.org/2000/svg';
   const COLORS = ['#c8202f', '#16233f', '#2a9d8f', '#e9a23b', '#6a4c93', '#3d85c6', '#b5651d', '#7a8b2e', '#d6609a', '#5b6b7d'];
@@ -453,7 +456,8 @@
     let top = parseInt(ctl.top.value, 10);
     if (!(top >= 1)) return;               // user is mid-typing
     top = Math.min(top, 30);
-    const q = new URLSearchParams({ kind: ctl.kind.value, top: top, source: ctl.source.value, level: ctl.level.value, months: ctl.months.value, program: ctl.program.value });
+    const q = new URLSearchParams({ kind: ctl.kind.value, top: top, source: ctl.source.value, level: ctl.level.value, months: ctl.months.value, program: ctl.program.value,
+      ghost: appliedGhost ? 'exclude' : 'include' });
     const my = ++reqId;
     fetch(panel.dataset.url + '?' + q, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
       .then(r => r.json().then(j => ({ ok: r.ok, j })))
@@ -464,12 +468,30 @@
         if (!j.exists) { showEmpty('No extracted skills yet. An administrator can create them on Data → Extract Skills.'); return; }
         data = j;
         if (!filtersBuilt) buildFilters(j);
-        setStats(j); drawBars(j); drawTrend(j); drawGaps(j); setSources(j); drawTraining(j.training);
+        setStats(j); drawBars(j); drawTrend(j); drawGaps(j); setSources(j); drawTraining(j.training); setGhostNote(j.ghost);
       })
       .catch(() => { if (my === reqId) errEl.textContent = 'Could not reach the server. Try again.'; });
   }
   // Light / dark switched while the charts are showing: redraw them in the new colours.
   window.addEventListener('ue:themechange', () => { if (data) { drawBars(data); drawTrend(data); } });
+
+  /* ---------------- Ghost jobs note ---------------- */
+  function setGhostNote(g) {
+    const note = $('ghost-note'); if (!note) return;
+    clear(note);
+    if (!g || (!g.marked && !g.excluded)) { note.hidden = true; return; }
+    const b = document.createElement('strong');
+    if (g.excluded) {
+      b.textContent = g.hidden.toLocaleString() + ' possible ghost job' + (g.hidden === 1 ? '' : 's') + ' excluded';
+      note.appendChild(b);
+      note.appendChild(document.createTextNode(' from these results (' + g.marked.toLocaleString() + ' marked). Turn it off in Filter.'));
+    } else {
+      b.textContent = g.marked.toLocaleString() + ' posting' + (g.marked === 1 ? '' : 's');
+      note.appendChild(b);
+      note.appendChild(document.createTextNode(' marked as possible ghost jobs, still counted. You can exclude them in Filter.'));
+    }
+    note.hidden = false;
+  }
 
   /* ---------------- Filter drawer ---------------- */
   // The controls sit in the Filter drawer. Nothing reloads until "Apply filters"; closing
@@ -478,6 +500,7 @@
   const KEYS = ['kind', 'top', 'program', 'source', 'level', 'months'];
   const DEFAULTS = { kind: 'hard', top: '10', program: '', source: '', level: '', months: '24' };
   let applied = Object.assign({}, DEFAULTS);
+  let appliedGhost = ghostOn();     // starts from what the server remembered for this login
 
   const label = (c) => c.tagName === 'SELECT' ? (c.options[c.selectedIndex] || {}).textContent || '' : c.value;
   function setSummary() {
@@ -491,7 +514,8 @@
     if ($('tab-skill-trends').classList.contains('is-active')) {
       sum.appendChild(document.createTextNode(' · ' + label(ctl.months)));
     }
-    const changed = KEYS.filter(k => applied[k] !== DEFAULTS[k]).length;
+    if (appliedGhost) sum.appendChild(document.createTextNode(' · Possible ghost jobs excluded'));
+    const changed = KEYS.filter(k => applied[k] !== DEFAULTS[k]).length + (appliedGhost ? 1 : 0);
     const badge = $('filter-count');
     badge.textContent = changed; badge.hidden = !changed;
     const reset = $('filter-reset');
@@ -503,7 +527,7 @@
     drawer.focus();
   }
   function closeDrawer(restore) {
-    if (restore) KEYS.forEach(k => { ctl[k].value = applied[k]; });
+    if (restore) { KEYS.forEach(k => { ctl[k].value = applied[k]; }); if (ghostBox) ghostBox.checked = appliedGhost; }
     drawer.classList.remove('is-active'); backdrop.classList.remove('is-active');
     drawer.setAttribute('aria-hidden', 'true'); filterBtn.setAttribute('aria-expanded', 'false');
   }
@@ -512,8 +536,9 @@
     if (!(v >= 1)) v = 10;
     ctl.top.value = String(Math.min(v, 30));
     const next = {}; KEYS.forEach(k => { next[k] = ctl[k].value; });
-    const changed = KEYS.some(k => next[k] !== applied[k]);
+    const changed = KEYS.some(k => next[k] !== applied[k]) || ghostOn() !== appliedGhost;
     applied = next;
+    appliedGhost = ghostOn();
     closeDrawer(false);
     setSummary();
     if (changed) { hidden.clear(); load(); }
@@ -524,10 +549,10 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && drawer.classList.contains('is-active')) closeDrawer(true); });
   $('filter-apply').addEventListener('click', apply);
   ctl.top.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); apply(); } });
-  $('filter-clear-all').addEventListener('click', () => { KEYS.forEach(k => { ctl[k].value = DEFAULTS[k]; }); });
+  $('filter-clear-all').addEventListener('click', () => { KEYS.forEach(k => { ctl[k].value = DEFAULTS[k]; }); if (ghostBox) ghostBox.checked = false; });
   // "Reset" next to the Filter button: back to the defaults and reload right away.
   const resetBtn = $('filter-reset');
-  if (resetBtn) resetBtn.addEventListener('click', () => { KEYS.forEach(k => { ctl[k].value = DEFAULTS[k]; }); apply(); });
+  if (resetBtn) resetBtn.addEventListener('click', () => { KEYS.forEach(k => { ctl[k].value = DEFAULTS[k]; }); if (ghostBox) ghostBox.checked = false; apply(); });
 
   // The period only matters for the trend chart, so the summary mentions it on that tab.
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setTimeout(setSummary)));

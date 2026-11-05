@@ -679,6 +679,17 @@ a.btn { text-decoration: none; }
 .auth-or{display:flex; align-items:center; gap:10px; color:var(--muted); font-size:.85rem; margin:2px 0;}
 .auth-or::before, .auth-or::after{content:""; flex:1; height:1px; background:#d9dde3;}
 
+/* Sign up: "Who are you?" (student / alumni / faculty) before any form */
+.role-choice-title{font-family:var(--font-head); font-size:1.25rem; color:var(--navy-text); margin:0;}
+.role-choice{display:flex; flex-direction:column; gap:10px; margin:6px 0 4px;}
+.role-choice-card{display:flex; flex-direction:column; gap:2px; padding:14px 16px; border:2px solid var(--line); border-radius:12px;
+  background:var(--surface); color:var(--navy-text); text-decoration:none; transition:border-color .12s;}
+.role-choice-card:hover, .role-choice-card:focus-visible{border-color:var(--red);}
+.role-choice-card strong{font-size:1rem;}
+.role-choice-card .muted{font-size:.85rem;}
+.role-choice-picked{margin:0; font-size:.92rem; color:var(--muted);}
+.role-choice-picked strong{color:var(--navy-text);}
+
 /* ============ Top-right tools: theme toggle (+ Log out on phones) ============ */
 .topbar-tools{position:absolute; top:15px; right:24px; z-index:30; display:flex; align-items:center; gap:6px;}
 .content:has(> .notif-bell) .topbar-tools{right:72px;}
@@ -926,3 +937,8 @@ img.sidebar-logo--mark{display:block; width:36px; height:auto; margin:0;}
   /* the bar carries the page name, so the page's own red header would repeat it */
   .app-shell:has(> .sidebar.is-collapsed) .content:has(.mobile-bar-title:not(:empty)) .page-header{display:none;}
 }
+
+/* "Purpose of this survey" box at the start of each survey */
+.survey-purpose{margin:8px 0 18px; padding:12px 14px; border-left:4px solid var(--red, #c8202f); border-radius:8px;
+  background:rgba(200,32,47,.07); color:var(--navy-text, inherit); font-size:.95rem; line-height:1.5;}
+.cs-header .survey-purpose{margin-top:0;}

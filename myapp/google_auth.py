@@ -9,9 +9,11 @@
   (student_views.register_view). That page checks their personal information first,
   keeps it in the session (PENDING_KEY), then sends them to Google; when Google sends
   them back, SocialAccountAdapter.save_user() makes the account from it.
-* A Google account with no UEnvision account, that did not come from the
-  registration page, is not signed up: they are sent back to the login page with a
-  note on how to register.
+* A new faculty member can sign up with Google from the faculty sign-up form
+  (views.auth.signup_view), the same way: name first, then Google.
+* A Google account with no UEnvision account, that did not come from one of those
+  forms, is not signed up: they are sent to the sign-up page, which first asks
+  whether they are a student, an alumni or faculty.
 
 The keys come from GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env (settings.py).
 Without them google_enabled() is False and the Google buttons are hidden.
@@ -47,14 +49,14 @@ def start_google_login(request, next_url=""):
     return provider.redirect(request, "login", next_url=next_url or None)
 
 
-def _back_to_login(request, text):
-    messages.error(request, text)
-    return ImmediateHttpResponse(redirect("login"))
+def _to_signup(request, text):
+    messages.info(request, text)
+    return ImmediateHttpResponse(redirect("signup"))
 
 
 class AccountAdapter(DefaultAccountAdapter):
-    """allauth's own email/password sign-up pages are never used: students and alumni
-    register on /register/ and faculty on /signup/."""
+    """allauth's own email/password sign-up pages are never used: /signup/ asks who they
+    are, then students and alumni register on /register/ and faculty on /signup/?as=faculty."""
 
     def is_open_for_signup(self, request):
         return False
@@ -90,11 +92,10 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
         email = (sociallogin.user.email or "").strip() if sociallogin.user else ""
         pending = request.session.get(PENDING_KEY)
         if not pending:
-            raise _back_to_login(
+            raise _to_signup(
                 request,
                 f"There is no UEnvision account for {email or 'that Google account'} yet. "
-                "Students and fresh graduates: press Check your skill gap to register first. "
-                "Faculty: sign up first, then you can use Continue with Google.")
+                "Choose who you are below to create one; you can use Continue with Google there.")
         # Any Google account works for students too (no @ue.edu.ph requirement any more);
         # Google has already confirmed they own the address.
 
@@ -103,14 +104,24 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
 
         pending = request.session.pop(PENDING_KEY, None) or {}
         user = sociallogin.user
-        user.role = (CustomUser.Role.ALUMNI if pending.get("role") == "alumni" else CustomUser.Role.STUDENT)
+        faculty = pending.get("role") == "faculty"
+        user.role = {"faculty": CustomUser.Role.FACULTY,
+                     "alumni": CustomUser.Role.ALUMNI}.get(pending.get("role"), CustomUser.Role.STUDENT)
         user.first_name = pending.get("first_name") or user.first_name or user.email.split("@")[0]
+        user.middle_name = pending.get("middle_name") or ""
         user.last_name = pending.get("last_name") or user.last_name or ""
-        user.learner_info = pending.get("info") or {}
-        user.target_role = pending.get("target_role") or ""
+        if faculty:
+            user.is_approved = False   # like a faculty password sign-up: an administrator checks them
+        else:
+            user.learner_info = pending.get("info") or {}
+            user.target_role = pending.get("target_role") or ""
         user.email_verified = True
         user.set_unusable_password()   # they can set one later with Forgot password
-        return super().save_user(request, sociallogin, form)
+        saved = super().save_user(request, sociallogin, form)
+        if faculty:
+            from . import notifications
+            notifications.notify_faculty_signup(request, saved)
+        return saved
 
     def get_connect_redirect_url(self, request, socialaccount):
         return reverse("settings")

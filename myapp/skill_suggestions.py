@@ -89,7 +89,7 @@ def title_matches(title):
 def _demand():
     """{skill key: number of IT/CS job postings asking for it} (read-only, from the extracted data set)."""
     from . import gap_analysis, job_roles
-    postings = job_roles.it_postings()
+    postings = job_roles.it_postings(exclude_ghosts=False)
     if not postings:
         return {}
     counts, _ = gap_analysis._tally(p["hard"] for p in postings)
@@ -98,7 +98,7 @@ def _demand():
 
 def _top_in_demand(demand, limit=12):
     from . import gap_analysis, job_roles
-    postings = job_roles.it_postings() or []
+    postings = job_roles.it_postings(exclude_ghosts=False) or []
     _, label = gap_analysis._tally(p["hard"] for p in postings)
     ranked = sorted(demand.items(), key=lambda kv: (-kv[1], label.get(kv[0], kv[0]).lower()))
     return [label.get(k, k) for k, _ in ranked[:limit]]

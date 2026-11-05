@@ -217,3 +217,23 @@ def survey_first_context(request):
             continue
     allowed.add(url)
     return {"survey_first": {"url": url, "allowed": sorted(allowed)}}
+
+
+class GhostJobsMiddleware:
+    """Applies the viewer's "Exclude possible ghost jobs" switch (Dashboard filters, kept in
+    the session) to every result computed during this request: job_roles.it_postings()
+    reads it, so the Dashboard, skill gap analysis, Recommendations and homepage all
+    leave the same postings out. Off unless the viewer turned it on."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from . import ghost_jobs
+
+        session = getattr(request, "session", None)
+        token = ghost_jobs.EXCLUDE.set(bool(session.get(ghost_jobs.SESSION_KEY)) if session is not None else False)
+        try:
+            return self.get_response(request)
+        finally:
+            ghost_jobs.EXCLUDE.reset(token)

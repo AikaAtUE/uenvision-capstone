@@ -63,7 +63,8 @@ class GoogleSignInTests(TestCase):
 
     def test_unknown_google_account_is_not_signed_up(self):
         request, response = self.google_login("stranger@gmail.com")
-        self.assertRedirects(response, reverse("login"), fetch_redirect_response=False)
+        # sent to sign-up, which first asks whether they're a student, alumni or faculty
+        self.assertRedirects(response, reverse("signup"), fetch_redirect_response=False)
         self.assertFalse(CustomUser.objects.exists())
 
     def test_students_may_register_with_any_google_account(self):

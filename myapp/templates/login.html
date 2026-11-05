@@ -28,8 +28,7 @@
       <div class="auth-or"><span>or</span></div>
       <button type="submit" class="btn btn-google btn-block" form="google-login-form">{% include "_google_icon.html" %}<span>Continue with Google</span></button>
       {% endif %}
-      <p class="auth-foot">Don't have an account? <a class="link-inline" href="{% url 'signup' %}">Sign up</a> (faculty)</p>
-      <p class="auth-foot">Student or fresh graduate? <a class="link-inline" href="{% url 'check_gap' %}">Check your skill gap</a></p>
+      <p class="auth-foot">Don't have an account? <a class="link-inline" href="{% url 'signup' %}">Sign up</a> as a student, alumni or faculty</p>
     </form>
     {% if google_enabled %}
     <form id="google-login-form" method="post" action="{% url 'google_login' %}" hidden>{% csrf_token %}<input type="hidden" name="process" value="login"></form>

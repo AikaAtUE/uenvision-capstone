@@ -11,6 +11,8 @@ from ..pipeline import manager as pipeline
 from .. import curriculum_data
 from .. import feedback_nudge
 from .. import gap_analysis
+from .. import ghost_jobs
+from .. import job_roles
 from .. import recommendations
 from .common import _sees_dummy_results, _sees_student_view, administrator_required
 
@@ -25,7 +27,8 @@ def dashboard_view(request):
         return render_student_dashboard(request, active_page="dashboard", as_kind=dev_learner_view(request))
     feedback_nudge.record_use(request.user)
     return render(request, "dashboard.html", {"active_page": "dashboard",
-                                              "has_professor_record": latest_response(request.user) is not None})
+                                              "has_professor_record": latest_response(request.user) is not None,
+                                              "exclude_ghost_jobs": bool(request.session.get(ghost_jobs.SESSION_KEY))})
 
 
 @login_required
@@ -41,6 +44,12 @@ def dashboard_skills_view(request):
     if not 1 <= top <= 30 or not 0 <= months <= 600:
         return JsonResponse({"ok": False, "error": "Top must be 1-30."}, status=400)
     pipeline.ensure_skill_csvs()
+    ghost = request.GET.get("ghost", "")
+    if ghost in ("exclude", "include"):
+        # The "Exclude possible ghost jobs" switch: remembered for this login, and applied
+        # right away to this response (GhostJobsMiddleware applies it on later pages).
+        request.session[ghost_jobs.SESSION_KEY] = ghost == "exclude"
+        ghost_jobs.EXCLUDE.set(ghost == "exclude")
     source = request.GET.get("source", "")
     level = request.GET.get("level", "")
     program = request.GET.get("program", "")
@@ -51,6 +60,7 @@ def dashboard_skills_view(request):
     except (OSError, UnicodeDecodeError) as exc:
         return JsonResponse({"ok": False, "error": f"Couldn't read the data: {exc}"}, status=500)
     if data.get("exists"):
+        data["ghost"] = job_roles.ghost_summary(source, level, program)
         try:
             data["gap"] = gap_analysis.compute(top, source, level, program, dummy=_sees_dummy_results(request))
         except (OSError, UnicodeDecodeError) as exc:
@@ -200,6 +210,7 @@ def recommendations_view(request):
         row["cached_resources"] = cached.get(row["skill"].strip().lower(), [])
     return render(request, "recommendations.html", {
         "curriculum_suggestions": _curriculum_suggestions(request.user, gap, subject_value),
+        "ghost": job_roles.ghost_summary(),
         "active_page": "recommendations",
         "gap": gap,
         "under_taught": rows,

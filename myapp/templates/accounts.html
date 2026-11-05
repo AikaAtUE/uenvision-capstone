@@ -11,7 +11,7 @@
       <button type="button" class="btn btn-navy btn-sm" id="add-account-btn">+ Add account</button>
     </div>
     {% if pending_count and state != "pending" %}
-    <p class="acct-pending-note"><strong>{{ pending_count }} faculty sign-up{{ pending_count|pluralize }}</strong> not approved yet. They can already use UEnvision. Approve the real faculty, and remove anyone who isn't (their survey answers are removed too). <a class="link-inline" href="?state=pending">Review</a></p>
+    <p class="acct-pending-note"><strong>{{ pending_count }} faculty sign-up{{ pending_count|pluralize }}</strong> not approved yet. They can already use UEnvision. Approve the real faculty. A student who signed up as faculty by mistake can be moved with <strong>Move to Student</strong> (their survey answers go with them); remove anyone else who isn't faculty (their survey answers are removed too). <a class="link-inline" href="?state=pending">Review</a></p>
     {% endif %}
     {# Search here; role, status, real/dummy and sort live in the Filter drawer (the same drawer as the Dashboard's). #}
     <form class="acct-toolbar" method="get" action="{% url 'accounts' %}" role="search">
@@ -49,7 +49,8 @@
             data-edit-url="{% url 'account_edit' a.pk %}"
             data-reset-url="{% url 'account_reset_password' a.pk %}"
             data-delete-url="{% url 'account_delete' a.pk %}"
-            data-approve-url="{% url 'account_approve' a.pk %}">
+            data-approve-url="{% url 'account_approve' a.pk %}"
+            data-move-url="{% url 'account_move_to_student' a.pk %}">
             <td>{{ a.pk }}</td>
             <td>{{ a.get_full_name }}{% if a.pk == user.pk %} <span class="pill pill--you">You</span>{% endif %}</td>
             <td>{{ a.email }}</td>
@@ -58,6 +59,7 @@
             <td class="row-actions">
               {% if not a.is_approved %}<button type="button" class="btn btn-navy btn-sm" data-action="approve">Approve</button>{% endif %}
               <button type="button" class="btn btn-ghost btn-sm" data-action="edit">Edit</button>
+              {% if a.role == "faculty" %}<button type="button" class="btn btn-ghost btn-sm" data-action="move" title="For a student who signed up as faculty by mistake">Move to Student</button>{% endif %}
               {% if a.is_approved %}<button type="button" class="btn btn-ghost btn-sm" data-action="reset">Reset password</button>{% endif %}
               {% if a.pk != user.pk %}<button type="button" class="btn btn-red btn-sm" data-action="delete">Remove</button>{% endif %}
             </td>

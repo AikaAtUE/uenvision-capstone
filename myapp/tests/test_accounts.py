@@ -31,11 +31,11 @@ class RoleAndPasswordTests(TestCase):
         self.assertTrue(su.is_administrator)
 
     def test_signup_always_faculty_and_min_length(self):
-        r = self.client.post(reverse("signup"), {"last_name": "A", "first_name": "B", "email": "x@ue.edu.ph",
+        r = self.client.post(reverse("signup"), {"as": "faculty", "last_name": "A", "first_name": "B", "email": "x@ue.edu.ph",
                                                   "password": "short", "password2": "short"})
         self.assertContains(r, "at least 8")
         self.assertFalse(CustomUser.objects.filter(email="x@ue.edu.ph").exists())
-        self.client.post(reverse("signup"), {"last_name": "A", "first_name": "B", "email": "x@ue.edu.ph",
+        self.client.post(reverse("signup"), {"as": "faculty", "last_name": "A", "first_name": "B", "email": "x@ue.edu.ph",
                                               "password": "longenough1", "password2": "longenough1", "role": "administrator"})
         self.assertEqual(CustomUser.objects.get(email="x@ue.edu.ph").role, "faculty")
 
@@ -301,7 +301,7 @@ class FacultyApprovalTests(TestCase):
                                                      notify_by_email=True)
 
     def signup(self):
-        return self.client.post(reverse("signup"), {"last_name": "Santos", "first_name": "Prof", "email": "prof@ue.edu.ph",
+        return self.client.post(reverse("signup"), {"as": "faculty", "last_name": "Santos", "first_name": "Prof", "email": "prof@ue.edu.ph",
                                                     "password": "longenough1", "password2": "longenough1"})
 
     def test_bell_poll_returns_live_count_and_dropdown(self):

@@ -7,19 +7,51 @@
     <div class="auth-brand auth-brand--compact">
       {% include "_logo.html" with logo_class="auth-logo auth-logo--sm" %}
     </div>
+    {% if not kind %}
+    {# Step 1: everyone says who they are first, so nobody becomes faculty by mistake. #}
+    <div class="auth-form" id="signup-choose">
+      {% include "_messages.html" %}
+      <h2 class="role-choice-title">Who are you?</h2>
+      <p class="muted">Choose one. Each group answers a different survey.</p>
+      {% if error %}<p class="form-msg is-error" role="alert">{{ error }}</p>{% endif %}
+      <div class="role-choice" role="list">
+        <a class="role-choice-card" role="listitem" id="signup-as-student" href="{% url 'register' %}?as=student">
+          <strong>I'm a current student</strong>
+          <span class="muted">BSIT or BSCS student at UE</span>
+        </a>
+        <a class="role-choice-card" role="listitem" id="signup-as-alumni" href="{% url 'register' %}?as=alumni">
+          <strong>I'm an alumni / fresh graduate</strong>
+          <span class="muted">UE BSIT or BSCS graduate</span>
+        </a>
+        <a class="role-choice-card" role="listitem" id="signup-as-faculty" href="{% url 'signup' %}?as=faculty">
+          <strong>I'm a faculty member</strong>
+          <span class="muted">I teach BSIT or BSCS subjects at UE</span>
+        </a>
+      </div>
+      <p class="auth-foot">Already have an account? <a class="link-inline" href="{% url 'login' %}">Log in</a></p>
+    </div>
+    {% else %}
     <form class="auth-form" id="signup-form" method="post" action="{% url 'signup' %}">
       {% csrf_token %}
+      <input type="hidden" name="as" value="faculty">
+      <p class="role-choice-picked">Signing up as <strong>Faculty</strong>. <a class="link-inline" href="{% url 'signup' %}">Not faculty?</a></p>
       <label class="field"><span>Last name</span><input type="text" id="signup-lastname" value="{{ form.last_name|default:'' }}" autocomplete="family-name" name="last_name" required></label>
       <label class="field"><span>First name</span><input type="text" id="signup-firstname" value="{{ form.first_name|default:'' }}" autocomplete="given-name" name="first_name" required></label>
       <label class="field"><span>Middle name</span><input type="text" id="signup-middlename" value="{{ form.middle_name|default:'' }}" autocomplete="additional-name" name="middle_name"></label>
-      <label class="field"><span>Email</span><input type="email" id="signup-email" value="{{ form.email|default:'' }}" autocomplete="email" name="email" placeholder="juan.delacruz@ue.edu.ph" required></label>
-      <label class="field"><span>Password</span><input type="password" id="signup-password" value="{{ form.password|default:'' }}" autocomplete="new-password" name="password" minlength="{{ min_password_length }}" required data-password-rules aria-describedby="signup-password-rules"></label>
+      {% if google_enabled %}
+      <button type="submit" class="btn btn-google btn-block" name="method" value="google" id="signup-google">{% include "_google_icon.html" %}<span>Continue with Google</span></button>
+      <p class="field-hint">Fill in your name above first. You won't need a password.</p>
+      <div class="auth-or"><span>or use a password</span></div>
+      {% endif %}
+      <label class="field"><span>Email</span><input type="email" id="signup-email" value="{{ form.email|default:'' }}" autocomplete="email" name="email" placeholder="juan.delacruz@ue.edu.ph" data-account{% if not google_enabled %} required{% endif %}></label>
+      <label class="field"><span>Password</span><input type="password" id="signup-password" value="{{ form.password|default:'' }}" autocomplete="new-password" name="password" minlength="{{ min_password_length }}" data-password-rules data-account aria-describedby="signup-password-rules"{% if not google_enabled %} required{% endif %}></label>
       <ul class="pw-rules" id="signup-password-rules" aria-live="polite"><li data-min-length="{{ min_password_length }}">At least {{ min_password_length }} characters</li></ul>
-      <label class="field"><span>Re-enter password</span><input type="password" id="signup-password2" value="{{ form.password2|default:'' }}" autocomplete="new-password" name="password2" required></label>
+      <label class="field"><span>Re-enter password</span><input type="password" id="signup-password2" value="{{ form.password2|default:'' }}" autocomplete="new-password" name="password2" data-account{% if not google_enabled %} required{% endif %}></label>
       <p class="form-msg is-error" id="signup-msg" role="alert">{% if error %}{{ error }}{% endif %}</p>
-      <button type="submit" class="btn btn-navy btn-block">Create account</button>
+      <button type="submit" class="btn btn-navy btn-block" name="method" value="password">Create account</button>
       <p class="auth-foot">Already have an account? <a class="link-inline" href="{% url 'login' %}">Log in</a></p>
     </form>
+    {% endif %}
   </div>
 </section>
 {% endblock %}
