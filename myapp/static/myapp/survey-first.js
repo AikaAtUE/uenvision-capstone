@@ -25,14 +25,11 @@
       message: 'UEnvision needs your answers before it can show your results.',
       okLabel: 'Go to survey',
       cancelLabel: 'Close',
-      // already on the survey: "Go to survey" just closes the pop-up (no reload, nothing lost)
+      // already on the survey: only "Close" (a "Go to survey" button would lead nowhere)
+      hideOk: onSurvey,
       okHref: onSurvey ? null : cfg.url
-    }).then(function (go) {
+    }).then(function () {
       open = false;
-      if (go && onSurvey) {
-        var form = document.querySelector('form.cs-panel, main form, .cs-page form');
-        if (form) form.scrollIntoView({ block: 'start' });
-      }
     });
   }
 

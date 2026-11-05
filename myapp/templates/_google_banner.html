@@ -1,0 +1,13 @@
+{# "Signed in using <email> through Google" on the sign-up pages (google_auth.held_google). #}
+{# in_form: inside the page's form (keeps what they typed); next: the page to come back to. #}
+<div class="google-signed" role="status">
+  {% include "_google_icon.html" %}
+  <div class="google-signed-text">
+    <span>Signed in using <strong>{{ google.email }}</strong> through Google</span>
+    {% if in_form %}
+    <button type="submit" class="link-btn" formaction="{% url 'google_signup_start' %}" formnovalidate name="next" value="{{ next }}">Use a different account</button>
+    {% else %}
+    <form method="post" action="{% url 'google_signup_start' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}"><button type="submit" class="link-btn">Use a different account</button></form>
+    {% endif %}
+  </div>
+</div>

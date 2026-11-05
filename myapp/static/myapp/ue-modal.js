@@ -2,6 +2,7 @@
    UEModal.confirm({ title, message, okLabel, cancelLabel, danger, okHref }) -> Promise<boolean>
      * resolves true when the main button is pressed, false on Cancel / Close / Esc / backdrop.
      * okHref: the main button is a link (e.g. "Go to survey") instead of a button.
+     * hideOk: only the Cancel / Close button is shown.
    Uses the site's .modal-backdrop / .modal styles, so it follows light and dark mode.
    Keyboard: focus moves into the dialog, Tab stays inside it, Esc closes it, and focus goes
    back to whatever was focused before. */
@@ -49,7 +50,7 @@
       var cancel = el('button', 'btn btn-ghost', opts.cancelLabel || 'Cancel');
       cancel.type = 'button';
       cancel.setAttribute('data-ue-modal-cancel', '');
-      actions.appendChild(ok);
+      if (!opts.hideOk) actions.appendChild(ok);
       actions.appendChild(cancel);
       box.appendChild(actions);
       backdrop.appendChild(box);
@@ -67,7 +68,7 @@
       function onKey(e) {
         if (e.key === 'Escape') { e.preventDefault(); close(false); return; }
         if (e.key === 'Tab') {
-          var items = [ok, cancel];
+          var items = opts.hideOk ? [cancel] : [ok, cancel];
           var i = items.indexOf(document.activeElement);
           e.preventDefault();
           items[(i + (e.shiftKey ? items.length - 1 : 1)) % items.length].focus();
@@ -77,7 +78,7 @@
       cancel.addEventListener('click', function () { close(false); });
       backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(false); });
       document.addEventListener('keydown', onKey, true);
-      ok.focus();
+      (opts.hideOk ? cancel : ok).focus();
     });
   }
 

@@ -72,6 +72,7 @@ class SurveyFirstPopupTests(IsolatedDataMixin, TestCase):
         self.assertIn("UEnvision needs your answers before it can show your results.", js)
         self.assertIn("'Go to survey'", js)
         self.assertIn("'Close'", js)
+        self.assertIn("hideOk: onSurvey", js)   # on the survey itself only Close is shown
 
 
 @override_settings(REQUIRE_PROFESSOR_SURVEY=True, REQUIRE_LEARNER_SURVEY=True)

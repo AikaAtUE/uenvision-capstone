@@ -275,11 +275,18 @@ def register_view(request):
            "min_grad_year": MIN_GRAD_YEAR, "max_grad_year": max_grad_year(),
            "min_password_length": MIN_PASSWORD_LENGTH, "google_enabled": google_auth.google_enabled(),
            "ue_email_domain": google_auth.UE_EMAIL_DOMAIN, "form": {}}
+    # Already signed in with Google (google_auth.HELD_KEY): names come from Google and
+    # there is no email or password to fill in.
+    google = google_auth.held_google(request)
+    ctx["google"] = google
+    ctx["return_url"] = reverse("register") + f"?as={kind}" + (f"&role={target_role}" if target_role else "")
     if request.method != "POST":
+        if google:
+            ctx["form"] = google_auth.prefill_from_google(google)
         return render(request, "register.html", ctx)
 
     post = request.POST
-    with_google = post.get("method") == "google" and google_auth.google_enabled()
+    with_google = bool(google)
     first = " ".join(str(post.get("first_name") or "").split())[:MAX_NAME_LENGTH]
     last = " ".join(str(post.get("last_name") or "").split())[:MAX_NAME_LENGTH]
     email = str(post.get("email") or "").strip()
@@ -306,10 +313,13 @@ def register_view(request):
         return render(request, "register.html", {**ctx, "error": error, "form": form})
 
     if with_google:
-        # Google confirms the email; google_auth.SocialAccountAdapter makes the account.
-        request.session[google_auth.PENDING_KEY] = {"role": kind, "first_name": first, "last_name": last,
-                                                    "info": info, "target_role": target_role}
-        return google_auth.start_google_login(request, next_url=survey_url_for(kind, target_role))
+        _user, error = google_auth.create_held_account(request, kind, first, last, info=info,
+                                                       target_role=target_role)
+        if error:
+            form = {k: v for k, v in post.items() if k != "csrfmiddlewaretoken"}
+            return render(request, "register.html", {**ctx, "google": google_auth.held_google(request),
+                                                     "error": error, "form": form})
+        return redirect(survey_url_for(kind, target_role))
 
     user = CustomUser.objects.create_user(
         email=email, password=password, first_name=first, last_name=last, role=LEARNER_KINDS[kind],

@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import student_views, survey_admin, survey_tracker, views
+from . import google_auth, student_views, survey_admin, survey_tracker, views
 
 urlpatterns = [
     # Public site
@@ -23,6 +23,7 @@ urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("session/ping/", views.session_ping_view, name="session_ping"),
     path("signup/", views.signup_view, name="signup"),
+    path("signup/google/", google_auth.start_google_signup_view, name="google_signup_start"),
     path("verify-email/resend/", views.resend_verification_view, name="resend_verification"),
     path("verify-email/<uidb64>/<token>/", views.verify_email_view, name="verify_email"),
     path("forgot-password/", views.forgot_password_view, name="forgot_password"),

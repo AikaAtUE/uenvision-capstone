@@ -23,6 +23,15 @@
       {% csrf_token %}
       <input type="hidden" name="as" value="{{ kind }}">
       {% if target_role %}<input type="hidden" name="role" value="{{ target_role }}">{% endif %}
+      {# Enter in a field creates the account; it never starts Google. #}
+      <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">Create account</button>
+      {% if google %}
+      {% include "_google_banner.html" with in_form=True next=return_url %}
+      {% elif google_enabled %}
+      <button type="submit" class="btn btn-google btn-block" formaction="{% url 'google_signup_start' %}" formnovalidate name="next" value="{{ return_url }}" data-google>{% include "_google_icon.html" %}<span>Continue with Google</span></button>
+      <p class="field-hint">Fastest: fills in your name and email for you. Any Google account works, such as your UE or personal Gmail account. You won't need a password.</p>
+      <div class="auth-or"><span>or fill in your details and use a password</span></div>
+      {% endif %}
 
       <div class="cs-privacy" id="register-privacy">
         <h3>Data Privacy Notice</h3>
@@ -65,14 +74,8 @@
       </div>
       {% endif %}
 
-      {% if google_enabled %}
-      <h2 class="reg-h">Sign in with Google</h2>
-      <button type="submit" class="btn btn-google btn-block" name="method" value="google" formnovalidate data-google>{% include "_google_icon.html" %}<span>Continue with Google</span></button>
-      <p class="field-hint">Any Google account works, such as your UE or personal Gmail account. You won't need a password.</p>
-      <div class="auth-or"><span>or use a password</span></div>
-      {% else %}
+      {% if not google %}
       <h2 class="reg-h">Your account</h2>
-      {% endif %}
       <label class="field"><span>Email address</span>
         <input type="email" name="email" value="{{ form.email|default:'' }}" autocomplete="username" placeholder="juan.delacruz@gmail.com" data-account>
         <span class="field-hint">Your UE email or a personal one you use. We send a link to confirm it.</span></label>
@@ -82,6 +85,7 @@
       <ul class="pw-rules" id="register-password-rules" aria-live="polite"><li data-min-length="{{ min_password_length }}">At least {{ min_password_length }} characters</li></ul>
       <label class="field"><span>Confirm password</span>
         <input type="password" name="password2" autocomplete="new-password" data-account></label>
+      {% endif %}
       {% if error %}<p class="form-msg is-error" role="alert">{{ error }}</p>{% endif %}
       <button type="submit" class="btn btn-red btn-block" name="method" value="password">Create account and start the survey</button>
       <p class="auth-foot">Already registered? <a class="link-inline" href="{% url 'login' %}">Log in</a></p>

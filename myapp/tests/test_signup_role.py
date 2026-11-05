@@ -43,11 +43,12 @@ class SignupAsksWhoYouAreTests(TestCase):
 
     @override_settings(**KEYS)
     def test_faculty_can_sign_up_with_google(self):
-        r = self.client.post(reverse("signup"), {"as": "faculty", "last_name": "Santos", "first_name": "Ana",
-                                                 "method": "google"})
+        self.assertContains(self.client.get(reverse("signup"), {"as": "faculty"}), "Continue with Google")
+        r = self.client.post(reverse("google_signup_start"), {"as": "faculty", "last_name": "Santos",
+                                                              "next": reverse("signup") + "?as=faculty"})
         self.assertTrue(r["Location"].startswith("https://accounts.google.com/"))
         from ..google_auth import PENDING_KEY
-        self.assertEqual(self.client.session[PENDING_KEY]["role"], "faculty")
+        self.assertEqual(self.client.session[PENDING_KEY]["return_to"], "/signup/?as=faculty")
 
 
 class MoveFacultyToStudentTests(IsolatedDataMixin, TestCase):

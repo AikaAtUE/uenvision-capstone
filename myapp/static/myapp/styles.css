@@ -677,6 +677,13 @@ a.btn { text-decoration: none; }
 .btn-google{display:inline-flex; align-items:center; justify-content:center; gap:10px; background:var(--surface); color:#1f1f1f; border:1px solid #c7ccd4;}
 .btn-google:hover{background:var(--soft);}
 .btn-google .google-g{flex:none;}
+/* "Signed in using <email> through Google" on the sign-up pages */
+.google-signed{display:flex; align-items:flex-start; gap:10px; background:var(--soft); border:1px solid #2e9e5b; border-radius:var(--radius); padding:10px 12px; margin:4px 0 10px; color:var(--ink); font-size:.92rem;}
+.google-signed .google-g{flex:none; margin-top:2px;}
+.google-signed-text{display:flex; flex-direction:column; gap:2px; min-width:0; overflow-wrap:anywhere;}
+.google-signed-text form{margin:0;}
+.link-btn{background:none; border:0; padding:0; font:inherit; font-size:.85rem; color:var(--red); cursor:pointer; text-align:left; text-decoration:underline;}
+.link-btn:hover{color:var(--red-dark);}
 .auth-or{display:flex; align-items:center; gap:10px; color:var(--muted); font-size:.85rem; margin:2px 0;}
 .auth-or::before, .auth-or::after{content:""; flex:1; height:1px; background:#d9dde3;}
 
@@ -950,7 +957,7 @@ img.sidebar-logo--mark{display:block; width:36px; height:auto; margin:0;}
    Light mode is unchanged. */
 :root[data-theme="dark"]{--red-text:#ff7a86; --green-text:#7fd6a5;}
 /* red text: the brand red is too dark to read on the dark background */
-:root[data-theme="dark"] .link-inline, :root[data-theme="dark"] .w-red, :root[data-theme="dark"] .form-msg.is-error,
+:root[data-theme="dark"] .link-inline, :root[data-theme="dark"] .link-btn, :root[data-theme="dark"] .w-red, :root[data-theme="dark"] .form-msg.is-error,
 :root[data-theme="dark"] .form-msg--error, :root[data-theme="dark"] .tab.is-active, :root[data-theme="dark"] .about-card h2,
 :root[data-theme="dark"] .ft-id, :root[data-theme="dark"] .notif-panel-item.is-unread .notif-panel-time,
 :root[data-theme="dark"] .data-tab.is-active, :root[data-theme="dark"] .table-empty a, :root[data-theme="dark"] .st-no,

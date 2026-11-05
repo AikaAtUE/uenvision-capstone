@@ -89,9 +89,15 @@ def signup_view(request):
         return redirect(reverse("register") + f"?as={kind}")
     if request.user.is_authenticated:
         return redirect(home_url_for(request.user))
+    # Already signed in with Google (google_auth.HELD_KEY): the chooser greets them, and
+    # the faculty form has their names filled in and no email or password.
+    google = google_auth.held_google(request)
     ctx = {"kind": kind, "min_password_length": MIN_PASSWORD_LENGTH,
-           "google_enabled": google_auth.google_enabled()}
+           "google_enabled": google_auth.google_enabled(), "google": google,
+           "return_url": reverse("signup") + ("?as=faculty" if kind == "faculty" else "")}
     if request.method != "POST":
+        if google:
+            ctx["form"] = google_auth.prefill_from_google(google)
         return render(request, "signup.html", ctx)
     if not kind:
         return render(request, "signup.html", {**ctx, "error": "Please choose whether you are a student, an alumni or faculty."})
@@ -110,11 +116,13 @@ def signup_view(request):
     if not first_name or not last_name:
         return failed("Please enter your first and last name.")
 
-    if request.POST.get("method") == "google" and google_auth.google_enabled():
-        # Google confirms the email; google_auth.SocialAccountAdapter makes the faculty account.
-        request.session[google_auth.PENDING_KEY] = {"role": "faculty", "first_name": first_name,
-                                                    "middle_name": middle_name, "last_name": last_name}
-        return google_auth.start_google_login(request, next_url=reverse("professor_survey"))
+    if google:
+        _user, error = google_auth.create_held_account(request, "faculty", first_name, last_name,
+                                                       middle_name=middle_name)
+        if error:
+            return render(request, "signup.html", {**ctx, "google": google_auth.held_google(request),
+                                                   "error": error, "form": request.POST})
+        return redirect("professor_survey")
 
     try:
         validate_email(email)
