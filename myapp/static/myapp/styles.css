@@ -102,6 +102,7 @@ a{color:inherit;}
 .auth-wordmark{font-family:var(--font-head); font-size:1.7rem; font-weight:700; letter-spacing:.02em;}
 .auth-title{font-size:1.6rem; text-align:center;}
 .auth-sub{color:var(--muted); text-align:center; max-width:340px; font-size:.92rem; line-height:1.5;}
+.lock-icon{color:var(--navy-text);}
 .lock-icon svg{width:64px; height:64px;}
 
 .auth-form{width:100%; max-width:340px; display:flex; flex-direction:column; gap:16px;}
@@ -942,3 +943,64 @@ img.sidebar-logo--mark{display:block; width:36px; height:auto; margin:0;}
 .survey-purpose{margin:8px 0 18px; padding:12px 14px; border-left:4px solid var(--red, #c8202f); border-radius:8px;
   background:rgba(200,32,47,.07); color:var(--navy-text, inherit); font-size:.95rem; line-height:1.5;}
 .cs-header .survey-purpose{margin-top:0;}
+
+/* ============ Dark mode: readable text and boxes everywhere ============
+   Boxes, pills and links above that set their own light colours (or use the brand red as
+   text) get a dark version here, so nothing is dark-on-dark or a bright white patch.
+   Light mode is unchanged. */
+:root[data-theme="dark"]{--red-text:#ff7a86; --green-text:#7fd6a5;}
+/* red text: the brand red is too dark to read on the dark background */
+:root[data-theme="dark"] .link-inline, :root[data-theme="dark"] .w-red, :root[data-theme="dark"] .form-msg.is-error,
+:root[data-theme="dark"] .form-msg--error, :root[data-theme="dark"] .tab.is-active, :root[data-theme="dark"] .about-card h2,
+:root[data-theme="dark"] .ft-id, :root[data-theme="dark"] .notif-panel-item.is-unread .notif-panel-time,
+:root[data-theme="dark"] .data-tab.is-active, :root[data-theme="dark"] .table-empty a, :root[data-theme="dark"] .st-no,
+:root[data-theme="dark"] .btn-danger-outline, :root[data-theme="dark"] .gap-rec-link a, :root[data-theme="dark"] .cmp-missing,
+:root[data-theme="dark"] .err-page .err-code, :root[data-theme="dark"] .rec-card-name:hover,
+:root[data-theme="dark"] .cs-about-status.is-error, :root[data-theme="dark"] .cs-skill-result--new,
+:root[data-theme="dark"] .cs-select-all:hover, :root[data-theme="dark"] .cs-select-all:focus-visible,
+:root[data-theme="dark"] .ms-remove-subject:hover, :root[data-theme="dark"] .ms-remove-subject:focus-visible{color:var(--red-text);}
+:root[data-theme="dark"] .tab.is-active, :root[data-theme="dark"] .data-tab.is-active{border-bottom-color:var(--red-text);}
+:root[data-theme="dark"] .link-inline--sm{color:var(--muted);}
+/* green text */
+:root[data-theme="dark"] .form-msg.is-success, :root[data-theme="dark"] .pw-rules li.is-met, :root[data-theme="dark"] .st-yes,
+:root[data-theme="dark"] .rec-card-check{color:var(--green-text);}
+:root[data-theme="dark"] .ms-status.is-dirty{color:#f3c56b;}
+:root[data-theme="dark"] .cs-select-all:disabled{color:var(--muted-2);}
+/* pills and badges: green / amber / red / neutral / blue families */
+:root[data-theme="dark"] .pill--approved, :root[data-theme="dark"] .sd-pill--strong,
+:root[data-theme="dark"] .run-badge[data-s="done"], :root[data-theme="dark"] .run-steps li[data-s="done"]{background:#163526; color:#94dcb4;}
+:root[data-theme="dark"] .pill--dummy, :root[data-theme="dark"] .pill--pending, :root[data-theme="dark"] .sd-pill--building,
+:root[data-theme="dark"] .email-status--no{background:#3a2f12; color:#f3dc9b;}
+:root[data-theme="dark"] .pill--administrator, :root[data-theme="dark"] .sd-pill--missing,
+:root[data-theme="dark"] .run-badge[data-s="failed"], :root[data-theme="dark"] .run-badge[data-s="interrupted"],
+:root[data-theme="dark"] .run-steps li[data-s="failed"]{background:#3a1519; color:#f4a7ae;}
+:root[data-theme="dark"] .pill, :root[data-theme="dark"] .run-badge, :root[data-theme="dark"] .run-steps li{background:#263048; color:var(--ink);}
+:root[data-theme="dark"] .pill--unverified{background:#263048; color:var(--muted);}
+:root[data-theme="dark"] .pill--developer, :root[data-theme="dark"] .pill--faculty, :root[data-theme="dark"] .run-badge[data-s="running"],
+:root[data-theme="dark"] .rec-pill-generated, :root[data-theme="dark"] .cs-added-tag{background:#24365e; color:#d6def0;}
+:root[data-theme="dark"] .pill--you, :root[data-theme="dark"] .run-steps li[data-s="running"]{background:var(--navy-light); color:#fff;}
+/* light boxes */
+:root[data-theme="dark"] .cs-banner, :root[data-theme="dark"] .cs-other-skip, :root[data-theme="dark"] .rec-caveat{background:#332a12; border-color:#57471c; color:#f3dc9b;}
+:root[data-theme="dark"] .cs-draft-banner{background:#1a2440; border-color:#2c3a5c; color:#cfdaf5;}
+:root[data-theme="dark"] .cs-level-guide dd, :root[data-theme="dark"] .cs-hint{color:var(--muted);}
+:root[data-theme="dark"] .cs-other-form{border-color:var(--line-strong);}
+:root[data-theme="dark"] .cs-chip-remove:hover, :root[data-theme="dark"] .cs-chip-remove:focus-visible{background:rgba(255,255,255,.15); color:var(--red-text);}
+:root[data-theme="dark"] .rec-resources.is-loading{background:linear-gradient(90deg, #1f2839 25%, #2a3448 50%, #1f2839 75%); background-size:200% 100%;}
+:root[data-theme="dark"] .results-switch-btn.is-active[value="dummy"]{background:#f5c542; color:#3d2a00;}
+:root[data-theme="dark"] .btn-cancel{background:#4b5468;}
+:root[data-theme="dark"] .btn-cancel:hover{background:#5a6479;}
+/* skill chips in the surveys: the same "deeper = stronger" blue scale, turned for a dark page */
+:root[data-theme="dark"] .cs-chip{--chip-bg:#263048; --chip-border:#3b4560; --chip-fg:var(--ink);}
+:root[data-theme="dark"] .cs-chip[data-level="beginner"]{--chip-bg:#1f3157; --chip-border:#2f4a82; --chip-fg:#dbe4f7;}
+:root[data-theme="dark"] .cs-chip[data-level="intermediate"], :root[data-theme="dark"] .cs-chip[data-level="introduced"]{--chip-bg:#2c4a80; --chip-border:#3c5a99; --chip-fg:#eef2fb;}
+:root[data-theme="dark"] .cs-chip[data-level="advanced"], :root[data-theme="dark"] .cs-chip[data-level="practiced"]{--chip-bg:#4f78c4; --chip-border:#6a8fd4; --chip-fg:#fff;}
+:root[data-theme="dark"] .cs-chip[data-level="expert"], :root[data-theme="dark"] .cs-chip[data-level="applied"]{--chip-bg:#a9c0ef; --chip-border:#c3d4f5; --chip-fg:#0f1a33;}
+:root[data-theme="dark"] .cs-chip .cs-chip-level{background:var(--input-bg); color:var(--ink); border-color:var(--line-strong);}
+:root[data-theme="dark"] .cs-chip .cs-chip-remove:hover, :root[data-theme="dark"] .cs-chip .cs-chip-remove:focus-visible{background:rgba(255,255,255,.2); color:inherit;}
+/* subject tags (Y1S1IT…): same colours, a little dimmer so they don't glare */
+:root[data-theme="dark"] .cs-term-tag--y1, :root[data-theme="dark"] .cs-term-tag--y2{filter:brightness(.88);}
+:root[data-theme="dark"] .about-card{background:var(--card); box-shadow:var(--shadow-card);}
+:root[data-theme="dark"] .cs-term-tag--bscs.cs-term-tag--y3{background:#15803d;}
+:root[data-theme="dark"] .results-switch-btn.is-active[value="student"]{background:#1f7a6f;}
+:root[data-theme="dark"] .reg-steps li{background:#263048; color:var(--muted);}
+:root[data-theme="dark"] .reg-steps li.is-current{background:var(--navy-light); color:#fff;}
