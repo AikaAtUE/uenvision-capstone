@@ -899,3 +899,30 @@ img.sidebar-logo--mark{display:block; width:36px; height:auto; margin:0;}
 .settings-logout p{flex:1 1 100%; margin:0;}
 .settings-logout .btn{display:inline-flex; align-items:center; gap:8px; text-decoration:none;}
 .settings-logout .btn svg{width:18px; height:18px;}
+
+/* ============ Collapsed sidebar on a computer: hidden completely (like GitHub) ============
+   The red top bar then carries ☰, the logo icon and the page name, the same as on phones;
+   ☰ (#nav-open) brings the sidebar back. */
+@media (min-width: 721px){
+  .app-shell:has(> .sidebar.is-collapsed) > .sidebar{display:none;}
+  .content:has(> .mobile-bar) .mobile-bar{display:none;}
+  .app-shell:has(> .sidebar.is-collapsed) .mobile-bar{
+    display:flex; align-items:center; gap:14px; position:sticky; top:0; z-index:25;
+    min-height:70px; background:var(--red); color:#fff; padding:10px 24px;
+  }
+  .app-shell:has(> .sidebar.is-collapsed) .content:has(> .topbar-tools) .mobile-bar{padding-right:84px;}
+  .app-shell:has(> .sidebar.is-collapsed) .content:has(> .topbar-tools):has(> .notif-bell) .mobile-bar{padding-right:132px;}
+  .app-shell:has(> .sidebar.is-collapsed) .mobile-menu-btn{
+    width:44px; height:44px; flex-shrink:0; border-radius:8px; border:1px solid rgba(255,255,255,.4); background:transparent; color:#fff;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .app-shell:has(> .sidebar.is-collapsed) .mobile-menu-btn:hover{background:rgba(255,255,255,.12);}
+  .app-shell:has(> .sidebar.is-collapsed) .mobile-menu-btn svg{width:22px; height:22px;}
+  .app-shell:has(> .sidebar.is-collapsed) .mobile-bar-home{display:inline-flex; flex-shrink:0; align-items:center; justify-content:center;
+    width:40px; height:40px; border-radius:8px; background:#fff;}
+  .app-shell:has(> .sidebar.is-collapsed) img.mobile-bar-logo{width:30px; height:auto; display:block;}
+  .app-shell:has(> .sidebar.is-collapsed) .mobile-bar-title{font-family:var(--font-head); font-weight:700; font-size:1.3rem; letter-spacing:.02em;
+    min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  /* the bar carries the page name, so the page's own red header would repeat it */
+  .app-shell:has(> .sidebar.is-collapsed) .content:has(.mobile-bar-title:not(:empty)) .page-header{display:none;}
+}

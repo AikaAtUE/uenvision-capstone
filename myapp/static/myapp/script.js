@@ -159,6 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
     collapseBtn.setAttribute('aria-label', label);
     collapseBtn.setAttribute('title', label);
     collapseBtn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+    const openBtn = document.getElementById('nav-open');
+    if (openBtn && !isPhone()) openBtn.setAttribute('aria-expanded', closed ? 'false' : 'true');
   }
   if (collapseBtn){
     syncCollapseBtn();
@@ -167,7 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const collapsed = sidebar.classList.toggle('is-collapsed');
       try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {}
       syncCollapseBtn();
-      collapseBtn.focus();
+      // collapsed = the sidebar is gone, so focus moves to ☰ in the top bar
+      const target = collapsed ? navOpen : collapseBtn;
+      if (target) target.focus();
     });
     window.addEventListener('resize', syncCollapseBtn);
   }
@@ -193,7 +197,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (navOpen) { navOpen.setAttribute('aria-expanded', 'false'); navOpen.focus(); }
   }
   if (navOpen && sidebar){
-    navOpen.addEventListener('click', openNav);
+    // Phones: slide the menu in. Computers: the sidebar is hidden completely when collapsed,
+    // and ☰ in the top bar brings it back (remembered).
+    navOpen.addEventListener('click', () => {
+      if (!isPhone() && sidebar.classList.contains('is-collapsed')) {
+        sidebar.classList.remove('is-collapsed');
+        try { localStorage.setItem(COLLAPSE_KEY, '0'); } catch (e) {}
+        syncCollapseBtn();
+        if (collapseBtn) collapseBtn.focus();
+        return;
+      }
+      openNav();
+    });
     if (backdrop) backdrop.addEventListener('click', closeNav);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeNav(); });
   }
