@@ -1,10 +1,12 @@
 {% load static %}
-<header class="pub-header">
+<header class="pub-header{% if user.is_authenticated and survey_first %} pub-header--locked{% endif %}">
   <a href="{% url 'home' %}" class="pub-brand">{% include "_logo.html" with logo_class="pub-logo" %}</a>
   <nav class="pub-nav">
     {% if user.is_authenticated %}
-      <a class="btn btn-ghost btn-sm" href="{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">My dashboard</a>
-      {# Log out is always here, so someone who just registered and is still on their survey can sign out. #}
+      {# Hidden until their initial survey is answered: it would only open the "answer the survey first" pop-up. #}
+      {% if not survey_first %}<a class="btn btn-ghost btn-sm" href="{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">My dashboard</a>{% endif %}
+      {% comment %}Log out is always here, so someone who just registered and is still on their survey can sign out.
+         While the survey isn't done the bar stays at the top of the screen (pub-header--locked).{% endcomment %}
       <a class="btn btn-ghost btn-sm pub-logout" id="logout-btn" href="{% url 'logout' %}">{% include "_icon_logout.html" %}<span>Log out</span></a>
     {% else %}
       <a class="btn btn-ghost btn-sm" href="{% url 'login' %}">Log in</a>

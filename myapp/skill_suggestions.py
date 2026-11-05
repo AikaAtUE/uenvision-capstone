@@ -20,7 +20,7 @@ Subjects a respondent adds themselves get the title matches in the browser
 import time
 from collections import Counter
 
-MAX_SUGGESTIONS = 16
+MAX_SUGGESTIONS = 40   # whole list sent to the page; the skill box shows 16 at a time
 MAX_FROM_FACULTY = 8
 CACHE_SECONDS = 300
 

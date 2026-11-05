@@ -54,6 +54,7 @@ urlpatterns = [
     path("feedback/", views.feedback_view, name="feedback"),
     path("feedback/submit/", views.survey_submit_view, name="survey_submit"),
     path("feedback/later/", views.feedback_later_view, name="feedback_later"),
+    path("feedback/form/<str:key>/", views.feedback_form_save_view, name="feedback_form_save"),
     path("about/", views.about_view, name="about"),
     path("help/", views.help_view, name="help"),
     path("settings/", views.settings_view, name="settings"),

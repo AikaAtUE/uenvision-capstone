@@ -11,17 +11,50 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from ..models import SurveyResponse
-from .. import feedback_nudge
+from .. import feedback_forms, feedback_nudge
 from .common import PH_TIME
 
 
 @login_required
 def feedback_view(request):
     audience = sus_audience(request.user)
+    content = feedback_forms.get_all()   # purposes, instructions and questions (developers can edit them)
     return render(request, "feedback.html", {"active_page": "feedback",
-                                             "sus_first_statement": SUS_FIRST_STATEMENTS[audience],
+                                             "sus_first_statement": content["sus"]["first_statements"][audience],
                                              "uat_audience": uat_audience(request.user),
+                                             "forms": content,
+                                             "can_edit_forms": request.user.is_developer,
                                              "saved_feedback": saved_feedback(request.user)})
+
+
+@login_required
+@require_POST
+def feedback_form_save_view(request, key):
+    """Developers only: save their edit of one Feedback survey's contents ("Edit form"), or
+    {"reset": true} to go back to the original contents. The new contents show for everyone."""
+    from ..models import FeedbackForm
+
+    if not request.user.is_developer:
+        return JsonResponse({"ok": False, "error": "Only developers can edit the feedback forms."}, status=403)
+    if key not in feedback_forms.KEYS:
+        return JsonResponse({"ok": False, "error": "Unknown form."}, status=404)
+    if len(request.body or b"") > 200_000:
+        return JsonResponse({"ok": False, "error": "That is too large."}, status=400)
+    try:
+        body = json.loads(request.body or b"{}")
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Malformed request."}, status=400)
+    if not isinstance(body, dict):
+        return JsonResponse({"ok": False, "error": "Malformed request."}, status=400)
+    if body.get("reset"):
+        FeedbackForm.objects.filter(key=key).delete()
+    else:
+        try:
+            content = feedback_forms.clean(key, body.get("content"))
+        except ValueError as exc:
+            return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+        FeedbackForm.objects.update_or_create(key=key, defaults={"content": content, "updated_by": request.user})
+    return JsonResponse({"ok": True, "content": feedback_forms.get_all()[key]})
 
 
 @login_required
@@ -67,14 +100,8 @@ UAT_AUDIENCES = ("learner", "faculty")
 
 # Statement 1 depends on who is answering. Administrators and developers get the faculty
 # wording, since they use the same staff pages.
-SUS_FIRST_STATEMENTS = {
-    "student": "I would like to use UEnvision to keep me updated on the skills that job postings ask for, "
-               "so I can prepare for them before I graduate.",
-    "alumni": "I would like to use UEnvision to keep me updated on the skills that job postings ask for, "
-              "so I can keep my skills current in my career.",
-    "faculty": "I would like to use UEnvision to keep me updated on the skills that job postings ask for, "
-               "so I can include them in the subjects I teach.",
-}
+# (the default wording; developers can change it on the Feedback page, see feedback_forms.py)
+SUS_FIRST_STATEMENTS = dict(feedback_forms.DEFAULTS["sus"]["first_statements"])
 
 
 def sus_audience(user):

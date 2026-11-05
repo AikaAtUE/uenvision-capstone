@@ -90,6 +90,7 @@
           </tbody>
         </table>
         <p class="chart-source">According to {% if role %}{{ role.postings }} {{ role.label }} job posting{{ role.postings|pluralize }}{% else %}{{ stats.overall.postings }} IT/CS job posting{{ stats.overall.postings|pluralize }}{% endif %} from {{ stats.source_label }} and your survey answers.</p>
+        {% include "_data_updated.html" %}
       </section>
 
       <section class="panel">
@@ -108,6 +109,7 @@
           </tbody>
         </table>
         <p class="chart-source">According to {{ stats.overall.postings }} IT/CS job posting{{ stats.overall.postings|pluralize }} from {{ stats.source_label }} and your survey answers.</p>
+        {% include "_data_updated.html" %}
       </section>
     </div>
 

@@ -94,6 +94,22 @@
     { feature: 'Edit settings', scenario: 'You go to Settings, change your name, and click Save. Your new name should be shown right away in Settings and in the sidebar.' }
   ];
 
+  // The contents developers saved on the Feedback page (feedback_forms.py) replace the lists
+  // above. SUS / UAT keep their number of statements, so only the wording can differ.
+  var CONTENT = {};
+  try { CONTENT = JSON.parse((qs('#feedback-content') || {}).textContent || '{}') || {}; } catch (e) { CONTENT = {}; }
+  function sameLength(list, fallback) {
+    return Array.isArray(list) && list.length === fallback.length ? list.slice() : fallback;
+  }
+  if (CONTENT.sus) SUS_QUESTIONS = sameLength(CONTENT.sus.questions, SUS_QUESTIONS);
+  if (CONTENT.uat) {
+    UAT_QUESTIONS = sameLength(CONTENT.uat.questions_faculty, UAT_QUESTIONS);
+    UAT_QUESTIONS_STUDENT = sameLength(CONTENT.uat.questions_learner, UAT_QUESTIONS_STUDENT);
+  }
+  if (CONTENT.functional && Array.isArray(CONTENT.functional.rows) && CONTENT.functional.rows.length) {
+    FUNCTIONAL_DEFAULT_ROWS = CONTENT.functional.rows.slice();
+  }
+
   var functionalRowCount = 0;
 
   /* ---------- saving ---------- */
@@ -412,7 +428,7 @@
     var form = qs('#functional-form');
     var editor = makeEditable('functional', form, fillFunctional, blankFunctional);
 
-    qs('#functional-add-row').addEventListener('click', function () { addFunctionalRow(); });
+    // (+ Add test case is for developers only and opens Edit form: see initFormEditors)
 
     qs('#functional-rows').addEventListener('click', function (e) {
       if (e.target.classList.contains('ft-remove')) {
@@ -446,6 +462,147 @@
     });
   }
 
+  /* ---------- Developers: "Edit form" (feedback_forms.py, views/feedback.py feedback_form_save_view) ----------
+     Changes the purpose, instructions and statements / test cases of a survey for everyone.
+     SUS and UAT keep their number of statements (their scores depend on it). */
+  function initFormEditors() {
+    var urlPattern = page.dataset.formUrl;
+    if (!urlPattern) return;
+    var openKey = null;
+
+    function area(name, value, label, rows) {
+      return '<label class="field"><span>' + escapeHtml(label) + '</span><textarea data-f="' + name + '" rows="' + (rows || 2) + '">' +
+        escapeHtml(value || '') + '</textarea></label>';
+    }
+    function caseHtml(row, i) {
+      return '<div class="fb-edit-case" data-case>' +
+        '<div class="fb-edit-case-head"><strong>TC-' + String(i + 1).padStart(2, '0') + '</strong>' +
+        '<span class="fb-edit-case-tools">' +
+          '<button type="button" class="link-inline link-inline--sm" data-case-up aria-label="Move up">↑ Up</button>' +
+          '<button type="button" class="link-inline link-inline--sm" data-case-down aria-label="Move down">↓ Down</button>' +
+          '<button type="button" class="link-inline link-inline--sm" data-case-remove>Remove</button>' +
+        '</span></div>' +
+        '<label class="field"><span>Feature</span><input type="text" data-case-feature maxlength="200" value="' + escapeHtml(row.feature || '') + '"></label>' +
+        '<label class="field"><span>Scenario (what the tester does, and what should happen)</span><textarea data-case-scenario rows="3">' + escapeHtml(row.scenario || '') + '</textarea></label>' +
+      '</div>';
+    }
+    function renumber(box) {
+      qsa('[data-case]', box).forEach(function (c, i) { qs('strong', c).textContent = 'TC-' + String(i + 1).padStart(2, '0'); });
+    }
+
+    function build(key, box) {
+      var c = CONTENT[key] || {};
+      var html = '<h3 class="fb-edit-title">Edit form</h3>' +
+        area('purpose', c.purpose, 'Purpose of this survey', 2) + area('instructions', c.instructions, 'Instructions', 3);
+      if (key === 'sus') {
+        var f = c.first_statements || {};
+        html += '<p class="fb-edit-note">Statement 1 is worded for who is answering. The SUS keeps its 6 statements, since the score depends on them.</p>' +
+          area('first_student', f.student, '1. (students)') + area('first_alumni', f.alumni, '1. (alumni)') +
+          area('first_faculty', f.faculty, '1. (faculty, administrators and developers)');
+        (c.questions || []).forEach(function (q, i) { if (i) html += area('q' + i, q, (i + 1) + '.'); });
+      } else if (key === 'uat') {
+        html += '<p class="fb-edit-note">The UAT keeps its 10 statements per group, since the score depends on them.</p><h4>Faculty, administrators and developers</h4>';
+        (c.questions_faculty || []).forEach(function (q, i) { html += area('fac' + i, q, (i + 1) + '.'); });
+        html += '<h4>Students and alumni</h4>';
+        (c.questions_learner || []).forEach(function (q, i) { html += area('lrn' + i, q, (i + 1) + '.'); });
+      } else {
+        html += '<div class="fb-edit-cases">' + (c.rows || []).map(caseHtml).join('') + '</div>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-case-add>+ Add test case</button>';
+      }
+      html += '<p class="form-msg form-msg--error form-error" data-edit-error hidden></p>' +
+        '<div class="fb-actions">' +
+          '<button type="button" class="btn btn-navy" data-edit-save>Save form</button>' +
+          '<button type="button" class="btn btn-ghost" data-edit-cancel>Cancel</button>' +
+          (c.edited ? '<button type="button" class="link-inline" data-edit-reset>Back to the original form</button>' : '') +
+        '</div>';
+      box.innerHTML = html;
+    }
+    function val(box, name) { var el = qs('[data-f="' + name + '"]', box); return el ? el.value : ''; }
+    function collect(key, box) {
+      var c = CONTENT[key] || {};
+      var out = { purpose: val(box, 'purpose'), instructions: val(box, 'instructions') };
+      if (key === 'sus') {
+        out.first_statements = { student: val(box, 'first_student'), alumni: val(box, 'first_alumni'), faculty: val(box, 'first_faculty') };
+        out.questions = (c.questions || []).map(function (q, i) { return i ? val(box, 'q' + i) : out.first_statements.faculty; });
+      } else if (key === 'uat') {
+        out.questions_faculty = (c.questions_faculty || []).map(function (q, i) { return val(box, 'fac' + i); });
+        out.questions_learner = (c.questions_learner || []).map(function (q, i) { return val(box, 'lrn' + i); });
+      } else {
+        out.rows = qsa('[data-case]', box).map(function (card) {
+          return { feature: qs('[data-case-feature]', card).value, scenario: qs('[data-case-scenario]', card).value };
+        });
+      }
+      return out;
+    }
+    function send(key, body, box) {
+      var token = qs('input[name=csrfmiddlewaretoken]', page);
+      var err = qs('[data-edit-error]', box);
+      err.hidden = true;
+      return fetch(urlPattern.replace('KEY', key), {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': token ? token.value : '' },
+        body: JSON.stringify(body)
+      }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (res) {
+        if (!res.ok) { err.textContent = res.error || 'Could not save the form.'; err.hidden = false; return; }
+        // reload so every part of the page uses the new contents, with this survey open
+        window.location.href = window.location.pathname + '?survey=' + key;
+      }).catch(function () { err.textContent = 'Could not reach the server.'; err.hidden = false; });
+    }
+
+    function open(key, addCase) {
+      var box = document.getElementById(key + '-form-editor');
+      if (!box) return;
+      if (openKey && openKey !== key) close(openKey);
+      if (box.hidden) { build(key, box); box.hidden = false; openKey = key; }
+      if (addCase) {
+        var cases = qs('.fb-edit-cases', box);
+        cases.insertAdjacentHTML('beforeend', caseHtml({}, qsa('[data-case]', cases).length));
+        var last = cases.lastElementChild;
+        last.scrollIntoView({ block: 'center' });
+        qs('[data-case-feature]', last).focus();
+      } else {
+        box.scrollIntoView({ block: 'start' });
+      }
+    }
+    function close(key) {
+      var box = document.getElementById(key + '-form-editor');
+      if (box) { box.hidden = true; box.innerHTML = ''; }
+      openKey = null;
+    }
+
+    qsa('[data-form-edit]', page).forEach(function (btn) {
+      btn.addEventListener('click', function () { open(btn.getAttribute('data-form-edit'), btn.hasAttribute('data-form-add')); });
+    });
+    qsa('.fb-form-editor', page).forEach(function (box) {
+      var key = box.id.replace('-form-editor', '');
+      box.addEventListener('click', function (e) {
+        var t = e.target;
+        var card = t.closest && t.closest('[data-case]');
+        if (t.hasAttribute('data-case-add')) {
+          var cases = qs('.fb-edit-cases', box);
+          cases.insertAdjacentHTML('beforeend', caseHtml({}, qsa('[data-case]', cases).length));
+          qs('[data-case-feature]', cases.lastElementChild).focus();
+        } else if (t.hasAttribute('data-case-remove') && card) {
+          card.remove(); renumber(box);
+        } else if (t.hasAttribute('data-case-up') && card && card.previousElementSibling) {
+          card.parentNode.insertBefore(card, card.previousElementSibling); renumber(box);
+        } else if (t.hasAttribute('data-case-down') && card && card.nextElementSibling) {
+          card.parentNode.insertBefore(card.nextElementSibling, card); renumber(box);
+        } else if (t.hasAttribute('data-edit-cancel')) {
+          close(key);
+        } else if (t.hasAttribute('data-edit-save')) {
+          send(key, { content: collect(key, box) }, box);
+        } else if (t.hasAttribute('data-edit-reset')) {
+          var go = function () { send(key, { reset: true }, box); };
+          if (window.UEModal) {
+            window.UEModal.confirm({ message: 'Go back to the original contents of this survey? Your edits to it are removed for everyone.',
+              okLabel: 'Back to the original', cancelLabel: 'Cancel', danger: true }).then(function (yes) { if (yes) go(); });
+          } else { go(); }
+        }
+      });
+    });
+  }
+
   /* ---------- init ---------- */
   qsa('.feedback-item', page).forEach(function (link) {
     link.addEventListener('click', function (e) {
@@ -458,6 +615,8 @@
   initSusForm();
   initUatForm();
   initFunctionalForm();
+
+  initFormEditors();
 
   // ?survey=sus (from the "Help us evaluate UEnvision" banner) opens that survey directly.
   var wanted = new URLSearchParams(window.location.search).get('survey');

@@ -122,7 +122,9 @@
   box-shadow: 0 6px 18px rgba(22,35,63,.12); max-height: 280px; overflow-y: auto;
 }
 .cs-skill-results[hidden] { display: none; }
-.cs-skill-results-head { padding: 7px 12px 4px; font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.cs-skill-results-head { padding: 7px 12px 4px; font-size: .74rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cs-suggest-all { flex: none; border: 1px solid #c8202f; background: #fff; color: #c8202f; border-radius: 999px; padding: 3px 10px; font: inherit; font-size: .72rem; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.cs-suggest-all:hover { background: #c8202f; color: #fff; }
 .cs-skill-result { text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 8px 12px; font: inherit; font-size: .9rem; cursor: pointer; }
 .cs-skill-result:hover, .cs-skill-result.is-active { background: #f3f4f7; }
 .cs-skill-result--new { color: #c8202f; font-weight: 600; }
@@ -279,6 +281,8 @@
 .cs-clear-all { color: var(--red, #c8202f); border-color: currentColor; }
 .cs-clear-all:hover { background: rgba(200, 32, 47, .08); border-color: var(--red, #c8202f); }
 :root[data-theme="dark"] .cs-clear-all { color: #ff8b95; }
+:root[data-theme="dark"] .cs-suggest-all { background: transparent; border-color: #ff8b95; color: #ff8b95; }
+:root[data-theme="dark"] .cs-suggest-all:hover { background: #ff8b95; color: #1a1b20; }
 .cs-submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
 .cs-submit-row [hidden] { display: none; }
 @media (max-width: 480px) {

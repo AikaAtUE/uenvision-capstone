@@ -651,6 +651,8 @@ def my_skills_view(request):
         "keywordSkills": skill_suggestions.keyword_table(),
         "termTags": curriculum_data.subject_term_tags(),
         "saveUrl": reverse("my_skills_save"),
+        # unsaved changes are kept in this browser for the login session (curriculum-survey.js surveyDraft)
+        "draftKey": views._survey_draft_key(request, "my-skills"),
         "skillSearchUrl": reverse("skill_search"),
         "skillAddUrl": reverse("skill_add"),
     }

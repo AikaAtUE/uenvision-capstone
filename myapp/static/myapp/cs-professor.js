@@ -210,8 +210,21 @@
       };
     }, function (d) {
       if (d.consent) writeFields({ 'professor-consent': true }, ['professor-consent']);
-      fillSubjects(d.subjects, true);
-    });
+      if (hasRecord) {
+        // unsaved changes to the saved record: show them instead of the record
+        qsa('.cs-subject-pick', form).forEach(function (c) { c.checked = false; });
+        qsa('.cs-subject-block', blocksWrap).forEach(function (b) { b.remove(); });
+        pickers = {};
+        fillSubjects(d.subjects, false);
+      } else {
+        fillSubjects(d.subjects, true);
+      }
+    }, hasRecord ? {
+      restoredText: 'We filled in the changes you hadn\u2019t saved yet. Press Save changes to keep them.',
+      resetLabel: 'Discard changes',
+      resetQuestion: 'Discard the changes you hadn\u2019t saved? Your saved subjects and skills will be shown again.',
+      statusText: 'Your unsaved changes are kept on this device until you save or log out.'
+    } : null);
 
     window.addEventListener('beforeunload', function (e) {
       if (!dirty) return;
@@ -247,6 +260,11 @@
       if (on && CS.refreshSelectAll) CS.refreshSelectAll();   // a "Select all" with nothing to tick stays off
     }
     if (hasRecord) setEditing(false);
+    if (hasRecord && draft.restored) {
+      // they left while editing: carry on editing where they stopped
+      setEditing(true);
+      markDirty();
+    }
     editBtns.forEach(function (b) {
       b.addEventListener('click', function () {
         setEditing(true);
@@ -262,6 +280,7 @@
           if (statusEl) { statusEl.classList.remove('is-dirty'); statusEl.textContent = savedStatus; }
           setFormError('professor-error', '');
           resetTo(savedRecord);
+          draft.discard();   // the kept unsaved changes go too
           setEditing(false);
           if (editBtns.length) editBtns[editBtns.length - 1].focus();
         };
@@ -312,8 +331,8 @@
         if (saveBtn) saveBtn.textContent = hasRecord ? 'Save changes' : 'Submit survey';
         if (!body || body.ok !== true) return;   // offline fallback: nothing saved on the server
         dirty = false;
-        draft.clear();
         if (body.created) {
+          draft.clear();
           showToast('Thank you! Your subjects and skills were saved. You can edit them here any time.');
           setTimeout(function () { window.location.reload(); }, 1200);
           return;
@@ -321,6 +340,7 @@
         savedRecord = subjects.map(function (s) {
           return { code: s.code, name: s.name, custom: !!s.custom, programs: s.programs || [], skills: s.skills };
         });
+        draft.discard();   // saved: nothing unsaved to keep (later edits are kept again)
         savedStatus = 'Saved just now';
         if (statusEl) { statusEl.classList.remove('is-dirty'); statusEl.textContent = savedStatus; }
         setEditing(false);

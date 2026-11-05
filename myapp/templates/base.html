@@ -43,6 +43,10 @@
 <script src="{% static 'myapp/password-toggle.js' %}?v={% now 'U' %}"></script>
 <script src="{% static 'myapp/welcome-tips.js' %}?v={% now 'U' %}"></script>
 {% if user.is_administrator %}<script src="{% static 'myapp/notif-bell.js' %}?v={% now 'U' %}"></script>{% endif %}
+{% if not user.is_authenticated %}
+{# Logged out (log out, or the session ended): unsaved survey answers kept in this browser go too. #}
+<script>(function(){try{for(var i=localStorage.length-1;i>=0;i--){var k=localStorage.key(i);if(k&&k.indexOf('ue_survey_draft:')===0)localStorage.removeItem(k);}}catch(e){}})();</script>
+{% endif %}
 {% if user.is_authenticated %}
 <script src="{% static 'myapp/idle-timeout.js' %}?v={% now 'U' %}" data-timeout="{{ request.idle_timeout_seconds|default:1800 }}"
         data-ping-url="{% url 'session_ping' %}" data-csrf="{{ csrf_token }}" data-login-url="{% url 'login' %}?timeout=1"></script>

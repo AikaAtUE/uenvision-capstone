@@ -39,7 +39,11 @@
 
     <div class="table-wrap">
       <table id="accounts-table">
-        <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Actions</th></tr></thead>
+        <thead><tr>
+          {# Press a header to sort by it; press it again for the other direction (accounts_view: columns). #}
+          {% for label, url, direction in columns %}<th{% if direction %} aria-sort="{% if direction == 'asc' %}ascending{% else %}descending{% endif %}"{% endif %}><a class="th-sort{% if direction %} is-sorted{% endif %}" href="{{ url }}" title="Sort by {{ label|lower }}{% if direction == 'asc' %} (press again for the other order){% endif %}">{{ label }}<span class="th-sort-arrow" aria-hidden="true">{% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% else %}↕{% endif %}</span></a></th>{% endfor %}
+          <th>Actions</th>
+        </tr></thead>
         <tbody>
         {% for a in accounts %}
           <tr
@@ -54,10 +58,11 @@
             <td>{{ a.pk }}</td>
             <td>{{ a.get_full_name }}{% if a.pk == user.pk %} <span class="pill pill--you">You</span>{% endif %}</td>
             <td>{{ a.email }}</td>
-            <td><span class="pill pill--{{ a.role }}{% if a.is_dummy %} pill--dummy{% endif %}">{{ a.role_label }}</span>{% if not a.is_approved %} <span class="pill pill--pending">Not approved yet</span>{% endif %}{% if not a.email_verified %} <span class="pill pill--unverified">Email not confirmed</span>{% endif %}</td>
+            <td><span class="pill pill--{{ a.role }}{% if a.is_dummy %} pill--dummy{% endif %}">{{ a.role_label }}</span></td>
+            <td class="acct-status">{% if a.role == "faculty" and not a.is_approved %}<span class="pill pill--pending">Not approved yet</span>{% endif %}{% if not a.email_verified %} <span class="pill pill--unverified">Email not confirmed</span>{% endif %}{% if a.email_verified and a.is_approved %}<span class="pill pill--approved">Approved</span>{% elif a.email_verified and a.role != "faculty" %}<span class="pill pill--approved">Approved</span>{% endif %}</td>
             <td>{{ a.date_joined|date:"M j, Y" }}</td>
             <td class="row-actions">
-              {% if not a.is_approved %}<button type="button" class="btn btn-navy btn-sm" data-action="approve">Approve</button>{% endif %}
+              {% if a.role == "faculty" and not a.is_approved %}<button type="button" class="btn btn-navy btn-sm" data-action="approve">Approve</button>{% endif %}
               <button type="button" class="btn btn-ghost btn-sm" data-action="edit">Edit</button>
               {% if a.role == "faculty" %}<button type="button" class="btn btn-ghost btn-sm" data-action="move" title="For a student who signed up as faculty by mistake">Move to Student</button>{% endif %}
               {% if a.is_approved %}<button type="button" class="btn btn-ghost btn-sm" data-action="reset">Reset password</button>{% endif %}
@@ -65,7 +70,7 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="6" class="muted">No accounts match.</td></tr>
+          <tr><td colspan="7" class="muted">No accounts match.</td></tr>
         {% endfor %}
         </tbody>
       </table>

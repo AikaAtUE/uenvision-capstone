@@ -4,7 +4,7 @@
 {% block page_content %}
 {# If you add a URL named 'survey_submit', responses are POSTed there; otherwise they are kept in the browser only. #}
 {% url 'survey_submit' as survey_submit_url %}
-<section class="page is-active" id="page-feedback" data-submit-url="{{ survey_submit_url }}">
+<section class="page is-active" id="page-feedback" data-submit-url="{{ survey_submit_url }}"{% if can_edit_forms %} data-form-url="{% url 'feedback_form_save' 'KEY' %}"{% endif %}>
   <header class="page-header"><h1>Feedback</h1></header>
   <div class="page-body page-body--photo">
 
@@ -36,8 +36,15 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel">
         <h2 class="section-title">System Usability Scale (SUS) evaluation</h2>
-        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> to measure how easy UEnvision is to use. The System Usability Scale is a standard 10-question test that gives UEnvision a usability score from 0 to 100.</div>
-        <p class="muted survey-desc">For each statement, choose how much you agree, from 1 (Strongly disagree), 2 (Disagree), 3 (Neutral), 4 (Agree) to 5 (Strongly agree).</p>
+        {% if can_edit_forms %}
+        <div class="fb-form-admin">
+          <button type="button" class="btn btn-ghost btn-sm" data-form-edit="sus">Edit form</button>
+          <span class="muted">Developers only: change this survey's purpose, instructions and statements. Saved changes show for everyone.{% if forms.sus.edited %} Last edited{% if forms.sus.updated_by %} by {{ forms.sus.updated_by }}{% endif %}.{% endif %}</span>
+        </div>
+        <div class="fb-form-editor" id="sus-form-editor" hidden></div>
+        {% endif %}
+        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> <span data-form-text="sus.purpose">{{ forms.sus.purpose }}</span></div>
+        <p class="muted survey-desc" data-form-text="sus.instructions">{{ forms.sus.instructions }}</p>
         <form id="sus-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
@@ -65,8 +72,15 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel">
         <h2 class="section-title">User Acceptance Testing survey</h2>
-        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> to check whether UEnvision meets the needs of its users (students, alumni and faculty) and is acceptable for use at UE, based on your own experience with it.</div>
-        <p class="muted survey-desc">Tell us how you felt about using UEnvision. For each statement, choose how much you agree, from 1 (Strongly disagree), 2 (Disagree), 3 (Neutral), 4 (Agree) to 5 (Strongly agree). There are no right or wrong answers.</p>
+        {% if can_edit_forms %}
+        <div class="fb-form-admin">
+          <button type="button" class="btn btn-ghost btn-sm" data-form-edit="uat">Edit form</button>
+          <span class="muted">Developers only: change this survey's purpose, instructions and statements. Saved changes show for everyone.{% if forms.uat.edited %} Last edited{% if forms.uat.updated_by %} by {{ forms.uat.updated_by }}{% endif %}.{% endif %}</span>
+        </div>
+        <div class="fb-form-editor" id="uat-form-editor" hidden></div>
+        {% endif %}
+        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> <span data-form-text="uat.purpose">{{ forms.uat.purpose }}</span></div>
+        <p class="muted survey-desc" data-form-text="uat.instructions">{{ forms.uat.instructions }}</p>
         <form id="uat-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
@@ -95,8 +109,15 @@
       <button class="link-inline survey-back" type="button" data-back>&larr; Back to surveys</button>
       <div class="panel survey-panel survey-panel--wide">
         <h2 class="section-title">Functional test case sheet</h2>
-        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> to confirm that every feature of UEnvision works as it should. Your results show the team which parts work and which need fixing.</div>
-        <p class="muted survey-desc">A functional test checks that each part of UEnvision does what it is supposed to do. For each test case, do what the scenario says, then answer whether it happened as expected. If it didn't, write what happened instead. Comments or remarks about your experience are welcome on any test case.</p>
+        {% if can_edit_forms %}
+        <div class="fb-form-admin">
+          <button type="button" class="btn btn-ghost btn-sm" data-form-edit="functional">Edit form</button>
+          <span class="muted">Developers only: change this survey's purpose, instructions and test cases. Saved changes show for everyone.{% if forms.functional.edited %} Last edited{% if forms.functional.updated_by %} by {{ forms.functional.updated_by }}{% endif %}.{% endif %}</span>
+        </div>
+        <div class="fb-form-editor" id="functional-form-editor" hidden></div>
+        {% endif %}
+        <div class="survey-purpose" role="note"><strong>Purpose of this survey:</strong> <span data-form-text="functional.purpose">{{ forms.functional.purpose }}</span></div>
+        <p class="muted survey-desc" data-form-text="functional.instructions">{{ forms.functional.instructions }}</p>
         <form id="functional-form" novalidate>
           {% csrf_token %}
           <p class="muted survey-answering">Answering as <strong>{{ user.get_full_name }}</strong> ({{ user.role_label }}).</p>
@@ -107,7 +128,8 @@
           </div>
           <fieldset class="fb-fieldset" id="functional-fields">
           <div class="ft-list" id="functional-rows"></div>
-          <button type="button" class="btn btn-ghost btn-sm" id="functional-add-row">+ Add test case</button>
+          {# Test cases are part of the sheet everyone answers: only developers add them (it opens Edit form). #}
+          {% if can_edit_forms %}<button type="button" class="btn btn-ghost btn-sm" id="functional-add-row" data-form-edit="functional" data-form-add="1">+ Add test case</button>{% endif %}
           </fieldset>
 
           <p class="form-msg form-msg--error form-error" id="functional-error" hidden></p>
@@ -124,5 +146,6 @@
 {% endblock %}
 {% block extra_js %}
 {{ saved_feedback|json_script:"saved-feedback" }}
+{{ forms|json_script:"feedback-content" }}
 <script src="{% static 'myapp/survey.js' %}?v={% now 'U' %}"></script>
 {% endblock %}

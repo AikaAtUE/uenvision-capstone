@@ -105,6 +105,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'myapp.context_processors.admin_notifications',
+                'myapp.context_processors.skills_data_updated',
                 'myapp.feedback_nudge.banner',
                 'myapp.middleware.survey_first_context',
             ],

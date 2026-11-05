@@ -4,16 +4,54 @@
 {% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/public.css' %}?v={% now 'U' %}">{% endblock %}
 {% block content %}
 {% include "_public_header.html" %}
-<main class="pub-main">
+{% comment %}Homepage: first a short introduction to UEnvision (the landing section), then, when they scroll
+   down, the top skills charts. Picking a program or job role reloads the page at the charts (#top-skills).{% endcomment %}
+<section class="land" aria-labelledby="land-title">
+  <div class="land-inner">
+    <div class="land-copy">
+      <p class="land-eyebrow">University of the East · College of Computer Studies and Systems</p>
+      <h1 id="land-title">Know the skills the IT job market wants, and how ready UE is for them.</h1>
+      <p class="land-lede">UEnvision is a curriculum mapping system. It reads real job postings for IT and Computer Science roles, finds the technical skills employers ask for most, and compares them with what UE's BSIT and BSCS subjects teach. Students and alumni see their own skill gap; faculty see where the curriculum can grow.</p>
+      <div class="land-actions">
+        <a class="btn btn-red land-btn" href="{% url 'check_gap' %}">Check your skill gap</a>
+        <a class="btn land-btn land-btn--ghost" href="#top-skills">See today's top skills</a>
+      </div>
+    </div>
+    {% if stats.exists %}
+    <div class="land-card" aria-label="UEnvision at a glance">
+      <p class="land-card-label">Right now in the data</p>
+      <div class="land-stat"><span class="land-stat-num">{{ stats.overall.postings }}</span><span class="land-stat-text">IT and CS job postings read</span></div>
+      {% with top=stats.overall.skills.0 %}{% if top %}
+      <div class="land-stat"><span class="land-stat-num">{{ top.skill }}</span><span class="land-stat-text">most asked-for skill, in {{ top.pct }}% of postings</span></div>
+      {% endif %}{% endwith %}
+      <div class="land-stat"><span class="land-stat-num">{{ stats.roles|length }}</span><span class="land-stat-text">job roles to compare</span></div>
+      <ol class="land-mini" aria-hidden="true">
+        {% for s in stats.overall.skills|slice:":4" %}<li><span>{{ s.skill }}</span><i style="width:{{ s.bar }}%"></i></li>{% endfor %}
+      </ol>
+    </div>
+    {% endif %}
+  </div>
+
+  <ol class="land-steps">
+    <li><span class="land-step-num">1</span><div><strong>Collect job postings</strong><p>Public IT and CS job postings from Philippine job boards.</p></div></li>
+    <li><span class="land-step-num">2</span><div><strong>Find the skills</strong><p>The technical skills each posting asks for are extracted and counted.</p></div></li>
+    <li><span class="land-step-num">3</span><div><strong>Compare with the curriculum</strong><p>Survey answers from students, alumni and faculty show which skills UE already covers.</p></div></li>
+    <li><span class="land-step-num">4</span><div><strong>Close the gap</strong><p>Your skill gap, plus learning and training resources for the missing skills.</p></div></li>
+  </ol>
+
+  <a class="land-scroll" href="#top-skills"><span>Scroll to see the top skills</span><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+</section>
+
+<main class="pub-main" id="top-skills">
   <section class="pub-hero">
-    <h1>What skills do IT and CS employers want right now?</h1>
-    <p>UEnvision reads real job postings for IT and Computer Science roles and lists the technical skills they ask for most. Pick a job role to see its own top skills, then check how your skills compare.</p>
+    <h2 class="pub-hero-title">What skills do IT and CS employers want right now?</h2>
+    <p>Pick a job role to see its own top skills, then check how your skills compare.</p>
   </section>
 
   {% if not stats.exists %}
     <div class="panel"><p class="empty-note">No job-market data has been collected yet. Please check back soon.</p></div>
   {% else %}
-  <form class="pub-role-form" method="get" action="{% url 'home' %}">
+  <form class="pub-role-form" method="get" action="{% url 'home' %}#top-skills">
     <label class="select-field"><span>Program</span>
       <select name="program" id="program-select" onchange="this.form.submit()">
         <option value="">Computer Science and IT</option>
@@ -45,6 +83,7 @@
         {% endfor %}
       </ol>
       <p class="chart-source">According to {{ stats.role.postings }} {{ stats.role.label }} job posting{{ stats.role.postings|pluralize }} from {{ stats.source_label }}.</p>
+      {% include "_data_updated.html" %}
     </section>
     {% endif %}
     <section class="panel">
@@ -60,6 +99,7 @@
         {% endfor %}
       </ol>
       <p class="chart-source">According to {{ stats.overall.postings }} {% if stats.program %}{{ stats.program }}{% else %}IT/CS{% endif %} job posting{{ stats.overall.postings|pluralize }} from {{ stats.source_label }}.</p>
+      {% include "_data_updated.html" %}
     </section>
   </div>
   <p class="muted pub-foot">Job postings are collected from public job boards (Kalibrr) for academic research at the University of the East – CCSS. Gemini marks which postings are tech jobs and whether they fit Computer Science or Information Technology graduates. Role groups come from job titles, so small roles are based on only a few postings.</p>

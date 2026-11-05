@@ -63,6 +63,7 @@ from .pages import (  # noqa: F401
 )
 from .feedback import (  # noqa: F401
     feedback_view,
+    feedback_form_save_view,
     feedback_later_view,
     MAX_SURVEY_ROWS,
     SUS_VERSION,

@@ -1,8 +1,9 @@
 /* UEnvision — "show password" eye button on every password box (log in, sign up, register,
    reset password, Settings > Change password, Accounts > Add account).
    Each <input type="password"> is wrapped in .pw-wrap with a type="button" toggle after it,
-   so pressing it never submits the form. The button says what it will do in aria-label
-   ("Show password" / "Hide password") and aria-pressed tells screen readers the state. */
+   so pressing it never submits the form. The icon shows the CURRENT state (crossed-out eye
+   while the password is hidden, open eye while it is shown); aria-label / title say what a
+   click does ("Show password" / "Hide password") and aria-pressed tells screen readers the state. */
 (function () {
   'use strict';
   var EYE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
@@ -10,7 +11,7 @@
 
   function setState(btn, input, shown) {
     input.type = shown ? 'text' : 'password';
-    btn.innerHTML = shown ? EYE_OFF : EYE;
+    btn.innerHTML = shown ? EYE : EYE_OFF;   // the icon shows the current state: crossed-out eye = hidden
     btn.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
     btn.setAttribute('title', shown ? 'Hide password' : 'Show password');
     btn.setAttribute('aria-pressed', shown ? 'true' : 'false');

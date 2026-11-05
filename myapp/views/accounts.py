@@ -66,7 +66,8 @@ ROLE_FILTERS = {
 STATE_FILTERS = {
     "": ("Any status", {}),
     "approved": ("Approved", {"is_approved": True, "is_active": True}),
-    "pending": ("Not approved yet", {"is_approved": False}),
+    # Only faculty sign-ups wait for approval (students, alumni and staff never do).
+    "pending": ("Not approved yet", {"is_approved": False, "role": CustomUser.Role.FACULTY}),
     "unverified": ("Email not confirmed", {"email_verified": False}),
     "inactive": ("Deactivated", {"is_active": False}),
 }
@@ -88,16 +89,32 @@ LEGACY_STATUS = {
 }
 
 
-# Sort options on the Accounts page: value -> (label, order_by fields)
+# Sort options on the Accounts page: value -> (label, order_by fields). The table's column
+# headers use these too (press a header to sort by it, press again for the other direction).
 ACCOUNT_SORTS = {
     "": ("Not approved yet first", ("is_approved", "last_name", "first_name")),
     "name": ("Name (A–Z)", ("last_name", "first_name")),
     "-name": ("Name (Z–A)", ("-last_name", "-first_name")),
     "-joined": ("Newest first", ("-date_joined", "-pk")),
     "joined": ("Oldest first", ("date_joined", "pk")),
-    "role": ("Role", ("role", "is_dummy", "last_name", "first_name")),
-    "email": ("Email", ("email",)),
+    "role": ("Role (A–Z)", ("role", "is_dummy", "last_name", "first_name")),
+    "-role": ("Role (Z–A)", ("-role", "-is_dummy", "last_name", "first_name")),
+    "email": ("Email (A–Z)", ("email",)),
+    "-email": ("Email (Z–A)", ("-email",)),
+    "id": ("ID (lowest first)", ("pk",)),
+    "-id": ("ID (highest first)", ("-pk",)),
+    "status": ("Status (needs action first)", ("is_approved", "email_verified", "last_name", "first_name")),
+    "-status": ("Status (approved first)", ("-is_approved", "-email_verified", "last_name", "first_name")),
 }
+# Sortable column headers: (label, sort value for ascending, sort value for descending)
+ACCOUNT_COLUMNS = [
+    ("ID", "id", "-id"),
+    ("Name", "name", "-name"),
+    ("Email", "email", "-email"),
+    ("Role", "role", "-role"),
+    ("Status", "status", "-status"),
+    ("Joined", "joined", "-joined"),
+]
 
 
 @administrator_required
@@ -130,6 +147,17 @@ def accounts_view(request):
     chips += [(STATE_FILTERS[state][0], without("state"))] if state else []
     chips += [(KIND_FILTERS[kind][0], without("kind"))] if kind else []
     chips += [(f"Sorted: {ACCOUNT_SORTS[sort][0]}", without("sort"))] if sort else []
+
+    def with_sort(value):
+        rest = {k: v for k, v in current.items() if v and k != "sort"}
+        if value:
+            rest["sort"] = value
+        return reverse("accounts") + ("?" + urlencode(rest) if rest else "")
+    # (label, link, "asc" / "desc" / "") per header: the first press sorts ascending, the next descending
+    columns = []
+    for label, asc, desc in ACCOUNT_COLUMNS:
+        direction = "asc" if sort == asc else "desc" if sort == desc else ""
+        columns.append((label, with_sort(desc if direction == "asc" else asc), direction))
     return render(request, "accounts.html", {
         "active_page": "accounts",
         "accounts": accounts,
@@ -145,7 +173,8 @@ def accounts_view(request):
         "kind_choices": [(v, label) for v, (label, _) in KIND_FILTERS.items()],
         "sort": sort,
         "sort_choices": [(v, label) for v, (label, _) in ACCOUNT_SORTS.items()],
-        "pending_count": CustomUser.objects.filter(is_approved=False).count(),
+        "columns": columns,
+        "pending_count": CustomUser.objects.filter(**STATE_FILTERS["pending"][1]).count(),
         "total_count": CustomUser.objects.count(),
         "roles": ACCOUNT_TYPES,
         "min_password_length": MIN_PASSWORD_LENGTH,
@@ -221,13 +250,15 @@ def account_edit_view(request, pk):
         where = "dummy (test) data" if dummy_now else "the real results"
         if moved:
             notes.append(f"{moved} survey answer{'' if moved == 1 else 's'} moved to {where}.")
+    if target.role != CustomUser.Role.FACULTY and not target.is_approved:
+        # only faculty sign-ups wait for approval: any other role is approved, so the
+        # "faculty sign-up not approved yet" notice never counts a student (or staff)
+        target.is_approved = True
+        data["is_approved"] = True
+        notifications.mark_read_about(target)
     if old_role == CustomUser.Role.FACULTY and target.is_learner:
         # faculty changed to Student / Alumni here: their Professor Survey answers go with them
         moved = move_faculty_answers_to_learner(target, target.role)
-        if not target.is_approved:
-            target.is_approved = True
-            data["is_approved"] = True
-            notifications.mark_read_about(target)
         if moved:
             notes.append(f"Professor Survey answer{'' if moved == 1 else 's'} moved to the {target.get_role_display()} Survey.")
     if target.role_label != old_label:

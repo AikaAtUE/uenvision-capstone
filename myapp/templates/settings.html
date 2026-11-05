@@ -6,6 +6,9 @@
   <div class="page-body">
     {% include "_messages.html" %}
     {% if user.must_change_password %}<p class="flash flash--error" role="status">You're using a temporary password. Choose your own password below to keep using UEnvision.</p>{% endif %}
+    {# Two columns on wide screens (settings-grid), one column on phones and small laptops. #}
+    <div class="settings-grid">
+    <div class="settings-col">
     <h2 class="section-title">Account settings</h2>
     {% if edit_account %}
     <form class="settings-card account-form" method="post" action="{% url 'update_account' %}">
@@ -76,6 +79,15 @@
       </div>
     </div>
 
+    {# Log out is also here (computer and phone), not only at the bottom of the menu. #}
+    <h2 class="section-title settings-section-gap" id="log-out">Account</h2>
+    <form class="settings-card settings-logout" method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <p class="muted">Signed in as <strong>{{ user.email }}</strong>.</p>
+      <button type="submit" class="btn btn-red" id="settings-logout">{% include "_icon_logout.html" %}<span>Log out</span></button>
+    </form>
+    </div>
+    <div class="settings-col">
     {% if user.is_administrator %}
     <h2 class="section-title settings-section-gap" id="notification-settings">Notifications</h2>
     <form class="settings-card" method="post" action="{% url 'notification_settings' %}">
@@ -119,13 +131,8 @@
       <button type="submit" class="btn btn-navy">Update password</button>
     </form>
 
-    {# Log out is also here (computer and phone), not only at the bottom of the menu. #}
-    <h2 class="section-title settings-section-gap" id="log-out">Account</h2>
-    <form class="settings-card settings-logout" method="post" action="{% url 'logout' %}">
-      {% csrf_token %}
-      <p class="muted">Signed in as <strong>{{ user.email }}</strong>.</p>
-      <button type="submit" class="btn btn-red" id="settings-logout">{% include "_icon_logout.html" %}<span>Log out</span></button>
-    </form>
+    </div>
+    </div>
   </div>
 </section>
 {% endblock %}

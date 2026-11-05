@@ -188,15 +188,33 @@
   /* ---------- unfinished answers (like Google Forms) ----------
      A logged-in user answering a survey for the first time gets their answers
      kept in this browser as they go, under BOOT.draftKey (views.py sets it only
-     then, so editing a saved record never uses it). Opening the survey again
-     fills them back in; submitting clears them.
+     and, for a saved Professor Survey, while editing it). Opening the survey again in the same
+     login session fills them back in; submitting, logging out or the session ending clears them.
      snapshot() returns the answers as plain JSON; restore(answers) puts them
      back on the page. Returns { clear } for the submit handler. */
   var DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-  function surveyDraft(form, snapshot, restore) {
+  // Keys look like ue_survey_draft:<survey>:<account>:<login session>. Unsaved answers only last
+  // for the login session they were typed in, so drafts of this account and survey kept under an
+  // older session are removed (log out / the login page clear them all, see login.html).
+  function clearOldDrafts(key) {
+    var parts = String(key).split(':');
+    if (parts.length < 4) return;
+    var prefix = parts.slice(0, 3).join(':') + ':';
+    try {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (k && k !== key && k.indexOf(prefix) === 0) localStorage.removeItem(k);
+      }
+    } catch (e) { /* storage blocked */ }
+  }
+
+  // opts (optional, for editing a saved record): restoredText / resetLabel / resetQuestion for the
+  // "we filled in ..." note, and statusText for the line under the Save button.
+  function surveyDraft(form, snapshot, restore, opts) {
+    opts = opts || {};
     var key = BOOT.draftKey;
-    if (!key) return { clear: function () {} };
+    if (!key) return { clear: function () {}, discard: function () {}, restored: false };
     var timer = null, restoring = false, stopped = false;
 
     var status = document.createElement('p');
@@ -211,7 +229,7 @@
       if (restoring || stopped) return;
       try {
         localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), answers: snapshot() }));
-        status.textContent = 'Your answers are saved on this device until you submit.';
+        status.textContent = opts.statusText || 'Your answers are saved on this device until you submit.';
       } catch (e) { /* storage full or blocked: the survey still works, just without a draft */ }
     }
     function saveSoon() {
@@ -220,26 +238,27 @@
       timer = setTimeout(save, 400);
     }
 
-    var saved = null;
+    var saved = null, restored = false;
+    clearOldDrafts(key);
     try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { saved = null; }
     if (saved && saved.answers && Date.now() - (saved.savedAt || 0) < DRAFT_MAX_AGE_MS) {
       restoring = true;
-      try { restore(saved.answers); } catch (e) { /* a draft from an older version of the survey */ }
+      try { restore(saved.answers); restored = true; } catch (e) { /* a draft from an older version of the survey */ }
       restoring = false;
       var note = document.createElement('div');
       note.className = 'cs-banner cs-draft-banner';
-      note.innerHTML = '<span>We filled in the answers you started earlier. Pick up where you left off.</span>' +
-        '<button type="button" class="link-inline cs-draft-reset">Start over</button>';
+      note.innerHTML = '<span>' + escapeHtml(opts.restoredText || 'We filled in the answers you started earlier. Pick up where you left off.') + '</span>' +
+        '<button type="button" class="link-inline cs-draft-reset">' + escapeHtml(opts.resetLabel || 'Start over') + '</button>';
       form.insertBefore(note, form.firstChild);
       qs('.cs-draft-reset', note).addEventListener('click', function () {
-        askFirst('Clear the answers you started and begin again?', 'Start over').then(function (yes) {
+        askFirst(opts.resetQuestion || 'Clear the answers you started and begin again?', opts.resetLabel || 'Start over').then(function (yes) {
           if (!yes) return;
           stopped = true;
           try { localStorage.removeItem(key); } catch (e) {}
           window.location.reload();
         });
       });
-      status.textContent = 'Your answers are saved on this device until you submit.';
+      status.textContent = opts.statusText || 'Your answers are saved on this device until you submit.';
     } else if (saved) {
       try { localStorage.removeItem(key); } catch (e) {}
     }
@@ -251,6 +270,7 @@
     window.addEventListener('pagehide', function () { if (timer) save(); });
 
     return {
+      restored: restored,
       clear: function () {
         stopped = true;
         clearTimeout(timer);
@@ -353,6 +373,9 @@
      Student/Alumni, I/P/A for Professor. With a single option there is no
      select. Returns an API object the caller uses to read the chosen skills. */
   var MAX_LOCAL_MATCHES = 8;
+  // Suggestions shown at once in an empty skill box. The subject's list is longer: picking a
+  // skill (or "Select all shown") brings up the next ones, and typing searches the whole list.
+  var MAX_SHOWN_SUGGESTIONS = 16;
 
   function buildSkillPicker(container, suggestedNames, levelOptions, idPrefix, initial) {
     // The suggestion list is positioned against .cs-skill-picker; without it the list was placed
@@ -447,12 +470,16 @@
       });
       // an exact name/synonym match first, then the subject's own suggestions, then the rest of the search
       server.filter(function (r) { return r.exact; }).forEach(function (r) { push(r.name); });
-      suggestedNames.filter(function (n) { return !low || n.toLowerCase().indexOf(low) !== -1; })
-        .slice(0, low ? MAX_LOCAL_MATCHES : suggestedNames.length).forEach(push);
+      suggestedNames.filter(function (n) { return !isChosen(n) && (!low || n.toLowerCase().indexOf(low) !== -1); })
+        .slice(0, low ? MAX_LOCAL_MATCHES : MAX_SHOWN_SUGGESTIONS).forEach(push);
       server.forEach(function (r) { push(r.name); });
 
       var html = '';
-      if (!low && names.length) html += '<div class="cs-skill-results-head">Suggested for this subject</div>';
+      if (!low && names.length) {
+        html += '<div class="cs-skill-results-head"><span>Suggested for this subject</span>' +
+          (names.length > 1 ? '<button type="button" class="cs-suggest-all" tabindex="-1" data-suggest-all="1">Select all shown (' + names.length + ')</button>' : '') +
+          '</div>';
+      }
       html += names.map(function (n) {
         var alias = aliases[n.toLowerCase()];
         return '<button type="button" class="cs-skill-result" role="option" tabindex="-1" data-name="' + escapeHtml(n) + '">' + escapeHtml(n) +
@@ -519,8 +546,22 @@
         if (last) { last.remove(); container.dispatchEvent(new Event('change', { bubbles: true })); }
       }
     });
+    /* "Select all shown": adds only the suggestions on screen right now (not the whole list),
+       without a level, so the respondent still picks a level for each one. The list then
+       shows the next suggestions, if any. */
+    function selectAllShown() {
+      var names = optionButtons().map(function (b) { return b.getAttribute('data-name'); }).filter(Boolean);
+      names.forEach(function (n) { addChip(n, '', true); });
+      if (!names.length) return;
+      container.dispatchEvent(new Event('change', { bubbles: true }));
+      showToast('Added ' + names.length + ' skill' + (names.length === 1 ? '' : 's') +
+        (askLevel ? '. Choose a level for each one.' : '.'));
+      render('', null);
+    }
+
     // mousedown (not click) so the input doesn't blur and close the list first
     resultsBox.addEventListener('mousedown', function (e) {
+      if (e.target.closest('[data-suggest-all]')) { e.preventDefault(); selectAllShown(); return; }
       var b = e.target.closest('.cs-skill-result');
       if (!b) return;
       e.preventDefault();

@@ -730,20 +730,24 @@ class SurveyDraftKeyTests(IsolatedDataMixin, TestCase):
         user = CustomUser.objects.create_user(email="s@ue.edu.ph", password="secret123", first_name="S",
                                               last_name="T", role=CustomUser.Role.STUDENT)
         self.client.force_login(user)
-        self.assertEqual(self.boot("student_survey")["draftKey"], f"ue_survey_draft:student:{user.pk}")
+        self.assertTrue(self.boot("student_survey")["draftKey"].startswith(f"ue_survey_draft:student:{user.pk}:"))
         alumnus = CustomUser.objects.create_user(email="a@ue.edu.ph", password="secret123", first_name="A",
                                                  last_name="T", role=CustomUser.Role.ALUMNI)
         self.client.force_login(alumnus)
-        self.assertEqual(self.boot("alumni_survey")["draftKey"], f"ue_survey_draft:alumni:{alumnus.pk}")
+        self.assertTrue(self.boot("alumni_survey")["draftKey"].startswith(f"ue_survey_draft:alumni:{alumnus.pk}:"))
 
     def test_professor_draft_only_before_the_first_answer(self):
         prof = CustomUser.objects.create_user(email="p@ue.edu.ph", password="secret123", first_name="P",
                                               last_name="C", role=CustomUser.Role.FACULTY)
         self.client.force_login(prof)
-        self.assertEqual(self.boot("professor_survey")["draftKey"], f"ue_survey_draft:professor:{prof.pk}")
+        first = self.boot("professor_survey")
+        self.assertTrue(first["draftKey"].startswith(f"ue_survey_draft:professor:{prof.pk}:"))   # + this login session
+        self.assertFalse(first["draftIsEdit"])
         self.client.post(reverse("professor_survey_submit"), content_type="application/json", data=json.dumps(
             {"consent": True, "subjects": [{"code": "CCP 1101", "skills": [{"name": "Python", "level": "applied"}]}]}))
-        self.assertIsNone(self.boot("professor_survey")["draftKey"])   # editing the saved record: no draft
+        edit = self.boot("professor_survey")   # editing the saved record keeps its own draft (unsaved edits)
+        self.assertTrue(edit["draftKey"].startswith(f"ue_survey_draft:professor-edit:{prof.pk}:"))
+        self.assertTrue(edit["draftIsEdit"])
 
 
 class SurveyInstructionsTests(IsolatedDataMixin, TestCase):

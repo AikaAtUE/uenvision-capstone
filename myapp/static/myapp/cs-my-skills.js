@@ -173,6 +173,35 @@
     render(saved);
     setEditing(false);
 
+    // Unsaved changes are kept in this browser until they are saved, cancelled or the login ends
+    // (curriculum-survey.js surveyDraft). Coming back to the page fills them in, still editing.
+    function currentState() {
+      return {
+        subjects: qsa('.ms-subject', list).map(function (block) {
+          var code = block.getAttribute('data-code');
+          var out = { code: code, name: custom[code] ? custom[code].name : (names[code] || ''), skills: pickers[code] ? pickers[code].collect() : [] };
+          if (custom[code]) { out.custom = true; out.programs = custom[code].programs; }
+          return out;
+        }),
+        overall: overallPicker ? overallPicker.collect() : saved.overall
+      };
+    }
+    var draft = CS.surveyDraft ? CS.surveyDraft(form, function () {
+      return editing ? currentState() : null;
+    }, function (d) {
+      if (!d || !Array.isArray(d.subjects)) throw new Error('not a My subjects & skills draft');
+      render({ subjects: d.subjects, overall: d.overall || [] });
+    }, {
+      restoredText: 'We filled in the changes you hadn\u2019t saved yet. Press Save changes to keep them.',
+      resetLabel: 'Discard changes',
+      resetQuestion: 'Discard the changes you hadn\u2019t saved? Your saved subjects and skills will be shown again.',
+      statusText: 'Your unsaved changes are kept on this device until you save or log out.'
+    }) : { restored: false, discard: function () {}, clear: function () {} };
+    if (draft.restored) {
+      setEditing(true);
+      markDirty();
+    }
+
     editBtn.addEventListener('click', function () {
       setEditing(true);
       statusEl.textContent = 'Editing: press Save changes when you are done.';
@@ -181,6 +210,7 @@
 
     cancelBtn.addEventListener('click', function () {
       var back = function () {
+        draft.discard();
         stopEditing(saved);
         statusEl.textContent = savedStatus;
         setFormError('ms-error', '');
@@ -276,6 +306,7 @@
           }),
           overall: payload.overall_skills || saved.overall
         };
+        draft.discard();
         stopEditing(saved);
         savedStatus = 'Saved just now';
         statusEl.textContent = savedStatus;

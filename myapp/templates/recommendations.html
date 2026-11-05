@@ -78,6 +78,7 @@
     </p>
     {% endif %}
 
+    {% if gap.exists %}{% include "_data_updated.html" %}{% endif %}
     {% if not gap.exists %}
       <p class="empty-note">No extracted job-market data yet. An administrator can create it on Data → Extract Skills.</p>
     {% elif not under_taught %}

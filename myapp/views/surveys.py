@@ -298,7 +298,13 @@ def _survey_draft_key(request, survey):
     to someone else using the same browser; None turns drafts off."""
     if not request.user.is_authenticated:
         return None
-    return f"ue_survey_draft:{survey}:{request.user.pk}"
+    # The last part ties the draft to this login session: unsaved answers last only as long as
+    # the login (curriculum-survey.js drops drafts from older sessions; log out clears them all).
+    import hashlib
+    if not request.session.session_key:
+        request.session.save()
+    session_tag = hashlib.sha256(request.session.session_key.encode()).hexdigest()[:12]
+    return f"ue_survey_draft:{survey}:{request.user.pk}:{session_tag}"
 
 
 def _learner_survey_gate(request, kind):
@@ -421,8 +427,10 @@ def professor_survey_view(request):
                   for subj in data.get("subjects") or [] if isinstance(subj, dict) and subj.get("code")]
     consent_at = data.get("consent_at") or (current.created_at.isoformat() if current and data.get("consent") else None)
     bootstrap = {
-        # drafts only for a first answer: editing a saved record keeps its "Unsaved changes" warning
-        "draftKey": _survey_draft_key(request, "professor") if current is None else None,
+        # unfinished answers are kept for a first answer, and unsaved changes while editing the
+        # saved record (its own draft, cleared when the changes are saved or cancelled)
+        "draftKey": _survey_draft_key(request, "professor" if current is None else "professor-edit"),
+        "draftIsEdit": current is not None,
         "currentSemLabel": period["current_label"],
         "previousSemLabel": period["previous_sem_label"],
         "previousSummerLabel": period["previous_summer_label"],

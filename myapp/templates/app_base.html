@@ -140,6 +140,10 @@
         </a>
         <span class="mobile-bar-title"></span>
       </div>
+      {% comment %}Notes for this account (test account, evaluation reminder, first-visit tips). They go just under
+         the page's red header (the script after the page puts them there), so the theme and bell icons in the
+         top-right corner always sit on the red header, not on one of these bars.{% endcomment %}
+      <div class="app-banners" id="app-banners">
       {% if user.is_dummy %}<p class="dummy-banner" role="note"><strong>Test account.</strong> Your survey answers are saved as dummy data and don't count in the real results. Overall results you see here come from dummy answers only.</p>{% endif %}
       {% if feedback_nudge %}
       <div class="feedback-nudge" role="note">
@@ -151,12 +155,18 @@
       </div>
       {% endif %}
       {# First visit (per account, per browser): what each menu item does. welcome-tips.js shows it. #}
-      <div class="welcome-tips" id="welcome-tips" data-key="ue_welcome_seen:{{ user.pk }}" role="note" hidden>
+      <div class="welcome-tips" id="welcome-tips" data-key="ue_welcome_seen:{{ user.pk }}" data-page="{{ active_page }}" role="note" hidden>
         <p><strong>Welcome to UEnvision!</strong> Here is what each page in the menu does. Point at a menu item any time to see its description again, or open <a class="link-inline" href="{% url 'help' %}">How to use</a> for the full guide.</p>
         <ul class="welcome-tips-list" id="welcome-tips-list"></ul>
         <button type="button" class="btn btn-navy btn-sm" id="welcome-tips-ok">Got it</button>
       </div>
+      </div>
       {% block page_content %}{% endblock %}
+      <script>(function () {
+        var bars = document.getElementById('app-banners');
+        var header = bars && document.querySelector('.content .page-header');
+        if (header) header.insertAdjacentElement('afterend', bars);
+      })();</script>
     </main>
   </div>
 </section>

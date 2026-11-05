@@ -67,3 +67,63 @@
 .reg-form .cs-privacy { margin-top: 4px; }
 .reg-h { font-size: 1rem; margin: 10px 0 2px; }
 
+
+/* Students / alumni who registered but haven't answered their survey yet are kept on the survey
+   page: the bar with Log out stays at the top of the screen while they scroll (phones too). */
+.pub-header--locked{position:sticky; top:0; z-index:40;}
+.pub-header--locked .pub-logout{font-weight:700;}
+
+/* ============ Homepage introduction (landing section above the top skills charts) ============ */
+html{scroll-behavior:smooth;}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
+.land{position:relative; overflow:hidden; color:#fff; padding:56px 20px 28px;
+  background:
+    radial-gradient(1000px 420px at 85% -10%, rgba(200,32,47,.55), transparent 60%),
+    radial-gradient(800px 380px at -10% 110%, rgba(60,90,153,.55), transparent 60%),
+    linear-gradient(160deg, #16233f 0%, #101a30 100%);
+  min-height:calc(100vh - 69px); display:flex; flex-direction:column; justify-content:center;}
+.land::after{content:""; position:absolute; inset:0; pointer-events:none; opacity:.08;
+  background-image:linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px);
+  background-size:44px 44px; mask-image:linear-gradient(180deg, #000 0%, transparent 85%); -webkit-mask-image:linear-gradient(180deg, #000 0%, transparent 85%);}
+.land > *{position:relative; z-index:1;}
+.land-inner{max-width:1100px; width:100%; margin:0 auto; display:grid; grid-template-columns:1.25fr .9fr; gap:40px; align-items:center;}
+.land-eyebrow{margin:0 0 14px; font-size:.78rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#ffb3ba;}
+.land h1{font-family:var(--font-head); font-size:clamp(1.9rem, 4.2vw, 3.1rem); line-height:1.08; letter-spacing:-.01em; margin:0 0 18px; color:#fff;}
+.land-lede{margin:0 0 26px; font-size:1.05rem; line-height:1.65; color:rgba(255,255,255,.82); max-width:620px;}
+.land-actions{display:flex; flex-wrap:wrap; gap:12px;}
+.land-btn{text-decoration:none; padding:12px 20px; font-size:.95rem;}
+.land-btn--ghost{background:transparent; color:#fff; border:1px solid rgba(255,255,255,.45);}
+.land-btn--ghost:hover{background:rgba(255,255,255,.1);}
+.land-card{background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.16); border-radius:18px; padding:22px 22px 18px;
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); box-shadow:0 20px 50px rgba(0,0,0,.25);}
+.land-card-label{margin:0 0 12px; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.6);}
+.land-stat{display:flex; flex-direction:column; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.1);}
+.land-stat-num{font-family:var(--font-head); font-size:1.6rem; font-weight:700; line-height:1.15; overflow-wrap:anywhere;}
+.land-stat-text{font-size:.85rem; color:rgba(255,255,255,.7);}
+.land-mini{list-style:none; margin:14px 0 0; padding:0; display:grid; gap:8px;}
+.land-mini li{display:grid; grid-template-columns:90px 1fr; align-items:center; gap:10px; font-size:.78rem; color:rgba(255,255,255,.75);}
+.land-mini li span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.land-mini i{display:block; height:8px; border-radius:4px; background:linear-gradient(90deg, #c8202f, #ff6b78);}
+.land-steps{list-style:none; max-width:1100px; width:100%; margin:44px auto 0; padding:0; display:grid; grid-template-columns:repeat(4, 1fr); gap:14px;}
+.land-steps li{display:flex; gap:12px; align-items:flex-start; padding:14px; border-radius:14px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);}
+.land-steps strong{display:block; font-size:.92rem; margin-bottom:4px;}
+.land-steps p{margin:0; font-size:.82rem; line-height:1.45; color:rgba(255,255,255,.7);}
+.land-step-num{flex:none; width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:.85rem; background:#c8202f; color:#fff;}
+.land-scroll{margin:28px auto 0; display:flex; flex-direction:column; align-items:center; gap:2px; color:rgba(255,255,255,.75);
+  text-decoration:none; font-size:.82rem;}
+.land-scroll svg{animation:land-bob 1.8s ease-in-out infinite;}
+.land-scroll:hover{color:#fff;}
+@keyframes land-bob{0%,100%{transform:translateY(0);} 50%{transform:translateY(5px);}}
+@media (prefers-reduced-motion: reduce){ .land-scroll svg{animation:none;} }
+#top-skills{scroll-margin-top:12px;}
+.pub-hero-title{font-size:1.6rem; line-height:1.2; margin-bottom:8px;}
+@media (max-width: 900px){
+  .land{min-height:auto; padding:40px 16px 24px;}
+  .land-inner{grid-template-columns:1fr; gap:28px;}
+  .land-steps{grid-template-columns:1fr 1fr;}
+}
+@media (max-width: 560px){
+  .land-steps{grid-template-columns:1fr;}
+  .land-actions .land-btn{flex:1 1 100%; text-align:center;}
+}

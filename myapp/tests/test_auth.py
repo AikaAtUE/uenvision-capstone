@@ -206,7 +206,7 @@ class ForgotPasswordTests(TestCase):
         from django.core import mail
         r = self.client.post(reverse("forgot_password"), {"email": "paeng@UE.edu.ph"})   # any letter case
         self.assertContains(r, "emailed it a link to reset")
-        self.assertEqual(mail.outbox[0].to, ["Paeng@ue.edu.ph"])
+        self.assertEqual(mail.outbox[0].to, ["paeng@ue.edu.ph"])   # emails are saved in lowercase
         link = mail.outbox[0].body.split("http://testserver", 1)[1].split()[0]
         self.assertContains(self.client.get(link), "Choose a new password")
         r = self.client.post(link, {"password": "short", "password2": "short"})

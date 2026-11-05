@@ -96,6 +96,18 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
 
+    def save(self, *args, **kwargs):
+        # Emails are not case-sensitive: every way an account is made or changed (sign-up,
+        # register, Google, Accounts, Settings) ends up here, so they are all saved in lowercase.
+        if self.email:
+            self.email = self.email.strip().lower()
+        # Only faculty sign-ups wait for an administrator's approval; every other role is approved.
+        if self.role != self.Role.FACULTY and not self.is_approved:
+            self.is_approved = True
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = set(kwargs["update_fields"]) | {"is_approved"}
+        super().save(*args, **kwargs)
+
     @property
     def is_administrator(self):
         """Administrators and developers: full access to every admin page."""
@@ -252,3 +264,17 @@ class ProfilePhoto(models.Model):
     data = models.BinaryField()
     content_type = models.CharField(max_length=20)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class FeedbackForm(models.Model):
+    """A developer's edited copy of one Feedback page survey's contents (purpose, instructions,
+    questions / test cases). No row = the defaults in feedback_forms.py are used."""
+
+    key = models.CharField(max_length=20, unique=True)   # "sus", "uat" or "functional"
+    content = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+
+    def __str__(self):
+        return f"Feedback form: {self.key}"

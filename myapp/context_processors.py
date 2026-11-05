@@ -35,3 +35,26 @@ def admin_notifications(request):
         context["dev_learner_view"] = dev_learner_view(request)
         context["dev_student_view"] = bool(context["dev_learner_view"])
     return context
+
+
+# Time zone the "Data last updated" line is shown in (the server itself runs in UTC).
+DISPLAY_TIME_ZONE = "Asia/Manila"
+
+
+def skills_data_updated(request):
+    """{"skills_data_updated": "Nov 4, 2026, 3:12 PM"} for the line under every top skills chart
+    (_data_updated.html): when the extracted skills data was last written by Extract Skills or
+    Import Data. Empty when there is no data yet."""
+    from zoneinfo import ZoneInfo
+
+    from .pipeline import manager as pipeline
+
+    try:
+        when = pipeline.skills_data_updated()
+    except OSError:
+        when = None
+    if when is None:
+        return {}
+    local = when.astimezone(ZoneInfo(DISPLAY_TIME_ZONE))
+    hour = local.strftime("%I").lstrip("0") or "12"
+    return {"skills_data_updated": f"{local:%b} {local.day}, {local.year}, {hour}:{local:%M} {local:%p}"}

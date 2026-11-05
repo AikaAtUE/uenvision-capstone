@@ -78,6 +78,7 @@
         <div class="source-key" id="bar-source-key" hidden></div>
         <div class="bars bars--wide" id="bar-chart" aria-live="polite"></div>
         <p class="chart-source" id="src-top"></p>
+        {% include "_data_updated.html" %}
       </div>
 
       <div class="tab-panel" id="tab-skill-trends">
@@ -89,6 +90,7 @@
         <div class="trend-legend" id="trend-key"></div>
         <p class="muted" id="trend-note"></p>
         <p class="chart-source" id="src-trend"></p>
+        {% include "_data_updated.html" %}
       </div>
 
       <div class="tab-panel" id="tab-skill-gaps">
@@ -124,6 +126,7 @@
           {% endif %}
           <p class="muted" id="gap-note"></p>
           <p class="chart-source" id="src-gap"></p>
+          {% include "_data_updated.html" %}
         </div>
       </div>
     </div>

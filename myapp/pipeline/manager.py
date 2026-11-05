@@ -80,6 +80,17 @@ def extracted_csv() -> Path:
     return data_dir() / "extracted_skills.csv"
 
 
+def skills_data_updated():
+    """When the skills data the charts read was last written (the last Extract Skills run or
+    Import Data that wrote extracted_skills.csv), as an aware datetime, or None if there is none.
+    Only the file's time is read: the counts always come from the datasets as they are."""
+    from datetime import datetime, timezone as dt_timezone
+    path = extracted_csv()
+    if not path.is_file():
+        return None
+    return datetime.fromtimestamp(path.stat().st_mtime, tz=dt_timezone.utc)
+
+
 def ontology_dir() -> Path:
     return data_dir() / "ontology"
 
