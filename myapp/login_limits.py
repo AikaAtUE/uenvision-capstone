@@ -16,9 +16,11 @@ import time
 
 from django.core.cache import cache
 
-MAX_PER_EMAIL = 5
-MAX_PER_IP = 20
-WINDOW_SECONDS = 15 * 60
+MAX_PER_EMAIL = 20
+# Must stay above MAX_PER_EMAIL: otherwise one account's 20 wrong passwords would also pause
+# every other account on that computer (or on a shared campus connection) at the same moment.
+MAX_PER_IP = 50
+WINDOW_SECONDS = 30
 
 
 def client_ip(request):
@@ -60,6 +62,10 @@ def clear_email(email):
 
 
 def message(seconds):
-    minutes = max(1, math.ceil(seconds / 60))
-    return (f"Too many login attempts. Try again in {minutes} minute{'' if minutes == 1 else 's'}, "
-            "or use Forgot password.")
+    seconds = max(1, math.ceil(seconds))
+    if seconds < 60:
+        wait = f"{seconds} second{'' if seconds == 1 else 's'}"
+    else:
+        minutes = math.ceil(seconds / 60)
+        wait = f"{minutes} minute{'' if minutes == 1 else 's'}"
+    return f"Too many login attempts. Try again in {wait}, or use Forgot password."

@@ -101,7 +101,9 @@
         '<button type="button" class="ms-remove-subject" aria-label="Remove ' + escapeHtml(code) + '">Remove subject</button></div>' +
         '<div class="cs-skill-picker"></div>';
       if (isNew) list.insertBefore(block, list.firstChild); else list.appendChild(block);
-      pickers[code] = buildSkillPicker(qs('.cs-skill-picker', block), skillsFor('', code), levelSet, blockId, skills || []);
+      var suggested = skillsFor('', code);
+      if (!suggested.length && customInfo && CS.titleSuggestions) suggested = CS.titleSuggestions(customInfo.name || name);
+      pickers[code] = buildSkillPicker(qs('.cs-skill-picker', block), suggested, levelSet, blockId, skills || []);
       if (isNew) {
         block.classList.add('is-new');
         block.scrollIntoView({ block: 'nearest' });

@@ -80,7 +80,8 @@
         '</div>'
       );
       var block = document.getElementById(blockId);
-      var api = buildSkillPicker(qs('.cs-skill-picker', block), extra.custom ? [] : skillsFor('', code), IPA_LEVELS, blockId, skills || []);
+      var suggested = extra.custom ? (CS.titleSuggestions ? CS.titleSuggestions(name) : []) : skillsFor('', code);
+      var api = buildSkillPicker(qs('.cs-skill-picker', block), suggested, IPA_LEVELS, blockId, skills || []);
       pickers[code] = { api: api, name: name, programs: extra.programs || [], code: code,
                         termLabel: extra.termLabel || '', bucket: extra.bucket || '', custom: !!extra.custom };
       return block;

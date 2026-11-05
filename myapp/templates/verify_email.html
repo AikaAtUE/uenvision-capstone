@@ -50,8 +50,8 @@
         {% else %}
           <label class="field"><span>Your email</span><input type="email" name="email" autocomplete="email" required></label>
         {% endif %}
-        {% if wait %}<p class="form-msg">Please wait a minute before asking for another email.</p>{% endif %}
-        <button type="submit" class="btn btn-navy btn-block">Send the email again</button>
+        {% if wait %}<p class="form-msg">Please wait {{ resend_wait|default:30 }} seconds before asking for another email.</p>{% endif %}
+        <button type="submit" class="btn btn-navy btn-block"{% if email %} data-countdown="{{ resend_wait|default:30 }}" data-label="Send the email again"{% endif %}>Send the email again</button>
       </form>
       <p class="auth-foot"><a class="link-inline" href="{% url 'login' %}">Back to log in</a></p>
       {% endif %}
@@ -59,3 +59,4 @@
   </div>
 </section>
 {% endblock %}
+{% block extra_js %}{% load static %}<script src="{% static 'myapp/resend-countdown.js' %}?v={% now 'U' %}"></script>{% endblock %}

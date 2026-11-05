@@ -20,8 +20,9 @@ def dashboard_view(request):
     from ..student_views import latest_response
 
     if _sees_student_view(request):
+        from ..context_processors import dev_learner_view
         from ..student_views import render_student_dashboard
-        return render_student_dashboard(request, active_page="dashboard")
+        return render_student_dashboard(request, active_page="dashboard", as_kind=dev_learner_view(request))
     feedback_nudge.record_use(request.user)
     return render(request, "dashboard.html", {"active_page": "dashboard",
                                               "has_professor_record": latest_response(request.user) is not None})
@@ -178,8 +179,9 @@ def recommendations_view(request):
     separate POST (recommendations_generate_view) so simply opening this page never
     spends API quota."""
     if _sees_student_view(request):
+        from ..context_processors import dev_learner_view
         from ..student_views import render_student_dashboard
-        return render_student_dashboard(request, active_page="recommendations")
+        return render_student_dashboard(request, active_page="recommendations", as_kind=dev_learner_view(request))
     feedback_nudge.record_use(request.user)
     cached = recommendations.load_recommendations()
     subject_value = _subject_code(request.GET.get("subject", ""))
@@ -242,15 +244,16 @@ def recommendations_download_view(request):
 @administrator_required
 @require_POST
 def developer_results_view(request):
-    """The developer switches: Real / Dummy results ("results") and Faculty / Student view
-    ("view"). Each button sends only its own switch, so the other one keeps its setting."""
+    """The developer switches: Real / Dummy results ("results") and Faculty / Student / Alumni
+    view ("view"). Each button sends only its own switch, so the other one keeps its setting."""
     from ..context_processors import DEV_DUMMY_VIEW_KEY, DEV_STUDENT_VIEW_KEY
     if not request.user.is_developer:
         raise PermissionDenied
     if "results" in request.POST:
         request.session[DEV_DUMMY_VIEW_KEY] = request.POST.get("results") == "dummy"
     if "view" in request.POST:
-        request.session[DEV_STUDENT_VIEW_KEY] = request.POST.get("view") == "student"
+        view = request.POST.get("view")
+        request.session[DEV_STUDENT_VIEW_KEY] = view if view in ("student", "alumni") else ""
     next_url = request.POST.get("next")
     if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         return redirect(next_url)

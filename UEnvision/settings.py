@@ -226,6 +226,12 @@ LOGGING = {
     'disable_existing_loggers': False,
     'handlers': {'console': {'class': 'logging.StreamHandler'}},
     'root': {'handlers': ['console'], 'level': 'WARNING'},
+    # Account emails: every reset / confirmation email sent (or why not) shows in the server log
+    # (journalctl -u uenvision).
+    'loggers': {
+        'myapp.email_verification': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'myapp.views.auth': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
 }
 
 # Cache (failed-login counts, "wait a minute" limits on emails). Kept in the database so the

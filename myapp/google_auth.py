@@ -95,10 +95,8 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
                 f"There is no UEnvision account for {email or 'that Google account'} yet. "
                 "Students and fresh graduates: press Check your skill gap to register first. "
                 "Faculty: sign up first, then you can use Continue with Google.")
-        if pending.get("role") != "alumni" and not is_ue_email(email):
-            messages.error(request, f"Please choose your UE Google account (ending in @{UE_EMAIL_DOMAIN}). "
-                                    f"{email or 'That account'} is not a UE email.")
-            raise ImmediateHttpResponse(redirect(reverse("register") + f"?as={pending.get('role', 'student')}"))
+        # Any Google account works for students too (no @ue.edu.ph requirement any more);
+        # Google has already confirmed they own the address.
 
     def save_user(self, request, sociallogin, form=None):
         from .models import CustomUser

@@ -45,8 +45,8 @@ def _sees_dummy_results(request):
 def _sees_student_view(request):
     """Developers test both sides: with the Faculty / Student view switch on Student, the
     Dashboard and Recommendations show the student / alumni skill gap page instead."""
-    from ..context_processors import DEV_STUDENT_VIEW_KEY
-    return request.user.is_developer and bool(request.session.get(DEV_STUDENT_VIEW_KEY))
+    from ..context_processors import dev_learner_view
+    return bool(dev_learner_view(request))
 
 
 def _safe_json(obj):

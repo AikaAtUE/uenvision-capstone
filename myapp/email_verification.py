@@ -20,7 +20,8 @@ from .models import CustomUser
 
 log = logging.getLogger(__name__)
 
-RESEND_WAIT_SECONDS = 60
+# How long before the same address can be sent another confirmation / reset email.
+RESEND_WAIT_SECONDS = 30
 
 
 class EmailVerificationTokenGenerator(PasswordResetTokenGenerator):
@@ -98,6 +99,7 @@ def send_password_reset_email(request, user):
     except Exception:
         log.exception("Could not send the password reset email to %s", user.email)
         return False
+    log.info("Sent a password reset email to %s", user.email)
     return True
 
 
@@ -109,6 +111,15 @@ def reset_user_from_link(uidb64, token):
     return user if default_token_generator.check_token(user, token) else None
 
 
+def _reset_key(email):
+    return "reset-email-sent:" + email.strip().lower()
+
+
 def reset_rate_limited(email):
-    """True if a reset email went to this address in the last minute (and starts the clock if not)."""
-    return not cache.add("reset-email-sent:" + email.strip().lower(), True, RESEND_WAIT_SECONDS)
+    """True if a reset email went to this address in the last RESEND_WAIT_SECONDS (and starts the clock if not)."""
+    return not cache.add(_reset_key(email), True, RESEND_WAIT_SECONDS)
+
+
+def release_reset_limit(email):
+    """Sending failed: let them try again right away instead of waiting for nothing."""
+    cache.delete(_reset_key(email))

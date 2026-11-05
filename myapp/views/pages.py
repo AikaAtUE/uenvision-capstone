@@ -12,7 +12,6 @@ from ..models import MIN_PASSWORD_LENGTH, ProfilePhoto
 from .. import email_verification
 from .accounts import _clean_account_fields
 from .common import home_url_for
-from .surveys import UE_EMAIL_DOMAIN, _is_ue_email
 
 
 @login_required
@@ -64,8 +63,6 @@ def update_account_view(request):
     """Settings > Account settings: change your own name and email."""
     user = request.user
     data, error = _clean_account_fields(request.POST, exclude_pk=user.pk)
-    if not error and user.is_learner and not _is_ue_email(data["email"]):
-        error = f"Please use your UE email address (ending in @{UE_EMAIL_DOMAIN})."
     if error:
         messages.error(request, error)
         return redirect(reverse("settings") + "?edit=1")

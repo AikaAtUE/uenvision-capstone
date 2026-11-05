@@ -1,3 +1,4 @@
+import logging
 from urllib.parse import urlencode
 
 
@@ -17,6 +18,8 @@ from .. import email_verification, notifications
 from .. import login_limits
 from ..google_auth import google_enabled
 from .common import home_url_for
+
+log = logging.getLogger(__name__)
 
 
 def login_view(request):
@@ -154,7 +157,7 @@ def send_my_verification_view(request):
     if user.email_verified:
         messages.success(request, "Your email is already confirmed.")
     elif not email_verification.can_resend(user.email):
-        messages.error(request, "We just sent you a link. Please wait a minute before asking for another one.")
+        messages.error(request, f"We just sent you a link. Please wait {email_verification.RESEND_WAIT_SECONDS} seconds before asking for another one.")
     elif email_verification.send_verification_email(request, user):
         messages.success(request, f"We sent a confirmation link to {user.email}. Check your spam or junk folder too.")
     else:
@@ -191,13 +194,19 @@ def forgot_password_view(request):
         validate_email(email)
     except ValidationError:
         return render(request, "forgot_password.html", {"error": "Enter a valid email address.", "email": email})
+    ctx = {"sent": True, "email": email, "resend_wait": email_verification.RESEND_WAIT_SECONDS}
     if email_verification.reset_rate_limited(email):
-        return render(request, "forgot_password.html", {"sent": True, "email": email, "wait": True})
-    user = CustomUser.objects.filter(email__iexact=email, is_active=True).first()
-    if user is not None:
-        email_verification.send_password_reset_email(request, user)
+        return render(request, "forgot_password.html", {**ctx, "wait": True})
+    # Any active account with this address, whatever the capitals, including accounts made with
+    # Google (no password of their own yet: the link lets them set one).
+    user = CustomUser.objects.filter(email__iexact=email, is_active=True).order_by("pk").first()
+    if user is None:
+        log.info("Password reset asked for %s: no active account with that email", email)
+    elif not email_verification.send_password_reset_email(request, user):
+        # already logged with the error; don't make them wait to try again
+        email_verification.release_reset_limit(email)
     # Same answer whether or not the account exists, so this can't be used to look up emails.
-    return render(request, "forgot_password.html", {"sent": True, "email": email})
+    return render(request, "forgot_password.html", {**ctx, "resent": request.POST.get("resend") == "1"})
 
 
 def reset_password_view(request):

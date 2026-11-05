@@ -139,7 +139,7 @@ class EmailVerificationTests(TestCase):
         self.client.post(reverse("resend_verification"), {"email": "stu@ue.edu.ph"})
         self.assertEqual(len(mail.outbox), 1)
         r = self.client.post(reverse("resend_verification"), {"email": "stu@ue.edu.ph"})
-        self.assertContains(r, "wait a minute")
+        self.assertContains(r, "Please wait 30 seconds")
         self.assertEqual(len(mail.outbox), 1)
         r = self.client.post(reverse("resend_verification"), {"email": "nobody@ue.edu.ph"})
         self.assertContains(r, "If <strong>nobody@ue.edu.ph</strong> has an account")
@@ -152,7 +152,7 @@ class EmailVerificationTests(TestCase):
         user.save()
         self.client.force_login(user)
         self.assertContains(self.client.get(reverse("settings") + "?edit=1"), 'name="email" value="stu@ue.edu.ph"')
-        r = self.client.post(reverse("update_account"), {"first_name": "S", "last_name": "T", "email": "gmail@example.com"})
+        r = self.client.post(reverse("update_account"), {"first_name": "S", "last_name": "T", "email": "not-an-email"})
         self.assertRedirects(r, reverse("settings") + "?edit=1", fetch_redirect_response=False)
         user.refresh_from_db()
         self.assertEqual(user.email, "stu@ue.edu.ph")
@@ -228,7 +228,7 @@ class ForgotPasswordTests(TestCase):
         from django.core import mail
         self.client.post(reverse("forgot_password"), {"email": "paeng@ue.edu.ph"})
         r = self.client.post(reverse("forgot_password"), {"email": "paeng@ue.edu.ph"})
-        self.assertContains(r, "wait a minute")
+        self.assertContains(r, "Please wait 30 seconds")
         self.assertEqual(len(mail.outbox), 1)
 
     def test_old_reset_address_redirects(self):
@@ -243,12 +243,18 @@ class LoginLimitTests(TestCase):
     def attempt(self, email="limit@ue.edu.ph", password="wrong-password", ip="10.0.0.1"):
         return self.client.post(reverse("login"), {"email": email, "password": password}, REMOTE_ADDR=ip)
 
-    def test_five_wrong_passwords_pause_that_email(self):
-        for _ in range(5):
+    def test_limits(self):
+        from .. import login_limits
+        self.assertEqual((login_limits.MAX_PER_EMAIL, login_limits.WINDOW_SECONDS), (20, 30))
+        self.assertGreater(login_limits.MAX_PER_IP, login_limits.MAX_PER_EMAIL)
+
+    def test_twenty_wrong_passwords_pause_that_email_for_30_seconds(self):
+        for _ in range(19):
             self.assertEqual(self.attempt().status_code, 200)
+        self.assertEqual(self.attempt().status_code, 200)   # the 20th is still answered normally
         resp = self.attempt(password="right-password1")
         self.assertEqual(resp.status_code, 429)
-        self.assertContains(resp, "Too many login attempts. Try again in 15 minutes", status_code=429)
+        self.assertContains(resp, "Too many login attempts. Try again in 30 seconds", status_code=429)
         self.assertNotIn("_auth_user_id", self.client.session)
         # from another computer too (it's the account that is paused)
         self.assertEqual(self.attempt(password="right-password1", ip="10.0.0.2").status_code, 429)
@@ -261,33 +267,33 @@ class LoginLimitTests(TestCase):
 
         from .. import login_limits
 
-        for _ in range(5):
+        for _ in range(20):
             self.attempt()
         later = login_limits.time.time() + login_limits.WINDOW_SECONDS + 1
         with mock.patch.object(login_limits.time, "time", return_value=later):
             self.assertRedirects(self.attempt(password="right-password1"), reverse("dashboard"))
 
     def test_successful_login_resets_the_count(self):
-        for _ in range(4):
+        for _ in range(19):
             self.attempt()
         self.assertRedirects(self.attempt(password="right-password1"), reverse("dashboard"))
         self.client.logout()
-        for _ in range(4):
+        for _ in range(19):
             self.assertEqual(self.attempt().status_code, 200)
 
     def test_same_message_for_emails_without_an_account(self):
-        for _ in range(5):
+        for _ in range(20):
             self.attempt("nobody@ue.edu.ph")
         self.assertContains(self.attempt("nobody@ue.edu.ph"), "Too many login attempts", status_code=429)
 
-    def test_twenty_failures_from_one_computer_pause_it(self):
-        for i in range(20):
+    def test_fifty_failures_from_one_computer_pause_it(self):
+        for i in range(50):
             self.attempt(f"guess{i}@ue.edu.ph")
         self.assertEqual(self.attempt(password="right-password1").status_code, 429)
         self.assertRedirects(self.attempt(password="right-password1", ip="10.0.0.9"), reverse("dashboard"))
 
     def test_nginx_real_ip_header_is_used(self):
-        for i in range(20):
+        for i in range(50):
             self.client.post(reverse("login"), {"email": f"g{i}@ue.edu.ph", "password": "x"},
                              REMOTE_ADDR="127.0.0.1", HTTP_X_REAL_IP="203.0.113.5")
         blocked = self.client.post(reverse("login"), {"email": "limit@ue.edu.ph", "password": "right-password1"},
@@ -302,7 +308,7 @@ class LoginLimitTests(TestCase):
         from django.utils.encoding import force_bytes
         from django.utils.http import urlsafe_base64_encode
 
-        for _ in range(5):
+        for _ in range(20):
             self.attempt()
         uid = urlsafe_base64_encode(force_bytes(self.user.pk))
         url = reverse("reset_password_confirm", args=[uid, default_token_generator.make_token(self.user)])
@@ -346,7 +352,7 @@ class KeepFormInputsTests(IsolatedDataMixin, TestCase):
 
     def test_paused_login_with_fetch(self):
         ajax = {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"}
-        for _ in range(5):
+        for _ in range(20):
             self.client.post(reverse("login"), {"email": "keep@ue.edu.ph", "password": "wrong"}, **ajax)
         r = self.client.post(reverse("login"), {"email": "keep@ue.edu.ph", "password": "right-password1"}, **ajax)
         self.assertEqual(r.status_code, 429)

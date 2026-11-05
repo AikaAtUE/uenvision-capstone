@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from ..models import (CustomUser, CurriculumSurveyResponse)
 from .. import curriculum_data
 from .. import ontology
+from .. import skill_suggestions
 from .common import _safe_json
 
 
@@ -38,7 +39,7 @@ MAX_SKILLS_PER_SUBJECT = 30
 
 
 MAX_JSON_BODY_BYTES = 200_000
-UE_EMAIL_DOMAIN = "ue.edu.ph"  # students/alumni must use their UE email (subdomains allowed)
+UE_EMAIL_DOMAIN = "ue.edu.ph"  # no longer required of anyone; kept for the old helpers below
 
 
 def _is_ue_email(value):
@@ -161,9 +162,8 @@ def _clean_target_role(payload):
 
 
 def _ue_email_error(payload):
-    if not _is_ue_email(str(payload["personal_info"].get("ue_email") or "").strip()):
-        return f"Please use your UE email address (ending in @{UE_EMAIL_DOMAIN})."
-    return None
+    """Any valid email address is fine (students no longer need a @ue.edu.ph one)."""
+    return _email_error(payload)
 
 
 def _email_error(payload):
@@ -356,7 +356,8 @@ def student_survey_view(request):
         "eligibility": curriculum_data.build_student_eligibility(period["slot"]),
         "knownCodes": sorted(curriculum_data.subject_by_code()),
         "targetRole": _target_role(request),
-        "skills": ontology.subject_skill_map(),
+        "skills": skill_suggestions.ranked_subject_skill_map(),   # ordering only (skill_suggestions.py)
+        "keywordSkills": skill_suggestions.keyword_table(),
         "termTags": curriculum_data.subject_term_tags(),
         "submitUrl": reverse("student_survey_submit"),
         "skillSearchUrl": reverse("skill_search"),
@@ -386,7 +387,8 @@ def alumni_survey_view(request):
         "knownCodes": sorted(curriculum_data.subject_by_code()),
         "targetRole": _target_role(request),
         "ueEmailDomain": UE_EMAIL_DOMAIN,
-        "skills": ontology.subject_skill_map(),
+        "skills": skill_suggestions.ranked_subject_skill_map(),   # ordering only (skill_suggestions.py)
+        "keywordSkills": skill_suggestions.keyword_table(),
         "termTags": curriculum_data.subject_term_tags(),
         "submitUrl": reverse("alumni_survey_submit"),
         "skillSearchUrl": reverse("skill_search"),
@@ -428,7 +430,8 @@ def professor_survey_view(request):
         "knownCodes": sorted(by_code),
         "record": record,
         "consented": bool(consent_at),
-        "skills": ontology.subject_skill_map(),
+        "skills": skill_suggestions.ranked_subject_skill_map(),   # ordering only (skill_suggestions.py)
+        "keywordSkills": skill_suggestions.keyword_table(),
         "termTags": curriculum_data.subject_term_tags(),
         "submitUrl": reverse("professor_survey_submit"),
         "skillSearchUrl": reverse("skill_search"),

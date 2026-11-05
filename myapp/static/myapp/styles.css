@@ -692,7 +692,6 @@ a.btn { text-decoration: none; }
 .topbar-btn .icon-sun{display:none;}
 :root[data-theme="dark"] .topbar-btn .icon-sun{display:block;}
 :root[data-theme="dark"] .topbar-btn .icon-moon{display:none;}
-.topbar-logout{display:none;}
 /* keep page titles and the banners above them clear of the tools */
 .content:has(> .topbar-tools) .page-header{padding-right:84px;}
 .content:has(> .topbar-tools):has(> .notif-bell) .page-header{padding-right:132px;}
@@ -706,9 +705,8 @@ a.btn { text-decoration: none; }
   .topbar-tools{position:fixed; top:10px; right:14px;}
   .content:has(> .notif-bell) .topbar-tools{right:60px;}
   .topbar-btn{background:transparent; border:1px solid rgba(255,255,255,.4); border-radius:8px;}
-  .topbar-logout{display:inline-flex;}
-  .content:has(> .topbar-tools) .mobile-bar{padding-right:110px;}
-  .content:has(> .topbar-tools):has(> .notif-bell) .mobile-bar{padding-right:156px;}
+  .content:has(> .topbar-tools) .mobile-bar{padding-right:64px;}
+  .content:has(> .topbar-tools):has(> .notif-bell) .mobile-bar{padding-right:110px;}
   .content:has(> .topbar-tools) .page-header, .content:has(> .topbar-tools):has(> .notif-bell) .page-header{padding-right:20px;}
 }
 
@@ -860,3 +858,44 @@ a.btn { text-decoration: none; }
 .ue-modal .modal-actions { flex-wrap: wrap; }
 .ue-modal .modal-actions .btn { text-decoration: none; justify-content: center; }
 @media (max-width: 420px) { .ue-modal .modal-actions .btn { flex: 1 1 100%; } }
+
+/* ============ Sidebar header: logo icon (home link) + ×/☰ collapse button ============ */
+.sidebar-top{justify-content:space-between; padding:0 2px 22px;}
+.sidebar-home{display:inline-flex; align-items:center; justify-content:center; border-radius:10px; padding:2px;}
+.sidebar-home:hover{background:rgba(22,35,63,.06);}
+.sidebar-home:focus-visible, .sidebar-toggle:focus-visible{outline:2px solid var(--navy); outline-offset:2px;}
+img.sidebar-logo--mark{display:block; width:36px; height:auto; margin:0;}
+.sidebar-toggle{
+  width:40px; height:40px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:8px; border:1px solid var(--line-strong); background:transparent; color:var(--ink); padding:0;
+}
+.sidebar-toggle:hover{background:rgba(22,35,63,.08);}
+.sidebar-toggle svg{width:20px; height:20px;}
+.sidebar-toggle .icon-menu{display:none;}
+.sidebar.is-collapsed .sidebar-toggle .icon-close{display:none;}
+.sidebar.is-collapsed .sidebar-toggle .icon-menu{display:block;}
+/* collapsed: ☰ on top, the logo icon under it */
+.sidebar.is-collapsed .sidebar-top{flex-direction:column-reverse; align-items:center; gap:12px;}
+.sidebar.is-collapsed img.sidebar-logo--mark{width:34px; margin:0;}
+:root[data-theme="dark"] .sidebar-toggle{border-color:var(--line); color:var(--ink);}
+:root[data-theme="dark"] .sidebar-toggle:hover, :root[data-theme="dark"] .sidebar-home:hover{background:rgba(255,255,255,.08);}
+.mobile-bar-home{display:none;}
+@media (max-width: 720px){
+  /* phone menu: always the open layout, logo left and × right */
+  .sidebar.is-collapsed .sidebar-top{flex-direction:row; justify-content:space-between;}
+  .sidebar.is-collapsed .sidebar-toggle .icon-close{display:block;}
+  .sidebar.is-collapsed .sidebar-toggle .icon-menu{display:none;}
+  .sidebar.is-collapsed img.sidebar-logo--mark{display:block; width:36px;}
+  /* top bar: ☰, the logo icon, the page name */
+  .mobile-bar-home{display:inline-flex; flex-shrink:0; align-items:center; justify-content:center; width:40px; height:40px;
+    border-radius:8px; background:#fff;}
+  .mobile-bar-home:focus-visible{outline:2px solid #fff; outline-offset:2px;}
+  img.mobile-bar-logo{width:30px; height:auto; display:block;}
+}
+:root[data-theme="dark"] .mobile-bar-home{background:#f2f3f5;}
+
+/* ============ Settings: Log out section ============ */
+.settings-logout{display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; text-align:left;}
+.settings-logout p{flex:1 1 100%; margin:0;}
+.settings-logout .btn{display:inline-flex; align-items:center; gap:8px; text-decoration:none;}
+.settings-logout .btn svg{width:18px; height:18px;}

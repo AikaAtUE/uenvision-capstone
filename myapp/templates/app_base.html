@@ -5,11 +5,15 @@
   <div class="app-shell">
 
     <aside class="sidebar" id="sidebar">
+      {% comment %}Header like GitHub's: the logo icon (goes to your home page) and a separate ×/☰ button that
+         collapses / expands the sidebar (on phones: closes the menu). script.js keeps id="collapse-btn".{% endcomment %}
       <div class="sidebar-top">
-        {# The logo itself is the collapse/expand button (keeps id="collapse-btn" so script.js still finds it). #}
-        <button type="button" class="logo-toggle" id="collapse-btn" aria-label="Collapse or expand sidebar" title="Collapse / expand sidebar">
-          {% include "_logo.html" with logo_class="sidebar-logo sidebar-logo--full" %}
+        <a class="sidebar-home" href="{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" aria-label="UEnvision home" title="Home">
           <img class="sidebar-logo sidebar-logo--mark" src="{% static 'myapp/img/uenvision-mark.png' %}" alt="UEnvision">
+        </a>
+        <button type="button" class="sidebar-toggle" id="collapse-btn" aria-controls="sidebar" aria-expanded="true" aria-label="Close menu" title="Close menu">
+          <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <svg class="icon-menu" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
       </div>
 
@@ -102,7 +106,7 @@
         {% endif %}
         <a class="nav-item {% if active_page == 'settings' %}is-active{% endif %}" href="{% url 'settings' %}" data-tip="Your profile, profile picture, password and email settings." title="Your profile, profile picture, password and email settings.">
           <span class="nav-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            {% include "_icon_settings.html" %}
           </span>
           <span>Settings</span>
         </a>
@@ -110,7 +114,7 @@
 
       <a class="nav-item nav-item--collapse" id="logout-btn" href="{% url 'logout' %}">
         <span class="nav-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M9 5l-7 7 7 7M2 12h20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {% include "_icon_logout.html" %}
         </span>
         <span>Log out</span>
       </a>
@@ -119,21 +123,21 @@
 
     <main class="content">
       {% if user.is_administrator %}{% include "_notif_bell.html" %}{% endif %}
-      {# Top right: the light / dark switch (theme.js). On phones Log out sits here too, always one tap away. #}
+      {# Top right: the light / dark switch (theme.js). Log out is in the menu and at the bottom of Settings. #}
       <div class="topbar-tools">
         <button type="button" class="topbar-btn" data-theme-toggle aria-label="Switch between light and dark mode" title="Switch between light and dark mode" aria-pressed="false">
           <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
           <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
-        <a class="topbar-btn topbar-logout" id="logout-btn-mobile" href="{% url 'logout' %}" aria-label="Log out" title="Log out">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 8l-4 4 4 4M6 12h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </a>
       </div>
       {# Phone-width only: one red top bar with the menu button, the page name and (admins) the bell. #}
       <div class="mobile-bar">
         <button type="button" class="mobile-menu-btn" id="nav-open" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
+        <a class="mobile-bar-home" href="{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" aria-label="UEnvision home">
+          <img class="mobile-bar-logo" src="{% static 'myapp/img/uenvision-mark.png' %}" alt="">
+        </a>
         <span class="mobile-bar-title"></span>
       </div>
       {% if user.is_dummy %}<p class="dummy-banner" role="note"><strong>Test account.</strong> Your survey answers are saved as dummy data and don't count in the real results. Overall results you see here come from dummy answers only.</p>{% endif %}

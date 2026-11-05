@@ -29,7 +29,7 @@
         <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
         <ul>
           <li><strong>Purpose:</strong> to compare the technical skills taught in the BSIT/BSCS curricula against current IT/CS job market demand{% if kind == "alumni" %}, including how well they carried over into your career{% endif %}.</li>
-          <li><strong>What is collected:</strong> your name, {% if kind == "alumni" %}email{% else %}UE email{% endif %}, course, student number, {% if kind == "alumni" %}year graduated, your subjects/skills, and your employment situation as you describe it{% else %}year level, section, the subjects you've taken, and the skills and levels you report for each{% endif %}.</li>
+          <li><strong>What is collected:</strong> your name, email, course, student number, {% if kind == "alumni" %}year graduated, your subjects/skills, and your employment situation as you describe it{% else %}year level, section, the subjects you've taken, and the skills and levels you report for each{% endif %}.</li>
           <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
           <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
           <li><strong>Questions or concerns:</strong> email the UEnvision research team at <a class="link-inline" href="mailto:inquiries@uenvision.tech">inquiries@uenvision.tech</a>.</li>
@@ -68,14 +68,14 @@
       {% if google_enabled %}
       <h2 class="reg-h">Sign in with Google</h2>
       <button type="submit" class="btn btn-google btn-block" name="method" value="google" formnovalidate data-google>{% include "_google_icon.html" %}<span>Continue with Google</span></button>
-      <p class="field-hint">{% if kind == "alumni" %}Any Google account works, such as your personal Gmail.{% else %}Choose your UE Google account (@{{ ue_email_domain }}).{% endif %} You won't need a password.</p>
+      <p class="field-hint">Any Google account works, such as your UE or personal Gmail account. You won't need a password.</p>
       <div class="auth-or"><span>or use a password</span></div>
       {% else %}
       <h2 class="reg-h">Your account</h2>
       {% endif %}
-      <label class="field"><span>{% if kind == "alumni" %}Email address{% else %}UE email address{% endif %}</span>
-        <input type="email" name="email" value="{{ form.email|default:'' }}" autocomplete="username" placeholder="{% if kind == "alumni" %}juan.delacruz@gmail.com{% else %}juan.delacruz@{{ ue_email_domain }}{% endif %}" data-account>
-        {% if kind == "alumni" %}<span class="field-hint">Your UE email or a personal one you still use.</span>{% endif %}</label>
+      <label class="field"><span>Email address</span>
+        <input type="email" name="email" value="{{ form.email|default:'' }}" autocomplete="username" placeholder="juan.delacruz@gmail.com" data-account>
+        <span class="field-hint">Your UE email or a personal one you use. We send a link to confirm it.</span></label>
       <label class="field"><span>Password</span>
         <input type="password" name="password" autocomplete="new-password" minlength="{{ min_password_length }}"
                data-password-rules data-account aria-describedby="register-password-rules"></label>

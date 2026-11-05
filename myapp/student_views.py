@@ -5,8 +5,8 @@ UEnvision — the public side of the site and the student/alumni side:
 * check_gap: "are you a student or a fresh graduate?" -> registration -> the survey
 * skill_search / skill_add: the survey skill pickers' ontology search (public)
 * register: a student/alumni creates their account (with their personal information,
-  by email + password or with Google; students must use their UE email, alumni may
-  use any email since they may no longer have their UE account) before answering their survey; after the
+  by email + password or with Google; any email works for students and alumni, and the
+  address is confirmed by the emailed link or by Google) before answering their survey; after the
   survey they go to their dashboard. (Old "create your account" links from surveys
   answered before this, ?t=..., still work for their 3 days.)
 * student_dashboard (+ role / generate): a student's or alumni's own skill gap
@@ -28,7 +28,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from . import curriculum_data, email_verification, feedback_nudge, gap_analysis, job_roles, ontology, recommendations, skills_catalog
+from . import curriculum_data, email_verification, feedback_nudge, gap_analysis, job_roles, ontology, recommendations, skill_suggestions, skills_catalog
 from .models import MIN_PASSWORD_LENGTH, CurriculumSurveyResponse, CustomUser
 
 REGISTER_SALT = "uenvision-register"
@@ -290,9 +290,7 @@ def register_view(request):
     if not error and post.get("consent") != "on":
         error = "Please tick the box to agree to the Data Privacy Notice."
     if not error and not with_google:
-        if kind == "student" and not google_auth.is_ue_email(email):
-            error = f"Please use your UE email address (ending in @{google_auth.UE_EMAIL_DOMAIN})."
-        elif not _valid_email(email):
+        if not _valid_email(email):
             error = "Please enter a valid email address."
         elif CustomUser.objects.filter(email__iexact=email).exists():
             error = "An account with this email already exists. Please log in instead."
@@ -344,7 +342,7 @@ def _register_after_survey(request, token):
     password2 = request.POST.get("password2", "")
     error = None
     if email.lower() != survey_email.lower():
-        error = "Please type the same UE email address you used in the survey."
+        error = "Please type the same email address you used in the survey."
     elif CustomUser.objects.filter(email__iexact=email).exists():
         error = "An account with this email already exists. Please log in instead."
     elif len(password) < MIN_PASSWORD_LENGTH:
@@ -450,11 +448,12 @@ def student_dashboard_view(request):
     return render_student_dashboard(request)
 
 
-def render_student_dashboard(request, active_page="student_dashboard"):
+def render_student_dashboard(request, active_page="student_dashboard", as_kind=None):
     """The student / alumni skill gap page. Developers also get it on Dashboard and
-    Recommendations when their Faculty / Student view switch is on Student (active_page
+    Recommendations when their view switch is on Student or Alumni (as_kind; active_page
     then keeps that menu item highlighted)."""
     user = request.user
+    is_alumni = as_kind == "alumni" if as_kind else user.role == CustomUser.Role.ALUMNI
     feedback_nudge.record_use(user)
     has_survey = CurriculumSurveyResponse.objects.filter(user=user).exists()
     mine = _my_skills(user)
@@ -483,7 +482,9 @@ def render_student_dashboard(request, active_page="student_dashboard"):
     return render(request, "student_dashboard.html", {
         "active_page": active_page,
         "has_survey": has_survey,
-        "survey_url": reverse("alumni_survey" if user.role == CustomUser.Role.ALUMNI else "student_survey"),
+        "survey_url": reverse("alumni_survey" if is_alumni else "student_survey"),
+        "viewing_as": as_kind,
+        "is_alumni": is_alumni,
         "stats": stats,
         "role": role,
         "roles": stats.get("roles", []) if stats.get("exists") else [],
@@ -636,7 +637,8 @@ def my_skills_view(request):
         "overallSkills": [s for s in (data.get("overall_skills") or []) if isinstance(s, dict)],
         "subjectOptions": _subject_options(program, professor),
         "knownCodes": sorted(by_code),
-        "skills": ontology.subject_skill_map(),
+        "skills": skill_suggestions.ranked_subject_skill_map(),   # ordering only (skill_suggestions.py)
+        "keywordSkills": skill_suggestions.keyword_table(),
         "termTags": curriculum_data.subject_term_tags(),
         "saveUrl": reverse("my_skills_save"),
         "skillSearchUrl": reverse("skill_search"),

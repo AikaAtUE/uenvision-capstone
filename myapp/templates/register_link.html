@@ -14,11 +14,11 @@
     <p>These survey answers are already linked to an account. <a class="link-inline" href="{% url 'login' %}">Log in</a> to see your results.</p>
   {% else %}
     <h1 class="pub-h2">Create your account</h1>
-    <p class="muted">Thanks{% if name %}, {{ name }}{% endif %}! Confirm your UE email and choose a password to see your skill gap and learning recommendations.</p>
+    <p class="muted">Thanks{% if name %}, {{ name }}{% endif %}! Confirm your email and choose a password to see your skill gap and learning recommendations.</p>
     <form method="post" action="{% url 'register' %}" class="auth-form">
       {% csrf_token %}
       <input type="hidden" name="t" value="{{ token }}">
-      <label class="field"><span>Confirm your UE email</span>
+      <label class="field"><span>Confirm your email</span>
         <input type="email" name="email" value="{{ form.email|default:'' }}" autocomplete="username" placeholder="{{ email }}" required>
         <span class="field-hint">Type the email you used in the survey: {{ email }}</span></label>
       <label class="field"><span>Password</span>

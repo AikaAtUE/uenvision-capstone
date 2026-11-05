@@ -14,7 +14,7 @@
       <label class="field"><span>Middle name <small class="field-hint">(optional)</small></span><input type="text" name="middle_name" value="{{ user.middle_name }}" autocomplete="additional-name"></label>
       <label class="field"><span>Last name</span><input type="text" name="last_name" value="{{ user.last_name }}" autocomplete="family-name" required></label>
       <label class="field"><span>Email</span><input type="email" name="email" value="{{ user.email }}" autocomplete="email" required>
-        {% if user.is_learner %}<small class="field-hint">Use your UE email. If you change it, we'll send a confirmation link to the new address.</small>{% endif %}</label>
+        {% if user.is_learner %}<small class="field-hint">If you change it, we'll send a confirmation link to the new address.</small>{% endif %}</label>
       <div class="settings-actions">
         <span></span>
         <span class="settings-actions-right">
@@ -117,6 +117,14 @@
         <input type="password" name="confirm_password" id="pw-confirm" autocomplete="new-password" minlength="{{ min_password_length }}" required></label>
       <p class="form-msg" id="pw-msg"></p>
       <button type="submit" class="btn btn-navy">Update password</button>
+    </form>
+
+    {# Log out is also here (computer and phone), not only at the bottom of the menu. #}
+    <h2 class="section-title settings-section-gap" id="log-out">Account</h2>
+    <form class="settings-card settings-logout" method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <p class="muted">Signed in as <strong>{{ user.email }}</strong>.</p>
+      <button type="submit" class="btn btn-red" id="settings-logout">{% include "_icon_logout.html" %}<span>Log out</span></button>
     </form>
   </div>
 </section>

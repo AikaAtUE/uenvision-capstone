@@ -22,7 +22,6 @@
       missingLevelError = CS.missingLevelError,
       LEARNER_LEVELS = CS.LEARNER_IPA_LEVELS,
       domId = CS.domId,
-      isUeEmail = CS.isUeEmail,
       termTagsHtml = CS.termTagsHtml,
       wireSubjectFilter = CS.wireSubjectFilter,
       addSelectAll = CS.addSelectAll,
@@ -175,7 +174,7 @@
         '</div>'
       );
       var block = document.getElementById(blockId);
-      var api = buildSkillPicker(qs('.cs-skill-picker', block), [], LEARNER_LEVELS, blockId, skills || []);
+      var api = buildSkillPicker(qs('.cs-skill-picker', block), CS.titleSuggestions ? CS.titleSuggestions(name) : [], LEARNER_LEVELS, blockId, skills || []);
       pickers[code] = { api: api, name: name, termLabel: 'Added by you', termBucket: 'added', custom: true };
       return block;
     }
@@ -285,8 +284,8 @@
         setFormError('student-error', 'Please fill in every personal info field.');
         return;
       }
-      if (!isUeEmail(email)) {
-        setFormError('student-error', 'Please use your UE email address (ending in @' + (BOOT.ueEmailDomain || 'ue.edu.ph') + ').');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setFormError('student-error', 'Please enter a valid email address.');
         return;
       }
       if (!consent) {

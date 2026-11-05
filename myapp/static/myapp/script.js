@@ -150,12 +150,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // remember the desktop collapse choice between pages (per browser; harmless if storage is blocked)
     try { if (localStorage.getItem(COLLAPSE_KEY) === '1') sidebar.classList.add('is-collapsed'); } catch (e) {}
   }
+  // The ×/☰ button in the sidebar header: on a computer it collapses / expands the sidebar
+  // (remembered), on a phone it closes the slide-in menu. The logo next to it is a home link.
+  function syncCollapseBtn(){
+    if (!collapseBtn || !sidebar) return;
+    const closed = !isPhone() && sidebar.classList.contains('is-collapsed');
+    const label = closed ? 'Open menu' : 'Close menu';
+    collapseBtn.setAttribute('aria-label', label);
+    collapseBtn.setAttribute('title', label);
+    collapseBtn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+  }
   if (collapseBtn){
+    syncCollapseBtn();
     collapseBtn.addEventListener('click', () => {
       if (isPhone()) { closeNav(); return; }
       const collapsed = sidebar.classList.toggle('is-collapsed');
       try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch (e) {}
+      syncCollapseBtn();
+      collapseBtn.focus();
     });
+    window.addEventListener('resize', syncCollapseBtn);
   }
 
   // Phone width: the red top bar shows the page name (taken from the page's own header, which is then hidden)

@@ -93,15 +93,35 @@ class ThemeTests(TestCase):
 
 
 class MobileLogoutAndPasswordTests(TestCase):
-    def test_log_out_is_in_the_top_bar_on_every_app_page(self):
+    def test_log_out_is_in_the_menu_and_in_settings_not_the_top_bar(self):
         for role in (CustomUser.Role.STUDENT, CustomUser.Role.ADMINISTRATOR):
             user = make_user(f"{role}@ue.edu.ph", role)
             if role == CustomUser.Role.STUDENT:
                 CurriculumSurveyResponse.objects.create(respondent_type="student", user=user, data={"subjects": []})
             self.client.force_login(user)
             page = self.client.get(reverse("about"))
-            self.assertContains(page, f'id="logout-btn-mobile" href="{reverse("logout")}" aria-label="Log out"')
-            self.assertContains(page, 'id="logout-btn"')   # and still at the bottom of the menu
+            self.assertNotContains(page, 'id="logout-btn-mobile"')
+            self.assertContains(page, 'id="logout-btn"')   # still at the bottom of the menu
+            self.assertContains(page, 'M9 21H5a2 2 0 0 1-2-2V5')   # door-and-arrow log out icon
+            self.assertNotContains(page, 'M9 5l-7 7 7 7M2 12h20')  # not the old plain arrow
+            settings_page = self.client.get(reverse("settings"))
+            self.assertContains(settings_page, 'id="settings-logout"')
+            self.assertContains(settings_page, f'action="{reverse("logout")}"')
+        r = self.client.post(reverse("logout"))
+        self.assertRedirects(r, reverse("home"), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse("settings")).status_code, 302)   # logged out
+
+    def test_sidebar_header_is_logo_link_plus_close_button(self):
+        user = make_user("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR)
+        self.client.force_login(user)
+        page = self.client.get(reverse("about")).content.decode()
+        self.assertIn(f'class="sidebar-home" href="{reverse("dashboard")}"', page)
+        self.assertIn('id="collapse-btn" aria-controls="sidebar" aria-expanded="true" aria-label="Close menu"', page)
+        self.assertNotIn("uenvision-logo.png", page.split('class="sidebar-top"')[1].split("</div>")[0])  # icon only, no wordmark
+        self.assertIn('class="mobile-bar-home"', page)
+        self.assertNotIn("Header like GitHub", page)   # the template comment stays a comment
+        self.assertIn("M19.4 15a1.65", page)   # Settings is a gear now
+        self.assertNotIn('r="3.2"', page)
 
     def test_password_boxes_get_a_show_password_button(self):
         from pathlib import Path

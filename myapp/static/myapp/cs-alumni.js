@@ -141,7 +141,7 @@
         '</div>'
       );
       var block = document.getElementById(blockId);
-      var api = buildSkillPicker(qs('.cs-skill-picker', block), [], LEARNER_LEVELS, blockId, skills || []);
+      var api = buildSkillPicker(qs('.cs-skill-picker', block), CS.titleSuggestions ? CS.titleSuggestions(name) : [], LEARNER_LEVELS, blockId, skills || []);
       pickers[code] = { api: api, name: name, termLabel: 'Added by you', termKey: '', bucket: 'added', custom: true };
       return block;
     }
@@ -227,6 +227,17 @@
         upskillBranch.hidden = !(r.value === 'yes' && r.checked);
       });
     });
+    // A reload can bring back a ticked "Currently employed" / "upskilling" answer without a
+    // change event (the browser restores form state), which left its questions hidden.
+    function syncBranches() {
+      var employed = (employedRadios.filter(function (r) { return r.checked; })[0] || {}).value;
+      employedBranch.hidden = employed !== 'yes';
+      unemployedBranch.hidden = employed !== 'no';
+      var up = (upskillRadios.filter(function (r) { return r.checked; })[0] || {}).value;
+      upskillBranch.hidden = up !== 'yes';
+    }
+    syncBranches();
+    window.addEventListener('pageshow', syncBranches);
 
     function tagInput(inputId, listId) {
       var input = document.getElementById(inputId);

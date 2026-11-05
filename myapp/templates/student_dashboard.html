@@ -1,6 +1,6 @@
 {% extends "app_base.html" %}
 {% load static %}
-{% block title %}{% if active_page == "dashboard" %}Dashboard (student view){% elif active_page == "recommendations" %}Recommendations (student view){% else %}My skill gap{% endif %}{% endblock %}
+{% block title %}{% if active_page == "dashboard" %}Dashboard ({{ viewing_as|default:"student" }} view){% elif active_page == "recommendations" %}Recommendations ({{ viewing_as|default:"student" }} view){% else %}My skill gap{% endif %}{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'myapp/recommendations.css' %}?v={% now 'U' %}">
 <link rel="stylesheet" href="{% static 'myapp/student-dashboard.css' %}?v={% now 'U' %}">
@@ -12,7 +12,7 @@
     {% include "_messages.html" %}
     {% if user.is_developer %}
     <div class="sd-switch-row">{% include "_results_switch.html" %}</div>
-    <p class="dev-view-note" role="note"><strong>Student view.</strong> This is the page students and alumni see as <em>My skill gap</em>{% if active_page == "recommendations" %}; their recommendations are the <a class="link-inline" href="#learning-resources">learning resources for their gaps</a> below{% endif %}. It uses your own subjects and skills (Data &rsaquo; My subjects &amp; skills). Switch back to Faculty view for the faculty pages.</p>
+    <p class="dev-view-note" role="note"><strong>{% if viewing_as == "alumni" %}Alumni view.{% else %}Student view.{% endif %}</strong> This is the page {% if viewing_as == "alumni" %}fresh graduates and alumni{% else %}students{% endif %} see as <em>My skill gap</em>{% if active_page == "recommendations" %}; their recommendations are the <a class="link-inline" href="#learning-resources">learning resources for their gaps</a> below{% endif %}. It uses your own subjects and skills (Data &rsaquo; My subjects &amp; skills). Switch back to Faculty view for the faculty pages.</p>
     {% endif %}
 
     {% if not user.email_verified %}

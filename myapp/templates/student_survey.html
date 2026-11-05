@@ -18,7 +18,7 @@
     <h3>How to answer</h3>
     <ol>
       {% if prefill %}<li>Check the details from your registration under <strong>About you</strong>. If your year level or section has changed, press <strong>Edit</strong> to update it.</li>{% else %}<li>Read the Data Privacy Notice and tick the box to agree.</li>
-      <li>Fill in your name, UE email, student number, course, year level and section.</li>{% endif %}
+      <li>Fill in your name, email, student number, course, year level and section.</li>{% endif %}
       <li>Your subjects appear after you pick your course and year level. Tick every subject you are taking this semester, and the ones you took last semester (use <strong>Select all</strong> to tick a whole semester at once). Subjects from earlier semesters or higher year levels are optional. For a Professional Elective, use <strong>+ Add a subject that isn’t listed</strong>.</li>
       <li>For each subject you ticked, type or pick the skills you learned in it, then choose how far you got with each one: Introduced, Practiced or Applied (the same levels faculty use; each level is explained above the skill boxes). If a skill isn’t suggested, type it in the skill box to search for it. Press <strong>×</strong> on a subject's box to remove it.</li>
       <li>Press <strong>Submit survey</strong>. You then go straight to your dashboard to see your own skill gap results.</li>
@@ -42,7 +42,7 @@
       <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
       <ul>
         <li><strong>Purpose:</strong> to compare the technical skills taught in the BSIT/BSCS curricula against current IT/CS job market demand.</li>
-        <li><strong>What is collected:</strong> your name, UE email, course, student number, year level, section, the subjects you've taken, and the skills and levels you report for each.</li>
+        <li><strong>What is collected:</strong> your name, email, course, student number, year level, section, the subjects you've taken, and the skills and levels you report for each.</li>
         <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
         <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
         <li><strong>Questions or concerns:</strong> email the UEnvision research team at <a class="link-inline" href="mailto:inquiries@uenvision.tech">inquiries@uenvision.tech</a>.</li>
@@ -69,12 +69,12 @@
       <label class="field"><span>Middle name (optional)</span><input type="text" id="student-middle" value="{{ prefill.middle_name }}" maxlength="100" autocomplete="additional-name" data-about-field="middle_name" data-from-account></label>
       <label class="field"><span>Last name</span><input type="text" id="student-last" value="{{ prefill.last_name }}" maxlength="100" autocomplete="family-name" data-about-field="last_name" data-from-account required></label>
     </div>
-    <label class="field cs-about-email"><span>UE email address</span><input type="email" id="student-email" value="{{ prefill.email }}" readonly aria-describedby="student-email-note">
+    <label class="field cs-about-email"><span>Email address</span><input type="email" id="student-email" value="{{ prefill.email }}" readonly aria-describedby="student-email-note">
       <small class="field-hint" id="student-email-note">This is the email you log in with, so it is changed in <a class="link-inline" href="{% url 'settings' %}?edit=1">Settings</a> (we send a confirmation link to the new address).</small></label>
     {% endif %}
     <div class="cs-row-3">
       {% if not prefill %}<label class="field"><span>Full name</span><input type="text" id="student-name" value="" required></label>
-      <label class="field"><span>UE email address</span><input type="email" id="student-email" value="" required></label>{% endif %}
+      <label class="field"><span>Email address</span><input type="email" id="student-email" value="" required></label>{% endif %}
       <label class="field"><span>Student number</span><input type="text" id="student-number" value="{{ prefill.student_number|default:'' }}" maxlength="30"{% if prefill %} data-about-field="student_number" data-from-account{% endif %} required></label>
     </div>
     <div class="cs-row-3">

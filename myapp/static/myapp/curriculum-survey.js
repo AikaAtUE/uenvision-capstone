@@ -110,6 +110,22 @@
     return (BOOT.skills && BOOT.skills[code]) || [];
   }
 
+  // A subject the respondent added themselves (an elective, ...): suggest skills from the words
+  // in its title, e.g. "Advanced Web Development" -> HTML, CSS, JavaScript (skill_suggestions.KEYWORD_SKILLS).
+  function titleSuggestions(title) {
+    var t = ' ' + String(title || '').toLowerCase() + ' ';
+    var out = [], seen = {};
+    (BOOT.keywordSkills || []).forEach(function (row) {
+      var words = row[0] || [], skills = row[1] || [];
+      if (!words.some(function (w) { return t.indexOf(w) !== -1; })) return;
+      skills.forEach(function (n) {
+        var k = n.toLowerCase();
+        if (!seen[k]) { seen[k] = true; out.push(n); }
+      });
+    });
+    return out;
+  }
+
   function csrfToken() {
     var tokenInput = qs('input[name=csrfmiddlewaretoken]');
     return tokenInput ? tokenInput.value : '';
@@ -339,6 +355,9 @@
   var MAX_LOCAL_MATCHES = 8;
 
   function buildSkillPicker(container, suggestedNames, levelOptions, idPrefix, initial) {
+    // The suggestion list is positioned against .cs-skill-picker; without it the list was placed
+    // (and scrolled to) far up the page.
+    container.classList.add('cs-skill-picker');
     var askLevel = levelOptions.length > 1;
     var optionsHtml = '<option value="">Choose level…</option>' + levelOptions.map(function (o) {
       return '<option value="' + escapeHtml(o.value) + '"' + (o.desc ? ' title="' + escapeHtml(o.desc) + '"' : '') + '>' + escapeHtml(o.label) + '</option>';
@@ -403,7 +422,12 @@
       if (!opts.length) return;
       active = (i + opts.length) % opts.length;
       opts.forEach(function (b, j) { b.classList.toggle('is-active', j === active); });
-      opts[active].scrollIntoView({ block: 'nearest' });
+      // Keep the highlighted suggestion visible by scrolling the list itself only. (scrollIntoView
+      // also scrolled the whole page, which made the alumni "skills applied" question jump up.)
+      var opt = opts[active];
+      var top = opt.offsetTop, bottom = top + opt.offsetHeight;
+      if (top < resultsBox.scrollTop) resultsBox.scrollTop = top;
+      else if (bottom > resultsBox.scrollTop + resultsBox.clientHeight) resultsBox.scrollTop = bottom - resultsBox.clientHeight;
     }
 
     function render(query, serverResults) {
@@ -801,6 +825,7 @@
     showToast: showToast,
     setFormError: setFormError,
     skillsFor: skillsFor,
+    titleSuggestions: titleSuggestions,
     csrfToken: csrfToken,
     postJson: postJson,
     submitPayload: submitPayload,

@@ -88,10 +88,12 @@ class CurriculumSurveySubmitTests(IsolatedDataMixin, TestCase):
     def test_accepts_valid(self):
         self.assertEqual(self.post(self.payload()).status_code, 200)
 
-    def test_rejects_non_ue_email(self):
+    def test_any_valid_email_is_accepted_but_not_a_bad_one(self):
         p = self.payload()
-        p["personal_info"]["ue_email"] = "juan@gmail.com"
+        p["personal_info"]["ue_email"] = "not-an-email"
         self.assertEqual(self.post(p).status_code, 400)
+        p["personal_info"]["ue_email"] = "juan@gmail.com"   # no @ue.edu.ph requirement any more
+        self.assertEqual(self.post(p).status_code, 200)
 
     def test_student_section_is_required_and_saved(self):
         from ..models import CurriculumSurveyResponse
@@ -258,7 +260,7 @@ class StudentFlowTests(IsolatedDataMixin, TestCase):
         self.assertContains(page, "Create your account")
         self.assertContains(page, 'name="student_number"')
         self.assertContains(page, "Data Privacy Notice")
-        self.assertContains(self.register(email="juan@gmail.com"), "Please use your UE email address")
+        self.assertContains(self.register(email="not-an-email"), "Please enter a valid email address.")
         self.assertContains(self.register(consent=""), "Data Privacy Notice")
         self.assertContains(self.register(section=""), "Please enter your section.")
         kept = self.register(password2="different")
@@ -299,7 +301,10 @@ class StudentFlowTests(IsolatedDataMixin, TestCase):
         self.client.logout()
         self.assertContains(self.register(**{"as": "alumni", "year_graduated": "2024", "email": "not-an-email"}),
                             "Please enter a valid email address.")
-        self.assertContains(self.register(email="juan@gmail.com"), "Please use your UE email address")   # students still need it
+        # students may use any email too (no @ue.edu.ph requirement)
+        r = self.register(email="juan.student@gmail.com", student_number="2023-77")
+        self.assertRedirects(r, reverse("student_survey") + "?role=data-analyst", fetch_redirect_response=False)
+        self.assertEqual(CustomUser.objects.get(email="juan.student@gmail.com").role, CustomUser.Role.STUDENT)
 
     def test_old_after_survey_links_still_work(self):
         from ..models import CurriculumSurveyResponse
@@ -308,10 +313,10 @@ class StudentFlowTests(IsolatedDataMixin, TestCase):
             "personal_info": {"name": "Juan Dela Cruz", "ue_email": "juan@ue.edu.ph", "student_number": "2023-1",
                               "course": "BSIT", "year_level": 1, "section": "TN11"}, "target_role": "data-analyst"})
         reg = register_url_for(resp)
-        self.assertContains(self.client.get(reg), "Confirm your UE email")
+        self.assertContains(self.client.get(reg), "Confirm your email")
         bad = self.client.post(reverse("register"), {"t": reg.split("t=", 1)[1], "email": "other@ue.edu.ph",
                                                      "password": "secret123", "password2": "secret123"})
-        self.assertContains(bad, "same UE email")
+        self.assertContains(bad, "same email")
         r = self.client.post(reverse("register"), {"t": reg.split("t=", 1)[1], "email": "JUAN@ue.edu.ph",
                                                    "password": "secret123", "password2": "secret123"})
         self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)

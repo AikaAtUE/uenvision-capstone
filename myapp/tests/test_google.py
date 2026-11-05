@@ -66,10 +66,12 @@ class GoogleSignInTests(TestCase):
         self.assertRedirects(response, reverse("login"), fetch_redirect_response=False)
         self.assertFalse(CustomUser.objects.exists())
 
-    def test_student_registration_needs_a_ue_google_account(self):
-        request, response = self.google_login("ana@gmail.com", {"role": "student", "info": {}})
-        self.assertRedirects(response, reverse("register") + "?as=student", fetch_redirect_response=False)
-        self.assertFalse(CustomUser.objects.exists())
+    def test_students_may_register_with_any_google_account(self):
+        pending = {"role": "student", "first_name": "Ana", "last_name": "Reyes",
+                   "info": {"student_number": "2023-9", "course": "BSCS", "year_level": "2", "section": "A1"}}
+        request, response = self.google_login("ana@gmail.com", pending)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(CustomUser.objects.get(email="ana@gmail.com").role, CustomUser.Role.STUDENT)
 
     def test_alumni_may_register_with_any_google_account(self):
         pending = {"role": "alumni", "first_name": "Ana", "last_name": "Reyes",
