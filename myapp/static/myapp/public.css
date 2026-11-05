@@ -76,47 +76,51 @@
 /* ============ Homepage introduction (landing section above the top skills charts) ============ */
 html{scroll-behavior:smooth;}
 @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto;} }
-.land{position:relative; overflow:hidden; color:#fff; padding:56px 20px 28px;
+/* Follows the light / dark theme like the rest of the site (colors from the theme variables). */
+.land{position:relative; overflow:hidden; color:var(--ink); padding:56px 20px 28px; border-bottom:1px solid var(--line);
+  --land-glow-red:rgba(200,32,47,.10); --land-glow-navy:rgba(22,35,63,.08); --land-grid:rgba(22,35,63,.5);
   background:
-    radial-gradient(1000px 420px at 85% -10%, rgba(200,32,47,.55), transparent 60%),
-    radial-gradient(800px 380px at -10% 110%, rgba(60,90,153,.55), transparent 60%),
-    linear-gradient(160deg, #16233f 0%, #101a30 100%);
+    radial-gradient(1000px 420px at 85% -10%, var(--land-glow-red), transparent 60%),
+    radial-gradient(800px 380px at -10% 110%, var(--land-glow-navy), transparent 60%),
+    var(--bg);
   min-height:calc(100vh - 69px); display:flex; flex-direction:column; justify-content:center;}
 .land::after{content:""; position:absolute; inset:0; pointer-events:none; opacity:.08;
-  background-image:linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px);
+  background-image:linear-gradient(var(--land-grid) 1px, transparent 1px), linear-gradient(90deg, var(--land-grid) 1px, transparent 1px);
   background-size:44px 44px; mask-image:linear-gradient(180deg, #000 0%, transparent 85%); -webkit-mask-image:linear-gradient(180deg, #000 0%, transparent 85%);}
 .land > *{position:relative; z-index:1;}
 .land-inner{max-width:1100px; width:100%; margin:0 auto; display:grid; grid-template-columns:1.25fr .9fr; gap:40px; align-items:center;}
-.land-eyebrow{margin:0 0 14px; font-size:.78rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#ffb3ba;}
-.land h1{font-family:var(--font-head); font-size:clamp(1.9rem, 4.2vw, 3.1rem); line-height:1.08; letter-spacing:-.01em; margin:0 0 18px; color:#fff;}
-.land-lede{margin:0 0 26px; font-size:1.05rem; line-height:1.65; color:rgba(255,255,255,.82); max-width:620px;}
+.land-eyebrow{margin:0 0 14px; font-size:.78rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--red);}
+.land h1{font-family:var(--font-head); font-size:clamp(1.9rem, 4.2vw, 3.1rem); line-height:1.08; letter-spacing:-.01em; margin:0 0 18px; color:var(--ink);}
+.land-lede{margin:0 0 26px; font-size:1.05rem; line-height:1.65; color:var(--muted); max-width:620px;}
 .land-actions{display:flex; flex-wrap:wrap; gap:12px;}
 .land-btn{text-decoration:none; padding:12px 20px; font-size:.95rem;}
-.land-btn--ghost{background:transparent; color:#fff; border:1px solid rgba(255,255,255,.45);}
-.land-btn--ghost:hover{background:rgba(255,255,255,.1);}
-.land-card{background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.16); border-radius:18px; padding:22px 22px 18px;
+.land-btn--ghost{background:var(--surface); color:var(--ink); border:1px solid var(--line-strong);}
+.land-btn--ghost:hover{background:var(--soft);}
+.land-card{background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-card); border-radius:18px; padding:22px 22px 18px;
   backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); box-shadow:0 20px 50px rgba(0,0,0,.25);}
-.land-card-label{margin:0 0 12px; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.6);}
-.land-stat{display:flex; flex-direction:column; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.1);}
+.land-card-label{margin:0 0 12px; font-size:.75rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted-2);}
+.land-stat{display:flex; flex-direction:column; padding:10px 0; border-bottom:1px solid var(--line);}
 .land-stat-num{font-family:var(--font-head); font-size:1.6rem; font-weight:700; line-height:1.15; overflow-wrap:anywhere;}
-.land-stat-text{font-size:.85rem; color:rgba(255,255,255,.7);}
+.land-stat-text{font-size:.85rem; color:var(--muted);}
 .land-mini{list-style:none; margin:14px 0 0; padding:0; display:grid; gap:8px;}
-.land-mini li{display:grid; grid-template-columns:90px 1fr; align-items:center; gap:10px; font-size:.78rem; color:rgba(255,255,255,.75);}
+.land-mini li{display:grid; grid-template-columns:90px 1fr; align-items:center; gap:10px; font-size:.78rem; color:var(--muted);}
 .land-mini li span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 .land-mini i{display:block; height:8px; border-radius:4px; background:linear-gradient(90deg, #c8202f, #ff6b78);}
 .land-steps{list-style:none; max-width:1100px; width:100%; margin:44px auto 0; padding:0; display:grid; grid-template-columns:repeat(4, 1fr); gap:14px;}
-.land-steps li{display:flex; gap:12px; align-items:flex-start; padding:14px; border-radius:14px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);}
+.land-steps li{display:flex; gap:12px; align-items:flex-start; padding:14px; border-radius:14px; background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-card);}
 .land-steps strong{display:block; font-size:.92rem; margin-bottom:4px;}
-.land-steps p{margin:0; font-size:.82rem; line-height:1.45; color:rgba(255,255,255,.7);}
+.land-steps p{margin:0; font-size:.82rem; line-height:1.45; color:var(--muted);}
 .land-step-num{flex:none; width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
   font-weight:700; font-size:.85rem; background:#c8202f; color:#fff;}
-.land-scroll{margin:28px auto 0; display:flex; flex-direction:column; align-items:center; gap:2px; color:rgba(255,255,255,.75);
+.land-scroll{margin:28px auto 0; display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--muted);
   text-decoration:none; font-size:.82rem;}
 .land-scroll svg{animation:land-bob 1.8s ease-in-out infinite;}
-.land-scroll:hover{color:#fff;}
+.land-scroll:hover{color:var(--red);}
 @keyframes land-bob{0%,100%{transform:translateY(0);} 50%{transform:translateY(5px);}}
 @media (prefers-reduced-motion: reduce){ .land-scroll svg{animation:none;} }
 #top-skills{scroll-margin-top:12px;}
+:root[data-theme="dark"] .land{--land-glow-red:rgba(200,32,47,.28); --land-glow-navy:rgba(60,90,153,.30); --land-grid:rgba(255,255,255,.5);}
+:root[data-theme="dark"] .land-eyebrow{color:#ff8b95;}
 .pub-hero-title{font-size:1.6rem; line-height:1.2; margin-bottom:8px;}
 @media (max-width: 900px){
   .land{min-height:auto; padding:40px 16px 24px;}
