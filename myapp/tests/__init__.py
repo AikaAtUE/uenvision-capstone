@@ -7,3 +7,5 @@ from django.conf import settings as _settings
 
 _settings.REQUIRE_PROFESSOR_SURVEY = False
 _settings.REQUIRE_LEARNER_SURVEY = False
+# The recommendations queue never starts its background thread (and never calls Gemini) in tests.
+_settings.REC_QUEUE_AUTOSTART = False

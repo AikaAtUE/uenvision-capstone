@@ -4,6 +4,7 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'myapp/recommendations.css' %}?v={% now 'U' %}">
 <link rel="stylesheet" href="{% static 'myapp/student-dashboard.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/rec-context.css' %}?v={% now 'U' %}">
 {% endblock %}
 {% block page_content %}
 <section class="page is-active" id="page-student-dashboard">
@@ -46,12 +47,15 @@
       </label>
       <noscript><button class="btn btn-navy btn-sm" type="submit">Save</button></noscript>
     </form>
+    {% if context_program and context_year %}
+    <p class="rc-context muted"><span class="rc-chip">{{ context_program }} · {{ context_year }}{% if context_year == 1 %}st{% elif context_year == 2 %}nd{% elif context_year == 3 %}rd{% else %}th{% endif %} Year</span> Recommendations update by themselves after your survey, based on your skills, your year level and the job role you pick.</p>
+    {% endif %}
 
     <div class="stat-grid sd-stats">
       <div class="stat-card">
         <p class="stat-label">Job readiness</p>
         <p class="stat-value">{% if readiness is not None %}{{ readiness }}%{% else %}—{% endif %}</p>
-        <p class="stat-note">You have {{ have }} of the top {{ compare|length }} skills{% if role %} for {{ role.label }}{% endif %} at Practiced or Applied</p>
+        <p class="stat-note">You have {{ have }} of the top {{ compare|length }} skills{% if role %} for {{ role.label }}{% endif %} at Practiced or Applied{% if have_assumed %}, {{ have_assumed }} of them assumed from earlier year levels{% endif %}</p>
       </div>
       <div class="stat-card">
         <p class="stat-label">Skills you reported</p>
@@ -70,6 +74,7 @@
       <p class="sd-legend-title"><strong>What &ldquo;Your Skill Level&rdquo; means:</strong> your highest level for each skill, from your survey. Tap or point at a level in the tables to see this again.</p>
       <ul class="sd-legend-list">
         {% for l in you_levels %}<li><span class="sd-pill sd-pill--{{ l.status }}">{{ l.label }}</span><span>{{ l.text }}</span></li>{% endfor %}
+        {% if assumed %}<li><span class="sd-pill sd-pill--strong sd-pill--assumed">Practiced*</span><span>A star means the level is assumed from earlier year levels, not from your own answers (see Skills we assumed you have).</span></li>{% endif %}
       </ul>
     </div>
 
@@ -113,11 +118,38 @@
       </section>
     </div>
 
+    {% if assumed or removed_assumed %}
+    <section class="panel sd-section rc-assumed" id="assumed-skills">
+      <h2 class="section-title">Skills we assumed you have</h2>
+      <p class="muted sd-sub rc-sub">You answered for your recent semesters only, so these come from {{ context_program }} subjects of earlier year levels: skills at least {{ min_respondents }} people reported there, at their average level. They count toward your job readiness. Keep the ones you really have.</p>
+      <ul class="rc-assumed-list">
+        {% for a in assumed %}
+        <li class="rc-assumed-item{% if a.confirmed %} is-confirmed{% endif %}">
+          <div class="rc-assumed-text">
+            <strong>{{ a.skill }}</strong> <span class="muted">· {% if a.confirmed %}you confirmed it{% else %}assumed{% endif %} {{ a.level }}</span>
+            <span class="muted rc-assumed-src">From {{ a.sources.0.subject }} ({{ a.sources.0.term }}), reported by {{ a.sources.0.people }} people{% if a.sources|length > 1 %}, and {{ a.sources|length|add:"-1" }} more subject{{ a.sources|length|add:"-1"|pluralize }}{% endif %}</span>
+          </div>
+          <div class="rc-assumed-actions">
+            {% if not a.confirmed %}
+            <form method="post" action="{% url 'assumed_skill' %}">{% csrf_token %}<input type="hidden" name="skill_key" value="{{ a.key }}"><input type="hidden" name="choice" value="confirmed"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-navy btn-sm">I have this</button></form>
+            {% endif %}
+            <form method="post" action="{% url 'assumed_skill' %}">{% csrf_token %}<input type="hidden" name="skill_key" value="{{ a.key }}"><input type="hidden" name="choice" value="removed"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="btn btn-ghost btn-sm">Remove</button></form>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if removed_assumed %}
+      <p class="muted rc-removed">Removed: {% for a in removed_assumed %}<form class="rc-undo" method="post" action="{% url 'assumed_skill' %}">{% csrf_token %}<input type="hidden" name="skill_key" value="{{ a.key }}"><input type="hidden" name="choice" value="undo"><input type="hidden" name="next" value="{{ request.get_full_path }}">{{ a.skill }} <button type="submit" class="link-inline">undo</button></form>{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+      {% endif %}
+    </section>
+    {% endif %}
+
     <section class="sd-section" id="learning-resources">
-      <h2 class="section-title">Learning resources for your gaps</h2>
+      <h2 class="section-title">What to learn next</h2>
       {% if not to_build %}
-        <p class="empty-note">You already have every top skill at Practiced or Applied. Try another job role above.</p>
+        <p class="empty-note">{% if coming_up %}The skills you still need are taught in a later subject of your curriculum (below).{% else %}You already have every top skill at Practiced or Applied. Try another job role above.{% endif %}</p>
       {% else %}
+      <p class="muted sd-sub rc-sub">The skills you still need{% if role %} for {{ role.label }}{% endif %}, most in demand first. Learning resources are found for them automatically{% if role %}, for your job role{% endif %}; it can take a few minutes after your survey.</p>
       <p class="form-msg rec-caveat">Resources are suggested by AI. Links marked ✓ Link checked were opened automatically and lead to that course, but no person has reviewed them yet. Check a course before paying for it.</p>
       <form id="rec-form" method="post" action="{% url 'student_generate' %}" data-max="{{ max_per_run }}" data-verb="Find resources">
         {% csrf_token %}
@@ -133,12 +165,14 @@
           <div class="rec-skill" data-skill="{{ s.skill }}">
             <div class="rec-skill-head">
               <label class="rec-skill-pick">
-                <input type="checkbox" name="skills" value="{{ s.skill }}" {% if not s.cached_resources %}checked{% endif %}>
+                <input type="checkbox" name="skills" value="{{ s.skill }}" {% if not s.cached_resources and not s.finding %}checked{% endif %}>
                 <span class="rec-skill-name">{{ s.skill }}</span>
               </label>
-              <span class="rec-skill-stats muted">{{ s.pct }}% of postings · you: {% if s.status == "missing" %}not yet{% else %}{{ s.my_level|lower }}{% endif %}</span>
+              <span class="rec-skill-stats muted">{{ s.pct }}% of postings · you: {% if s.status == "missing" %}not yet{% else %}{{ s.my_level|lower }}{% if s.assumed %} (assumed){% endif %}{% endif %}</span>
               {% if s.cached_resources %}<span class="pill rec-pill-generated">found</span>{% endif %}
             </div>
+            {% if s.reason %}<p class="rc-why"><strong>Why:</strong> {{ s.reason }}</p>{% endif %}
+            {% if s.finding %}<p class="rc-finding" role="status">Finding resources for this skill. They show up here within a few minutes.</p>{% endif %}
             <div class="rec-resources" data-skill-slot="{{ s.skill }}">
               {% include "_rec_cards.html" with resources=s.cached_resources %}
             </div>
@@ -147,6 +181,16 @@
         </div>
       </form>
       {% endif %}
+    </section>
+    {% endif %}
+
+    {% if coming_up %}
+    <section class="panel sd-section rc-coming" id="coming-up">
+      <h2 class="section-title">Coming up in your curriculum</h2>
+      <p class="muted sd-sub rc-sub">These skills{% if role %} for {{ role.label }}{% endif %} are built up in a later subject, so they are not pushed now.</p>
+      <ul class="rc-coming-list">
+        {% for c in coming_up %}<li><strong>{{ c.skill }}</strong><span class="muted">{{ c.subject }} · {{ c.term }}</span></li>{% endfor %}
+      </ul>
     </section>
     {% endif %}
 

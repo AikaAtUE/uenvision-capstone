@@ -1,0 +1,25 @@
+{# Data Extraction > Scrape Data: every failed saves log, newest first, each with Download and Delete. #}
+<details class="dx-sub" id="failed-saves" data-key="failed-saves" open>
+  <summary>
+    <span class="dx-sub-title">Failed save lists</span>
+    <span class="dx-sum-meta" id="failed-saves-meta">{% if failed_saves %}{{ failed_saves|length }} file{{ failed_saves|length|pluralize }} · latest {{ failed_saves.0.when }}{% else %}None yet{% endif %}</span>
+  </summary>
+  <div class="dx-sub-body">
+    <p class="dx-note">After every scrape, the job postings that couldn't be saved (and why) go into one CSV named by source with its saved (S) and failed (F) counts, such as <code>kalibrr_S120_F3_trabajo_S80_F5_…csv</code>. Only sources with a failed save are in it, and a run where everything saved makes no file. The most recent run is at the top.</p>
+    {% if failed_saves %}
+    <ul class="dx-failed-list" id="failed-saves-list">
+      {% for f in failed_saves %}
+      <li data-name="{{ f.name }}">
+        <div class="dx-failed-main">
+          <a href="{% url 'failed_saves_download' f.name %}" download>{{ f.name }}</a>
+          <span class="muted">{{ f.when }} · {% for s, saved, failed in f.sources %}{{ s|title }}: {{ saved }} saved, {{ failed }} failed{% if not forloop.last %} · {% endif %}{% endfor %}</span>
+        </div>
+        <button type="submit" class="btn btn-ghost btn-sm dx-failed-delete" form="failed-saves-delete-form"
+                name="name" value="{{ f.name }}" aria-label="Delete {{ f.name }}">Delete</button>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    <p class="dx-note" id="failed-saves-empty"{% if failed_saves %} hidden{% endif %}><em>No failed save lists yet.</em></p>
+  </div>
+</details>

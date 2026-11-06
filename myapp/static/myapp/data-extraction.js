@@ -174,11 +174,51 @@
     keys.addEventListener('change', () => { clearTimeout(keysTimer); saveKeys(); });
   }
 
+  // ---- Failed save lists: Delete asks first, then removes the file without reloading ----
+  const delForm = document.getElementById('failed-saves-delete-form');
+  function updateFailedMeta(count, latest) {
+    const meta = document.getElementById('failed-saves-meta');
+    if (meta) meta.textContent = count ? count + ' file' + (count === 1 ? '' : 's') + ' · latest ' + latest : 'None yet';
+    const empty = document.getElementById('failed-saves-empty');
+    if (empty) empty.hidden = count > 0;
+  }
+  async function deleteFailed(btn) {
+    const name = btn.value;
+    const ok = window.UEModal
+      ? await window.UEModal.confirm({ title: 'Delete this failed save list?',
+          message: name + ' will be permanently deleted. This can’t be undone.',
+          okLabel: 'Delete', cancelLabel: 'Cancel', danger: true })
+      : window.confirm('Delete ' + name + '? This can’t be undone.');
+    if (!ok) return;
+    const body = new FormData(delForm);
+    body.set('name', name);
+    btn.disabled = true;
+    try {
+      const r = await fetch(delForm.getAttribute('action'), { method: 'POST', body: body, credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'fetch', 'X-CSRFToken': csrf } });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || 'not deleted');
+      const li = btn.closest('li');
+      if (li) li.remove();
+      updateFailedMeta(d.count, d.latest);
+      setStatus('saved', 'Deleted ' + name);
+    } catch (e) {
+      btn.disabled = false;
+      setStatus('error', 'Couldn’t delete ' + name + ': ' + (e.message || 'no connection'));
+    }
+  }
+  if (delForm) {
+    document.querySelectorAll('.dx-failed-delete').forEach((btn) => btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      deleteFailed(btn);
+    }));
+  }
+
   // ---- Collapsible sections: remember open / closed, open one that has a problem ----
   const KEY = 'ue_dx_open';
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
-  const sections = form.querySelectorAll('details.dx-section');
+  const sections = form.querySelectorAll('details.dx-section, details.dx-sub');
   const hashTarget = location.hash ? document.getElementById(location.hash.slice(1)) : null;
   sections.forEach((d) => {
     if (saved && typeof saved[d.dataset.key] === 'boolean' && !d.hasAttribute('data-keep')) d.open = saved[d.dataset.key];

@@ -51,6 +51,11 @@ from urllib.parse import quote
 
 import requests
 
+try:                                   # run as a script (the pipeline)
+    from failed_saves import Recorder
+except ImportError:                    # imported as myapp.pipeline.<scraper> (tests)
+    from .failed_saves import Recorder
+
 # --------------------------------------------------------------------------
 # Config / constants
 # --------------------------------------------------------------------------
@@ -85,6 +90,10 @@ logging.basicConfig(
 )
 log = logging.getLogger("kalibrr_scraper")
 
+# Why the last get_json_with_retries() call returned None (for the failed saves log).
+LAST_ERROR = ""
+JOB_PAGE_TEMPLATE = "https://www.kalibrr.com/c/{company_code}/jobs/{job_id}/{slug}"
+
 
 # --------------------------------------------------------------------------
 # HTTP helpers
@@ -115,6 +124,8 @@ def random_delay(min_s: float, max_s: float) -> None:
 
 def get_json_with_retries(session: requests.Session, url: str) -> dict | None:
     """GET a URL and parse JSON, retrying with exponential backoff."""
+    global LAST_ERROR
+    LAST_ERROR = ""
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             resp = session.get(url, headers=random_headers(), timeout=20)
@@ -122,17 +133,21 @@ def get_json_with_retries(session: requests.Session, url: str) -> dict | None:
                 return resp.json()
             if resp.status_code == 404:
                 log.warning("404 Not Found: %s", url)
+                LAST_ERROR = "HTTP 404 Not Found (the posting may have been taken down)"
                 return None
+            LAST_ERROR = f"HTTP {resp.status_code} after {MAX_RETRIES} attempts"
             log.warning(
                 "Attempt %d/%d: HTTP %d for %s",
                 attempt, MAX_RETRIES, resp.status_code, url,
             )
         except requests.RequestException as exc:
+            LAST_ERROR = f"Request error after {MAX_RETRIES} attempts: {type(exc).__name__}"
             log.warning(
                 "Attempt %d/%d: request error for %s -> %s",
                 attempt, MAX_RETRIES, url, exc,
             )
         except ValueError as exc:  # JSON decode error
+            LAST_ERROR = f"The response wasn't valid JSON (after {MAX_RETRIES} attempts)"
             log.warning(
                 "Attempt %d/%d: bad JSON from %s -> %s",
                 attempt, MAX_RETRIES, url, exc,
@@ -223,9 +238,11 @@ def scrape(
     build_id: str | None,
     max_jobs: int | None,
     max_offset: int | None,
+    report_dir: Path | None = None,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     session = build_session()
+    record = Recorder(report_dir, "kalibrr", text)
 
     if not build_id:
         build_id = discover_build_id(session)
@@ -270,6 +287,10 @@ def scrape(
             job_id = job.get("id")
             slug = job.get("slug")
             company_code = (job.get("company") or {}).get("code")
+            title = job.get("name") or ""
+            company = (job.get("company") or {}).get("name") or job.get("company_name") or ""
+            page_url = (JOB_PAGE_TEMPLATE.format(company_code=company_code, job_id=job_id, slug=slug)
+                        if job_id and slug and company_code else "")
 
             if not job_id or not slug or not company_code:
                 log.warning(
@@ -277,6 +298,8 @@ def scrape(
                     job.get("name", "<unknown>"),
                 )
                 failed += 1
+                missing = [k for k, v in (("id", job_id), ("slug", slug), ("company code", company_code)) if not v]
+                record.failed("The search result has no " + ", ".join(missing), job_id, title, company, page_url)
                 continue
 
             out_path = job_output_path(output_dir, job_id, slug)
@@ -291,11 +314,24 @@ def scrape(
 
             if detail is None:
                 failed += 1
+                record.failed("Couldn't fetch the job details: " + (LAST_ERROR or "no response"),
+                              job_id, title, company, page_url)
                 continue
 
-            with open(out_path, "w", encoding="utf-8") as f:
-                json.dump(detail, f, ensure_ascii=False, indent=2)
+            try:
+                with open(out_path, "w", encoding="utf-8") as f:
+                    json.dump(detail, f, ensure_ascii=False, indent=2)
+            except (OSError, TypeError, ValueError) as exc:
+                log.error("Couldn't write %s: %s", out_path, exc)
+                failed += 1
+                record.failed(f"Couldn't write the JSON file: {exc}", job_id, title, company, page_url)
+                try:
+                    out_path.unlink()       # a half-written file would be skipped as "already have" next time
+                except OSError:
+                    pass
+                continue
             saved += 1
+            record.saved(job_id, title, company, page_url)
             log.info("Saved -> %s", out_path)
 
         offset += limit
@@ -354,6 +390,10 @@ def parse_args() -> argparse.Namespace:
         help="Stop paginating once offset reaches this value (default: no limit).",
     )
     parser.add_argument(
+        "--report-dir", default=None,
+        help="Folder for the failed saves log of this run (written by the Data Extraction page).",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Enable debug logging (shows per-request sleep timings, etc).",
     )
@@ -378,6 +418,7 @@ def main() -> None:
         build_id=args.build_id,
         max_jobs=args.max_jobs,
         max_offset=args.max_offset,
+        report_dir=Path(args.report_dir) if args.report_dir else None,
     )
 
 

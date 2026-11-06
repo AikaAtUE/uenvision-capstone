@@ -155,6 +155,32 @@ def data_import_view(request):
         request, "import", summary=pipeline.disk_summary(), import_types=pipeline.IMPORT_TYPES))
 
 
+@administrator_required
+def failed_saves_download_view(request, name):
+    """One failed saves log (data/failed_saves/), as a download."""
+    path = pipeline.failed_saves_path(name)
+    if path is None:
+        raise Http404("That log doesn't exist.")
+    return FileResponse(open(path, "rb"), as_attachment=True, filename=path.name, content_type="text/csv")
+
+
+@administrator_required
+@require_POST
+def failed_saves_delete_view(request):
+    """Delete one failed saves log (the page asks to confirm first)."""
+    name = request.POST.get("name", "")
+    error = pipeline.delete_failed_saves(name)
+    if _wants_json(request):
+        left = pipeline.list_failed_saves()
+        return JsonResponse({"ok": error is None, "error": error, "count": len(left),
+                             "latest": left[0]["when"] if left else ""}, status=200 if error is None else 400)
+    if error:
+        messages.error(request, error)
+    else:
+        messages.success(request, f"Deleted {name}.")
+    return redirect(reverse("data_extraction") + "#scrape")
+
+
 def _extraction_ctx(request, form=None, ghost_form=None, auto_form=None, errors=None):
     """Data Extraction: Scrape Data, Skill Extraction, Ghost Job Detection, What to run and
     Automation, on one page."""
@@ -167,6 +193,7 @@ def _extraction_ctx(request, form=None, ghost_form=None, auto_form=None, errors=
     found = ghost_jobs.detect()
     flagged = ghost_jobs.flagged_postings()
     auto = automation.status()
+    failed_saves = pipeline.list_failed_saves()
     return _data_ctx(
         request, "extraction",
         form=form,
@@ -184,6 +211,7 @@ def _extraction_ctx(request, form=None, ghost_form=None, auto_form=None, errors=
         flagged=flagged, ghost_total=len(found or {}), ghost_has_data=found is not None,
         ghost_excluded=sum(1 for r in flagged if r["excluded"]),
         max_chars=ghost_jobs.MAX_DESCRIPTION_CHARS,
+        failed_saves=failed_saves,
         auto=auto,
         auto_form=auto_form or auto["settings"],
         weekdays=list(enumerate(automation.WEEKDAYS)),
@@ -317,7 +345,19 @@ def scrape_status_view(request):
         "error": st.get("error"),
         "log": pipeline.read_log_tail(),
         "summary": pipeline.disk_summary(),
+        "failed_saves": _last_failed_saves(st),
     })
+
+
+def _last_failed_saves(st):
+    """The finished run's failed saves log, for the Console: {"name", "url"}, {"name": ""} when
+    every posting was saved, or None (still running, or the run didn't scrape)."""
+    if st.get("status") == "running" or not st.get("failed_saves_stamp"):
+        return None
+    name = pipeline.last_failed_saves_report()
+    if name is None:
+        return None
+    return {"name": name, "url": reverse("failed_saves_download", args=[name]) if name else ""}
 
 
 @administrator_required

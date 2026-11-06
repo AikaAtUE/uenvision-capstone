@@ -60,6 +60,22 @@
       stepsEl.appendChild(li);
     });
 
+    // The finished run's failed saves log (Console only).
+    const fs = document.getElementById('run-failed-saves');
+    if (fs) {
+      const f = d.failed_saves;
+      fs.hidden = !f;
+      while (fs.firstChild) fs.removeChild(fs.firstChild);
+      if (f && f.name) {
+        fs.appendChild(document.createTextNode('Job postings that failed to save: '));
+        const a = document.createElement('a');
+        a.href = f.url; a.textContent = f.name; a.setAttribute('download', '');
+        fs.appendChild(a);
+      } else if (f) {
+        fs.textContent = 'Every job posting this run found was saved, so there is no failed saves log.';
+      }
+    }
+
     // Everything (output, progress, warnings, errors) goes inside the dark box.
     let text = d.log || '';
     if (d.error && text.indexOf(d.error) === -1) text += (text ? '\n' : '') + 'ERROR: ' + d.error;

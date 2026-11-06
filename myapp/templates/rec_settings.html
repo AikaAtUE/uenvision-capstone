@@ -1,0 +1,102 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Recommendations settings{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/rec-context.css' %}?v={% now 'U' %}">
+{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-rec-settings">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
+    <h2 class="section-title">Recommendations</h2>
+    <p class="muted rc-intro">After every curriculum survey, UEnvision works out each student's and each subject's recommended skills from the survey answers and the job postings, then Gemini finds learning resources for them in the background. Nothing here changes any count shown from the extracted or hard skills data sets.</p>
+
+    <div class="rc-grid">
+      <section class="panel rc-panel">
+        <h3 class="rc-h">Minimum respondents</h3>
+        <p class="muted">A skill counts as built up in a subject once this many people (professors, students and alumni together) report it for that subject. It is used for students' assumed skills, "coming up" skills and the faculty view.</p>
+        <form method="post" class="rc-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="settings">
+          <label class="rc-field"><span>People</span>
+            <input type="number" name="min_respondents" min="{{ range.0 }}" max="{{ range.1 }}" value="{{ cfg.min_respondents }}" required>
+          </label>
+          <button type="submit" class="btn btn-navy btn-sm">Save</button>
+        </form>
+        <p class="muted rc-small">Subject profiles: {{ profile_subjects }} subject{{ profile_subjects|pluralize }}, {{ profile_rows }} subject skill{{ profile_rows|pluralize }}, {{ counted_rows }} reported by at least {{ cfg.min_respondents }}. They rebuild by themselves after every survey.</p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="rebuild">
+          <button type="submit" class="btn btn-ghost btn-sm">Rebuild now</button>
+        </form>
+      </section>
+
+      <section class="panel rc-panel">
+        <h3 class="rc-h">Finding resources</h3>
+        <p class="muted">Skills waiting for Gemini. They are worked through right after each survey and again every 5 minutes on the server.</p>
+        <ul class="rc-counts">
+          <li><strong>{{ queue.counts.pending }}</strong> waiting</li>
+          <li><strong>{{ queue.counts.running }}</strong> running</li>
+          <li><strong>{{ queue.counts.done }}</strong> done</li>
+          <li><strong>{{ queue.counts.failed }}</strong> failed</li>
+        </ul>
+        <div class="rc-inline">
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="run"><button type="submit" class="btn btn-navy btn-sm"{% if not queue.counts.pending %} disabled{% endif %}>Run now</button></form>
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="retry"><button type="submit" class="btn btn-ghost btn-sm"{% if not queue.counts.failed %} disabled{% endif %}>Retry failed</button></form>
+        </div>
+        {% if queue.failed %}
+        <details class="rc-details">
+          <summary>Failed skills</summary>
+          <ul class="rc-list">{% for j in queue.failed %}<li><strong>{{ j.skill }}</strong>{% if j.role %} <span class="muted">({{ j.role }})</span>{% endif %}: <span class="muted">{{ j.error|default:"no reason given" }}</span></li>{% endfor %}</ul>
+        </details>
+        {% endif %}
+        {% if queue.waiting %}
+        <details class="rc-details">
+          <summary>Waiting skills</summary>
+          <ul class="rc-list">{% for j in queue.waiting %}<li>{{ j.skill }}{% if j.role %} <span class="muted">({{ j.role }})</span>{% endif %}{% if j.error %} <span class="muted">· last try: {{ j.error }}</span>{% endif %}</li>{% endfor %}</ul>
+        </details>
+        {% endif %}
+      </section>
+    </div>
+
+    <section class="panel rc-panel rc-aliases">
+      <h3 class="rc-h">Subject aliases</h3>
+      <p class="muted">Subjects are matched by name. When two names are the same subject (for example an elective two professors typed differently, or a subject renamed in a new curriculum), set one as the same as the other and their survey answers are counted together.</p>
+      <form method="post" class="rc-inline rc-alias-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="alias_add">
+        <label class="rc-field rc-grow"><span>This subject</span>
+          <input type="text" name="alias" list="rc-subjects" maxlength="160" required>
+        </label>
+        <label class="rc-field rc-grow"><span>is the same subject as</span>
+          <input type="text" name="same_as" list="rc-subjects" maxlength="160" required>
+        </label>
+        <button type="submit" class="btn btn-red btn-sm">Add</button>
+        <datalist id="rc-subjects">{% for n in subject_names %}<option value="{{ n }}"></option>{% endfor %}</datalist>
+      </form>
+      {% if aliases %}
+      <div class="table-wrap">
+        <table class="sr-table">
+          <thead><tr><th>Subject</th><th>Counted as</th><th>Added by</th><th></th></tr></thead>
+          <tbody>
+          {% for a in aliases %}
+            <tr>
+              <td>{{ a.alias_name }}</td>
+              <td>{{ a.same_as_name }}</td>
+              <td class="muted">{{ a.created_by.get_full_name|default:"—" }}</td>
+              <td><form method="post">{% csrf_token %}<input type="hidden" name="action" value="alias_delete"><input type="hidden" name="id" value="{{ a.pk }}"><button type="submit" class="link-inline">Remove</button></form></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty-note">No aliases yet. Every subject name is its own subject.</p>
+      {% endif %}
+    </section>
+  </div>
+</section>
+{% endblock %}

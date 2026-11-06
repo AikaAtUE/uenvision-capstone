@@ -101,6 +101,8 @@ from .data import (  # noqa: F401
     data_clear_source_view,
     data_table_view,
     data_download_view,
+    failed_saves_download_view,
+    failed_saves_delete_view,
     data_ghost_jobs_view,
     data_import_view,
     _extraction_ctx,

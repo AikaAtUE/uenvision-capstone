@@ -7,7 +7,8 @@ It is started by myapp/pipeline/manager.py:    python -u orchestrator.py <run_co
 
 run_config.json:
     {"state_file": ..., "log_file": ..., "cwd": ..., "lane_labels": {lane: label},
-     "steps": [{"name", "label", "argv": [...], "lane"?: ..., "continue_on_fail"?: bool}, ...]}
+     "steps": [{"name", "label", "argv": [...], "lane"?: ..., "continue_on_fail"?: bool}, ...],
+     "finish_argv"?: [...]}     (run at the end whatever happened, e.g. the failed saves log)
 
 Progress is written to state_file (JSON) with a heartbeat, and all step output goes to
 log_file.  This file is deliberately standalone (stdlib only, no Django).
@@ -177,6 +178,20 @@ class Runner:
             i = j
 
 
+def finish(cfg, log):
+    """The run's closing command (the failed saves log), whatever happened to the steps."""
+    argv = cfg.get("finish_argv")
+    if not argv:
+        return
+    log.write("\n")
+    try:
+        extra = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}
+        subprocess.run(argv, cwd=cfg["cwd"], stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                       env=dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8"), timeout=300, **extra)
+    except (OSError, subprocess.SubprocessError) as exc:
+        log.write(f"Couldn't write the failed saves log: {exc}\n")
+
+
 def main():
     cfg = load(sys.argv[1])
     state_file, log_file = cfg["state_file"], cfg["log_file"]
@@ -186,7 +201,10 @@ def main():
 
     with open(log_file, "a", encoding="utf-8", errors="replace", buffering=1) as log:
         runner = Runner(cfg, state, log)
-        runner.run()
+        try:
+            runner.run()
+        finally:
+            finish(cfg, log)
 
     state.update(status=runner.final, current=None, finished_at=now(), heartbeat=now())
     save(state_file, state)

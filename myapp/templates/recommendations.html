@@ -1,7 +1,8 @@
 {% extends "app_base.html" %}
 {% load static %}
 {% block title %}Recommendations{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/recommendations.css' %}?v={% now 'U' %}">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/recommendations.css' %}?v={% now 'U' %}">
+<link rel="stylesheet" href="{% static 'myapp/rec-context.css' %}?v={% now 'U' %}">{% endblock %}
 {% block page_content %}
 <section class="page is-active" id="page-recommendations">
   <header class="page-header"><h1>Recommendations</h1></header>
@@ -40,11 +41,32 @@
     {% if subject %}
       {% if subject.exists %}
       <p class="form-msg rec-note">
-        <strong>{{ subject.code }} — {{ subject.name }}</strong>.
-        In-demand skills that fit this subject, ranked by job-market demand minus how deeply the Professor Survey
-        says they're already taught here ({{ subject.respondents }} survey response{{ subject.respondents|pluralize }} for this subject).
-        Skills nobody reported yet are the ones you could add.
+        <strong>{{ subject.code }} — {{ subject.name }}</strong>{% if subject.year_label %} ({{ subject.year_label }}){% endif %}.
+        In-demand skills that fit this subject, with what you teach, what students learned here, how many subjects of
+        earlier year levels in the same program already build each one up, and the job-market demand. Updated by itself
+        after every survey.
       </p>
+      <section class="panel rc-signals">
+        <h2 class="section-title">Skills in this subject</h2>
+        <div class="rc-table-wrap">
+          <table class="rc-table">
+            <thead><tr><th>Skill</th><th>You teach</th><th>Students learned</th><th>Earlier year levels</th><th>Job demand</th><th>Suggestion</th></tr></thead>
+            <tbody>
+            {% for r in subject.rows %}
+              <tr>
+                <td><strong>{{ r.skill }}</strong></td>
+                <td>{{ r.taught|default:"Not taught" }}</td>
+                <td>{% if r.learned_n %}{{ r.learned }} <span class="muted">({{ r.learned_n }})</span>{% else %}<span class="muted">Not reported</span>{% endif %}</td>
+                <td>{% if r.earlier_n %}<span title="{{ r.earlier_subjects|join:', ' }}">{{ r.earlier_n }} subject{{ r.earlier_n|pluralize }}, {{ r.earlier_level }}</span>{% else %}<span class="muted">Not built up earlier</span>{% endif %}</td>
+                <td>{{ r.industry_pct }}%</td>
+                <td><span class="rc-tag rc-tag--{{ r.tag }}">{{ r.tag_label }}</span></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="muted rc-small">A skill counts as taught or learned in a subject once at least {{ subject.min_respondents }} people report it there. Job demand is the share of IT/CS job postings in the data set that ask for it.</p>
+      </section>
       {% else %}
       <p class="form-msg rec-note">{{ subject.error }}</p>
       {% endif %}
@@ -100,14 +122,17 @@
           <div class="rec-skill" data-skill="{{ row.skill }}">
             <div class="rec-skill-head">
               <label class="rec-skill-pick">
-                <input type="checkbox" name="skills" value="{{ row.skill }}" {% if not row.cached_resources %}checked{% endif %}>
+                <input type="checkbox" name="skills" value="{{ row.skill }}" {% if not row.cached_resources and not row.finding and row.tag != "on_track" %}checked{% endif %}>
                 <span class="rec-skill-name">{{ row.skill }}</span>
               </label>
               <span class="rec-skill-stats muted">
-                {{ row.industry_pct }}% of postings{% if subject %} · {% if row.subject_depth_pct is not None %}taught here at {{ row.subject_depth_pct }}% depth{% else %}not reported for this subject yet{% endif %}{% elif gap.has_survey_data %} · {{ row.academic_pct }}% depth-weighted coverage{% endif %}
+                {{ row.industry_pct }}% of postings{% if subject %}{% elif gap.has_survey_data %} · {{ row.academic_pct }}% depth-weighted coverage{% endif %}
               </span>
+              {% if row.tag %}<span class="rc-tag rc-tag--{{ row.tag }}">{{ row.tag_label }}</span>{% endif %}
               {% if row.cached_resources %}<span class="pill rec-pill-generated">generated</span>{% endif %}
             </div>
+            {% if row.why %}<p class="rc-why"><strong>Why:</strong> {{ row.why }}</p>{% endif %}
+            {% if row.finding %}<p class="rc-finding" role="status">Finding resources for this skill. They show up here within a few minutes.</p>{% endif %}
             <div class="rec-resources" data-skill-slot="{{ row.skill }}">
               {% include "_rec_cards.html" with resources=row.cached_resources %}
             </div>

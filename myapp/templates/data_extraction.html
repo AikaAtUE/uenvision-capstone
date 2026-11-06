@@ -85,6 +85,8 @@
             <input type="number" name="max_jobs" value="{{ form.max_jobs }}" min="1" step="1" placeholder="No limit">
             <small class="field-hint">Handy for a quick test run. Jobs already downloaded are skipped and don't count.</small>
           </label>
+
+          {% include "_dx_failed_saves.html" %}
         </div>
       </details>
 
@@ -202,6 +204,8 @@
     </form>
     {# api_keys.txt is saved on its own (its textarea and button point here with form="api-keys-form") #}
     <form method="post" action="{% url 'api_keys_save' %}" id="api-keys-form">{% csrf_token %}</form>
+    {# the Delete buttons of the failed save lists point here with form="failed-saves-delete-form" #}
+    <form method="post" action="{% url 'failed_saves_delete' %}" id="failed-saves-delete-form">{% csrf_token %}</form>
 
     <h2 class="section-title settings-section-gap">What's in data/ right now</h2>
     <div id="summary-wrap">{% include "_data_summary.html" %}</div>

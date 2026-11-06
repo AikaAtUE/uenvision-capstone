@@ -2,6 +2,7 @@ from django.urls import path
 from django.views.generic import RedirectView
 
 from . import google_auth, student_views, survey_admin, survey_tracker, views
+from .views import rec_admin
 
 urlpatterns = [
     # Public site
@@ -19,6 +20,7 @@ urlpatterns = [
     path("me/role/", student_views.student_role_view, name="student_role"),
     path("me/about/", student_views.learner_about_save_view, name="learner_about_save"),
     path("me/recommendations/generate/", student_views.student_generate_view, name="student_generate"),
+    path("me/assumed-skills/", student_views.assumed_skill_view, name="assumed_skill"),
 
     path("login/", views.login_view, name="login"),
     path("session/ping/", views.session_ping_view, name="session_ping"),
@@ -37,6 +39,8 @@ urlpatterns = [
     path("data/", views.data_view, name="data"),
     path("data/table/", views.data_table_view, name="data_table"),
     path("data/download/<str:key>/", views.data_download_view, name="data_download"),
+    path("data/failed-saves/delete/", views.failed_saves_delete_view, name="failed_saves_delete"),
+    path("data/failed-saves/<str:name>/", views.failed_saves_download_view, name="failed_saves_download"),
     path("data/delete/<str:key>/", views.data_delete_view, name="data_delete"),
     path("data/clear/<str:source>/", views.data_clear_source_view, name="data_clear_source"),
     path("data/import/", views.data_import_view, name="data_import"),
@@ -85,6 +89,7 @@ urlpatterns = [
     path("data/survey-responses/", survey_admin.survey_responses_view, name="survey_responses"),
     path("data/survey-responses/delete/", survey_admin.survey_responses_delete_view, name="survey_responses_delete"),
     path("data/survey-tracker/", survey_tracker.survey_tracker_view, name="survey_tracker"),
+    path("data/recommendations/", rec_admin.rec_settings_view, name="rec_settings"),
     path("data/survey-tracker/remind/", survey_tracker.survey_tracker_remind_view, name="survey_tracker_remind"),
     path("data/professor-survey/", views.professor_survey_view, name="professor_survey"),
     path("data/professor-survey/submit/", views.professor_survey_submit_view, name="professor_survey_submit"),

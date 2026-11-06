@@ -314,3 +314,25 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 .dx-save-status[data-state="error"]{color:var(--red-dark, #a3161f); border-color:#f0c2c7; background:#fdf0f1; border-radius:12px;}
 [data-theme="dark"] .dx-save-status[data-state="saved"]{color:#7fd6a5; border-color:#2f5b45;}
 [data-theme="dark"] .dx-save-status[data-state="error"]{color:#ff8a94; background:#3a1d22; border-color:#6b2a33;}
+
+/* Data Extraction > Scrape Data: failed save lists; Console: this run's log */
+.dx-sub{border:1px solid var(--line); border-radius:10px;}
+.dx-sub > summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:12px 16px 12px 38px; position:relative;}
+.dx-sub > summary::-webkit-details-marker{display:none;}
+.dx-sub > summary::before{content:""; position:absolute; left:16px; top:50%; width:7px; height:7px; margin-top:-5px;
+  border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(-45deg); transition:transform .15s;}
+.dx-sub[open] > summary::before{transform:rotate(45deg); margin-top:-6px;}
+.dx-sub > summary:focus-visible{outline:2px solid var(--red); outline-offset:2px;}
+.dx-sub[open] > summary{border-bottom:1px solid var(--line);}
+.dx-sub-title{font-weight:700; font-size:.95rem; color:var(--ink);}
+.dx-sub-body{padding:12px 16px 14px; display:grid; gap:10px;}
+.dx-failed-list{list-style:none; margin:0; padding:0; max-height:420px; overflow-y:auto;}
+.dx-failed-list li{display:flex; align-items:center; gap:12px; padding:9px 2px; border-top:1px solid var(--line);}
+.dx-failed-list li:first-child{border-top:0;}
+.dx-failed-main{display:grid; gap:2px; min-width:0; flex:1;}
+.dx-failed-main a{font-weight:600; font-size:.86rem; overflow-wrap:anywhere;}
+.dx-failed-main .muted{font-size:.8rem;}
+.dx-body .dx-failed-delete{align-self:center; flex:none;}
+.run-failed-saves{margin:8px 0 12px; font-size:.88rem;}
+.run-failed-saves a{font-weight:600; overflow-wrap:anywhere;}

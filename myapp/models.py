@@ -278,3 +278,105 @@ class FeedbackForm(models.Model):
 
     def __str__(self):
         return f"Feedback form: {self.key}"
+
+
+# ---------------------------------------------------------------------------
+# Context-aware recommendations (subject_profiles.py, rec_context.py, rec_queue.py)
+# ---------------------------------------------------------------------------
+class SubjectSkillStat(models.Model):
+    """One row per (data set, program, subject, skill): the "subject profile" built from the
+    curriculum survey answers by subject_profiles.rebuild(). Derived data only: it is
+    deleted and rebuilt after every survey submit or edit, never typed by hand.
+
+    A subject is identified by its NAME (normalized, after the admin's subject aliases), so a
+    subject both programs share, or an elective two professors added with slightly different
+    codes, is one subject. `year` is the subject's year level in that program's curriculum
+    (None for a subject someone added that isn't in the curriculum)."""
+
+    is_dummy = models.BooleanField(default=False, db_index=True)
+    program = models.CharField(max_length=10, blank=True)       # "BSIT" / "BSCS"
+    subject_key = models.CharField(max_length=160, db_index=True)
+    subject_name = models.CharField(max_length=160)
+    codes = models.CharField(max_length=200, blank=True)        # the subject codes seen, "CCP 1101, ..."
+    year = models.PositiveSmallIntegerField(null=True, blank=True)
+    skill_key = models.CharField(max_length=120)
+    skill = models.CharField(max_length=120)
+    professors = models.PositiveIntegerField(default=0)         # how many professors reported it here
+    learners = models.PositiveIntegerField(default=0)           # how many students / alumni reported it here
+    professor_depth = models.FloatField(null=True, blank=True)  # mean level weight, 0-1
+    learner_depth = models.FloatField(null=True, blank=True)
+    rebuilt_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["is_dummy", "program", "subject_key"])]
+
+    @property
+    def respondents(self):
+        return self.professors + self.learners
+
+
+class SubjectAlias(models.Model):
+    """Set on Data > Recommendations: "this subject name is the same subject as that one",
+    for subjects that are named differently but taught the same (or electives people added
+    with different spellings). Both are matched by their normalized name."""
+
+    alias_key = models.CharField(max_length=160, unique=True)
+    alias_name = models.CharField(max_length=160)
+    same_as_key = models.CharField(max_length=160)
+    same_as_name = models.CharField(max_length=160)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["alias_name"]
+
+    def __str__(self):
+        return f"{self.alias_name} = {self.same_as_name}"
+
+
+class AssumedSkillChoice(models.Model):
+    """A student's answer to a skill UEnvision assumed they have (from earlier year levels):
+    "I have this" (confirmed) or "Remove" (removed)."""
+
+    CONFIRMED = "confirmed"
+    REMOVED = "removed"
+    CHOICES = [(CONFIRMED, "I have this"), (REMOVED, "Removed")]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assumed_skill_choices")
+    skill_key = models.CharField(max_length=120)
+    choice = models.CharField(max_length=10, choices=CHOICES)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "skill_key"], name="one_choice_per_assumed_skill")]
+
+
+class RecommendationJob(models.Model):
+    """One skill waiting for Gemini to find learning resources (rec_queue.py). Queued after
+    every survey submit for the recommended skills that have no resources yet, and worked
+    through in the background, a few at a time."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    STATUSES = [(PENDING, "Waiting"), (RUNNING, "Running"), (DONE, "Done"), (FAILED, "Failed")]
+
+    audience = models.CharField(max_length=10)          # "student" / "professor"
+    skill_key = models.CharField(max_length=120)
+    skill = models.CharField(max_length=120)
+    role = models.CharField(max_length=60, blank=True)  # job_roles key; "" = general list
+    context = models.CharField(max_length=300, blank=True)
+    status = models.CharField(max_length=10, choices=STATUSES, default=PENDING, db_index=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    error = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        constraints = [models.UniqueConstraint(fields=["audience", "skill_key", "role"], name="one_job_per_skill_role")]
+
+    def __str__(self):
+        return f"{self.audience}: {self.skill} ({self.role or 'general'}) {self.status}"

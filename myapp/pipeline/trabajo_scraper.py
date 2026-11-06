@@ -72,6 +72,11 @@ from urllib.robotparser import RobotFileParser
 import requests
 from bs4 import BeautifulSoup
 
+try:                                   # run as a script (the pipeline)
+    from failed_saves import Recorder
+except ImportError:                    # imported as myapp.pipeline.<scraper> (tests)
+    from .failed_saves import Recorder
+
 # --------------------------------------------------------------------------
 # Config / constants
 # --------------------------------------------------------------------------
@@ -198,6 +203,7 @@ class Fetcher:
         self.session = session
         self.max_failures = max_consecutive_failures
         self.consecutive_failures = 0
+        self.last_error = ""     # why the last get_html() returned None (for the failed saves log)
 
     def _record_failure(self) -> None:
         self.consecutive_failures += 1
@@ -208,8 +214,10 @@ class Fetcher:
             )
 
     def get_html(self, url: str) -> str | None:
+        self.last_error = ""
         if not is_allowed_url(url):
             log.error("Refusing to fetch non-allow-listed URL: %s", url)
+            self.last_error = "The address isn't on the allowed site"
             return None
 
         for attempt in range(1, MAX_RETRIES + 1):
@@ -222,6 +230,7 @@ class Fetcher:
                     # A redirect (e.g. to a login/captcha/other domain) must stay on-site.
                     if not is_allowed_url(resp.url):
                         log.error("Redirected off-site (%s -> %s); rejecting.", url, resp.url)
+                        self.last_error = f"Redirected off the site (to {resp.url})"
                         self._record_failure()
                         return None
 
@@ -229,10 +238,12 @@ class Fetcher:
                         ctype = resp.headers.get("Content-Type", "")
                         if "html" not in ctype.lower():
                             log.warning("Unexpected Content-Type %r for %s", ctype, url)
+                            self.last_error = f"The page wasn't HTML ({ctype or 'no content type'})"
                             self._record_failure()
                             return None
                         body = self._read_capped(resp)
                         if body is None:
+                            self.last_error = "The page was too large"
                             self._record_failure()
                             return None
                         self.consecutive_failures = 0
@@ -240,8 +251,10 @@ class Fetcher:
 
                     if resp.status_code == 404:
                         log.warning("404 Not Found: %s", url)
+                        self.last_error = "HTTP 404 Not Found (the posting may have been taken down)"
                         return None  # not a "block" signal; don't count it
 
+                    self.last_error = f"HTTP {resp.status_code} after {MAX_RETRIES} attempts"
                     if resp.status_code in (429, 503):
                         retry_after = resp.headers.get("Retry-After", "")
                         if retry_after.isdigit():
@@ -254,6 +267,7 @@ class Fetcher:
                         log.warning("Attempt %d/%d: HTTP %d for %s",
                                     attempt, MAX_RETRIES, resp.status_code, url)
             except requests.RequestException as exc:
+                self.last_error = f"Request error after {MAX_RETRIES} attempts: {type(exc).__name__}"
                 log.warning("Attempt %d/%d: request error for %s -> %s",
                             attempt, MAX_RETRIES, url, exc)
 
@@ -527,10 +541,20 @@ def scrape(
     max_pages: int | None,
     start_page: int,
     max_failures: int,
+    report_dir: Path | None = None,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     session = build_session()
     fetcher = Fetcher(session, max_failures)
+    recorder = Recorder(report_dir, "trabajo", keyword)
+    current = None          # the posting being fetched, if the circuit breaker stops the run on it
+
+    def job_id(job):
+        m = JOB_PATH_RE.match(urlparse(job["url"]).path)
+        return job.get("data_id") or (f"{m.group(1)}-{m.group(2)}" if m else "")
+
+    def fail(job, reason):
+        recorder.failed(reason, job_id(job), job.get("title"), job.get("company"), job["url"])
 
     rp = load_robots(session)
     random_delay(delay_min, delay_max)
@@ -591,13 +615,17 @@ def scrape(
                 if not robots_allows(rp, job["url"]):
                     log.warning("robots.txt disallows %s; skipping.", job["url"])
                     failed += 1
+                    fail(job, "The site's robots.txt doesn't allow fetching it")
                     continue
 
                 log.info("Fetching job: %s", job["url"])
+                current = job
                 detail_html = fetcher.get_html(job["url"])
+                current = None
                 random_delay(delay_min, delay_max)
                 if detail_html is None:
                     failed += 1
+                    fail(job, "Couldn't fetch the job page: " + (fetcher.last_error or "no response"))
                     continue
 
                 try:
@@ -605,6 +633,7 @@ def scrape(
                 except Exception as exc:  # parsing bug must not kill the run
                     log.error("Parse error for %s: %s", job["url"], exc)
                     failed += 1
+                    fail(job, f"Couldn't read the job page: {type(exc).__name__}: {exc}")
                     continue
 
                 record["listing"] = {
@@ -617,8 +646,16 @@ def scrape(
                 record["search_keyword"] = keyword
                 record["scraped_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-                atomic_write_json(out_path, record)
+                try:
+                    atomic_write_json(out_path, record)
+                except (OSError, TypeError, ValueError) as exc:
+                    log.error("Couldn't write %s: %s", out_path, exc)
+                    failed += 1
+                    fail(job, f"Couldn't write the JSON file: {exc}")
+                    continue
                 saved += 1
+                recorder.saved(job_id(job), job.get("title") or record.get("title"),
+                               job.get("company"), job["url"])
                 log.info("Saved -> %s", out_path)
 
             # Pagination ends ONLY when there is no "Next" button.
@@ -629,6 +666,10 @@ def scrape(
 
     except AbortScrape as exc:
         log.error("ABORTED: %s", exc)
+        if current is not None:
+            failed += 1
+            fail(current, "Couldn't fetch the job page: " + (fetcher.last_error or "no response")
+                 + f"; the search was then stopped ({exc})")
     except KeyboardInterrupt:
         log.warning("Interrupted by user; progress is saved (re-run to resume).")
 
@@ -663,6 +704,8 @@ def parse_args() -> argparse.Namespace:
                    help="Listing page to start from (default: 1).")
     p.add_argument("--max-failures", type=int, default=DEFAULT_MAX_CONSECUTIVE_FAILURES,
                    help="Abort after this many consecutive failed requests (default: 5).")
+    p.add_argument("--report-dir", default=None,
+                   help="Folder for the failed saves log of this run (written by the Data Extraction page).")
     p.add_argument("--verbose", "-v", action="store_true", help="Debug logging.")
     p.add_argument("--test-listing", metavar="HTML_FILE",
                    help="Parse a saved listing page offline and print the result.")
@@ -709,6 +752,7 @@ def main() -> None:
         max_pages=args.max_pages,
         start_page=args.start_page,
         max_failures=args.max_failures,
+        report_dir=Path(args.report_dir) if args.report_dir else None,
     )
 
 

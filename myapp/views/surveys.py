@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from ..models import (CustomUser, CurriculumSurveyResponse)
 from .. import curriculum_data
 from .. import ontology
+from .. import rec_queue
 from .. import skill_suggestions
 from .common import _safe_json
 
@@ -99,6 +100,7 @@ def _learner_survey_saved(request, response):
     if user.is_learner:
         response.user = user
         response.save(update_fields=["user"])
+        rec_queue.after_survey(user)   # context-aware recommendations, in the background
         return JsonResponse({"ok": True, "next_url": reverse("student_dashboard")})
     return JsonResponse({"ok": True})
 
@@ -281,6 +283,7 @@ def professor_survey_submit_view(request):
     if current is None:
         payload["consent_at"] = now
         _save_curriculum_survey(CurriculumSurveyResponse.PROFESSOR, payload, user=request.user)
+        rec_queue.after_survey(request.user)
         # First answer: faculty were held on this page until now, so take them in.
         return JsonResponse({"ok": True, "created": True, "next_url": reverse("dashboard")})
     data = dict(current.data or {})
@@ -289,6 +292,7 @@ def professor_survey_submit_view(request):
     data["edited_at"] = now
     current.data = data
     current.save(update_fields=["data"])
+    rec_queue.after_survey(request.user)
     return JsonResponse({"ok": True, "created": False, "edited_at": now})
 
 

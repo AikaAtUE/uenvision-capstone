@@ -19,12 +19,13 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from django.conf import settings
@@ -99,6 +100,57 @@ def ontology_dir() -> Path:
 
 def state_dir() -> Path:
     return data_dir() / ".state"
+
+
+def failed_saves_dir() -> Path:
+    """The downloadable failed saves logs (see failed_saves.py)."""
+    return data_dir() / "failed_saves"
+
+
+def failed_saves_run_dir() -> Path:
+    """What the current / last run's scrapers recorded, before it becomes a failed saves log."""
+    return state_dir() / "failed_saves_run"
+
+
+def build_failed_saves_report(stamp: str | None = None):
+    """Turn the last run's records into its failed saves log (once). Returns the path or None."""
+    from . import failed_saves
+    stamp = stamp or _read_state().get("failed_saves_stamp") or _stamp()
+    return failed_saves.build_report(failed_saves_run_dir(), failed_saves_dir(), stamp, order=SOURCES)
+
+
+def last_failed_saves_report() -> str | None:
+    """The last run's failed saves log file name, "" when nothing failed, None when not built."""
+    from . import failed_saves
+    return failed_saves.report_of(failed_saves_run_dir())
+
+
+def list_failed_saves(limit=None) -> list[dict]:
+    from . import failed_saves
+    return failed_saves.list_reports(failed_saves_dir(), limit)
+
+
+def failed_saves_path(name: str):
+    from . import failed_saves
+    return failed_saves.safe_report_path(failed_saves_dir(), name)
+
+
+def delete_failed_saves(name: str) -> str | None:
+    """Delete one failed saves log. Returns an error message, or None when done."""
+    path = failed_saves_path(name)
+    if path is None:
+        return "That failed save list doesn't exist (it may already be deleted)."
+    try:
+        path.unlink()
+    except OSError as exc:
+        return f"Couldn't delete {name}: {exc}"
+    return None
+
+
+def _stamp() -> str:
+    """Now, Philippine time (as the Automation section), for file names: 2026-11-06_2130."""
+    hours = getattr(settings, "AUTOMATION_UTC_OFFSET_HOURS", 8)
+    return datetime.now(timezone(timedelta(hours=hours))).strftime("%Y-%m-%d_%H%M")
 
 
 def api_keys_path() -> Path:
@@ -673,7 +725,8 @@ def build_steps(cfg: dict) -> list[dict]:
                     "name": f"scrape_{src}_{len(steps)}", "label": f"Scrape {info.label}: “{term}”",
                     "lane": src, "continue_on_fail": True,
                     "argv": info.scrape_argv(py, PIPELINE_DIR, term, json_dir(src),
-                                             cfg["delay_min"], cfg["delay_max"], cfg.get("max_jobs"))})
+                                             cfg["delay_min"], cfg["delay_max"], cfg.get("max_jobs"),
+                                             report_dir=failed_saves_run_dir())})
         if cfg.get("do_compile"):
             # A source whose searches found nothing new fails to compile; the others go on, and
             # its existing compiled CSV (if any) is still extracted.
@@ -807,6 +860,12 @@ def start_run(cfg: dict, kind: str = "extraction", wait: bool = False) -> str | 
     if cfg.get("do_extract") and state_json.is_file() and not extracted_csv().is_file():
         state_json.unlink()
 
+    # A fresh folder for this run's failed saves records (the last run's log is already built).
+    shutil.rmtree(failed_saves_run_dir(), ignore_errors=True)
+    stamp = _stamp()
+    if cfg.get("do_scrape") and sources:
+        failed_saves_run_dir().mkdir(parents=True, exist_ok=True)
+
     _log_file().write_text("", encoding="utf-8")
     log_to_console(f"Run started: {', '.join(x['label'] for x in steps)}. "
                    "It keeps going in the background, so you can leave this page.", "INFO")
@@ -816,6 +875,7 @@ def start_run(cfg: dict, kind: str = "extraction", wait: bool = False) -> str | 
                   + (" (automatic run)" if kind == "automation" else ""),
         "started_at": _now(), "heartbeat": _now(),
         "finished_at": None, "current": None, "pid": None, "error": None,
+        "failed_saves_stamp": stamp if cfg.get("do_scrape") and sources else None,
         "steps": [{"name": s["name"], "label": s["label"], "status": "pending"} for s in steps],
         "summary": {"searches": cfg.get("searches") if cfg.get("do_scrape") else None,
                     "delay_min": cfg.get("delay_min"), "delay_max": cfg.get("delay_max"),
@@ -826,6 +886,10 @@ def start_run(cfg: dict, kind: str = "extraction", wait: bool = False) -> str | 
     run_cfg = {"state_file": str(_run_file()), "log_file": str(_log_file()),
                "cwd": str(settings.BASE_DIR), "steps": steps,
                "lane_labels": {s: SOURCE_LABELS[s] for s in SOURCES}}
+    if cfg.get("do_scrape") and sources:
+        # Run when the run ends, whatever happened: the failed saves log of this run.
+        run_cfg["finish_argv"] = [sys.executable, "-u", str(PIPELINE_DIR / "failed_saves.py"),
+                                  str(failed_saves_run_dir()), str(failed_saves_dir()), stamp, *SOURCES]
     cfg_path = state_dir() / "run_config.json"
     _atomic_write_text(cfg_path, json.dumps(run_cfg, indent=2))
 
@@ -888,6 +952,14 @@ def stop_run() -> bool:
     _atomic_write_text(_run_file(), json.dumps(st, indent=2))
     with open(_log_file(), "a", encoding="utf-8") as f:
         f.write("\n=== Stopped by user. Progress so far is saved; running again resumes where it left off. ===\n")
+    if st.get("failed_saves_stamp"):
+        try:
+            path = build_failed_saves_report(st["failed_saves_stamp"])
+        except OSError:
+            path = None
+        if path:
+            log_to_console(f"Failed saves log: {path.name} (download it from Data Extraction > Scrape Data "
+                           "or the Console).", "INFO")
     return True
 
 

@@ -1,0 +1,67 @@
+/* Context-aware recommendations: student dashboard (assumed skills, "why", coming up),
+   faculty Recommendations (four signals per skill) and Data > Recommendations. */
+.rc-context{display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin:-6px 0 18px; font-size:.86rem;}
+.rc-chip{display:inline-block; padding:4px 12px; border-radius:999px; background:var(--card); border:1px solid var(--line); color:var(--ink); font-weight:600;}
+.rc-sub{margin:-6px 0 14px;}
+.rc-why{margin:8px 0 0; padding:9px 12px; border-radius:8px; background:var(--soft); font-size:.86rem; line-height:1.45;}
+.rc-finding{margin:8px 0 0; padding:10px 12px; border:1px dashed var(--line-strong); border-radius:8px; color:var(--muted); font-size:.86rem;}
+.rc-small{font-size:.8rem; margin:10px 0 0;}
+
+/* assumed skills */
+.sd-pill--assumed{outline:1px dashed currentColor; outline-offset:-3px;}
+.rc-assumed-list{list-style:none; margin:0; padding:0; display:grid; gap:10px;}
+.rc-assumed-item{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 12px; border:1px dashed var(--line-strong); border-radius:8px; background:var(--soft);}
+.rc-assumed-item.is-confirmed{border-style:solid;}
+.rc-assumed-text{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 260px;}
+.rc-assumed-src{font-size:.8rem;}
+.rc-assumed-actions{display:flex; gap:8px;}
+.rc-assumed-actions form{margin:0;}
+.rc-removed{margin:12px 0 0; font-size:.84rem;}
+.rc-undo{display:inline; margin:0;}
+
+/* coming up */
+.rc-coming-list{list-style:none; margin:0; padding:0;}
+.rc-coming-list li{display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; padding:9px 0; border-top:1px solid var(--line); font-size:.9rem;}
+
+/* faculty: four signals */
+.rc-signals{margin:0 0 18px;}
+.rc-table-wrap{overflow-x:auto;}
+.rc-table{width:100%; min-width:760px; border-collapse:collapse; font-size:.86rem;}
+.rc-table th{text-align:left; font-size:.76rem; color:var(--muted); font-weight:600; padding:6px 8px; border-bottom:2px solid var(--line);}
+.rc-table td{padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:top;}
+.rc-tag{display:inline-block; padding:3px 10px; border-radius:999px; font-size:.74rem; font-weight:700; white-space:nowrap;}
+.rc-tag--not_landing{background:#f6d5d8; color:#8a1520;}
+.rc-tag--add{background:#fff1cc; color:#7a5300;}
+.rc-tag--build{background:#e3e9f6; color:#24365e;}
+.rc-tag--deepen{background:#eceaf8; color:#4a3b8f;}
+.rc-tag--on_track{background:#d9f0e3; color:#1d6b41;}
+.rec-skill-head .rc-tag{margin-left:4px;}
+
+/* Data > Recommendations */
+.rc-intro{max-width:860px;}
+.rc-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; margin:14px 0 18px;}
+.rc-panel p{line-height:1.5;}
+.rc-h{margin:0 0 6px; font-size:1.02rem;}
+.rc-inline{display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; margin:10px 0;}
+.rc-inline form{margin:0;}
+.rc-field{display:flex; flex-direction:column; gap:4px; font-size:.82rem; font-weight:600;}
+.rc-field input{min-height:40px; padding:0 10px; border:1px solid var(--line-strong); border-radius:8px; background:var(--input-bg); color:var(--ink); font:inherit; font-weight:400;}
+.rc-field input[type=number]{width:96px;}
+.rc-grow{flex:1 1 240px;}
+.rc-counts{list-style:none; margin:10px 0; padding:0; display:flex; flex-wrap:wrap; gap:8px 18px; font-size:.9rem;}
+.rc-details{margin-top:10px; font-size:.86rem;}
+.rc-list{margin:8px 0 0; padding-left:18px; line-height:1.5;}
+.rc-aliases .table-wrap{margin-top:12px;}
+
+:root[data-theme="dark"] .rc-tag--not_landing{background:#3a1519; color:#f4a7ae;}
+:root[data-theme="dark"] .rc-tag--add{background:#3a2f12; color:#f3dc9b;}
+:root[data-theme="dark"] .rc-tag--build{background:#1a2440; color:#b8c7ec;}
+:root[data-theme="dark"] .rc-tag--deepen{background:#252046; color:#c9c0f2;}
+:root[data-theme="dark"] .rc-tag--on_track{background:#163526; color:#94dcb4;}
+
+@media (max-width: 640px){
+  .rc-assumed-actions{width:100%;}
+  .rc-assumed-actions form, .rc-assumed-actions .btn{flex:1; width:100%; min-height:44px;}
+  .rc-inline .btn{min-height:44px;}
+}

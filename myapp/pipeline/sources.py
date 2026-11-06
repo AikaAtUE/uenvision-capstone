@@ -4,7 +4,9 @@ The job sources the Data Extraction page can scrape, in one place.
 Adding a third source later takes three things:
   1. its scraper script in this folder, saving one JSON file per job posting into an
      output folder and taking the search words from a command-line option
-     (the options below are the ones Kalibrr's and Trabajo's scrapers already take);
+     (the options below are the ones Kalibrr's and Trabajo's scrapers already take),
+     and recording each job posting it saves or fails to save with failed_saves.Recorder
+     (--report-dir), so its failures show up in the failed saves log;
   2. its JSON layout in compile_jobs_to_csv.py (that script's SOURCES table), so the
      JSONs can be compiled into data/compiled_<key>.csv;
   3. one JobSource line in REGISTRY below.
@@ -24,12 +26,14 @@ class JobSource:
     search_option: str  # the scraper's option for the search words
 
     def scrape_argv(self, python: str, pipeline_dir: Path, search: str, output_dir: Path,
-                    delay_min: float, delay_max: float, max_jobs=None) -> list[str]:
+                    delay_min: float, delay_max: float, max_jobs=None, report_dir=None) -> list[str]:
         argv = [python, "-u", str(pipeline_dir / self.scraper),
                 f"{self.search_option}={search}", f"--output-dir={output_dir}",
                 f"--delay-min={delay_min}", f"--delay-max={delay_max}"]
         if max_jobs:
             argv.append(f"--max-jobs={max_jobs}")
+        if report_dir:
+            argv.append(f"--report-dir={report_dir}")
         return argv
 
 

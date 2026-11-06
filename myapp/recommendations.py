@@ -69,7 +69,10 @@ RECS_FILES = {
     "student": "student_learning_recommendations.csv",
 }
 RECS_FILENAME = RECS_FILES["professor"]
-RECS_COLUMNS = ["skill", "type", "name", "provider", "link", "photo", "verified", "context", "generated_at"]
+RECS_COLUMNS = ["skill", "type", "name", "provider", "link", "photo", "verified", "context", "generated_at", "role"]
+# "role" (student resources only): the job_roles key the resources were found for, so two
+# students aiming for the same role share one list per skill. Blank = the general list
+# (no role picked, professors, and every row saved before roles were added).
 # "verified" column values written by verify_resource(). Older rows say "no" /
 # "no (ungrounded)" -- they were saved before links were checked.
 LINK_CHECKED = "link checked"
@@ -138,9 +141,8 @@ def recs_path(audience: str = "professor") -> Path:
     return Path(settings.DATA_DIR) / RECS_FILES[audience]
 
 
-def load_recommendations(audience: str = "professor") -> dict:
-    """-> {skill_lower: [row, ...]} from whatever's already on disk, or {} if
-    nothing has been generated yet."""
+def load_all_recommendations(audience: str = "professor") -> dict:
+    """-> {(skill_lower, role): [row, ...]} for every role (role "" = the general list)."""
     path = recs_path(audience)
     if not path.is_file():
         return {}
@@ -149,14 +151,28 @@ def load_recommendations(audience: str = "professor") -> dict:
         for row in csv.DictReader(f):
             key = (row.get("skill") or "").strip().lower()
             if key:
-                out.setdefault(key, []).append(row)
+                out.setdefault((key, (row.get("role") or "").strip()), []).append(row)
     return out
 
 
-def _write_recommendations(by_skill: dict, audience: str = "professor") -> None:
+def load_recommendations(audience: str = "professor", role: str = "") -> dict:
+    """-> {skill_lower: [row, ...]} for one role ("" = the general list), or {} if nothing
+    has been generated yet."""
+    return {skill: rows for (skill, r), rows in load_all_recommendations(audience).items() if r == role}
+
+
+def resources_for(skill: str, role: str = "", audience: str = "student", loaded: dict | None = None) -> list:
+    """The resources to show for one skill: the role's own list, else the general list."""
+    loaded = load_all_recommendations(audience) if loaded is None else loaded
+    key = skill.strip().lower()
+    return loaded.get((key, role)) or loaded.get((key, "")) or []
+
+
+def _write_recommendations(by_key: dict, audience: str = "professor") -> None:
+    """by_key: load_all_recommendations()'s shape."""
     path = recs_path(audience)
     path.parent.mkdir(parents=True, exist_ok=True)
-    rows = [r for rows in by_skill.values() for r in rows]
+    rows = [r for rows in by_key.values() for r in rows]
     tmp = path.with_suffix(".csv.tmp")
     with open(tmp, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.DictWriter(f, fieldnames=RECS_COLUMNS, lineterminator="\r\n", extrasaction="ignore")
@@ -466,11 +482,13 @@ def _call_gemini(client, model: str, skill: str, audience: str = "professor", co
     return out
 
 
-def generate_for_skills(skills: list, audience: str = "professor", context: str = "") -> dict:
+def generate_for_skills(skills: list, audience: str = "professor", context: str = "", role: str = "") -> dict:
     """Calls Gemini for exactly these skills (caller decides which ones are
     worth (re)generating), merges the results into the on-disk CSV, and
     returns {"results": {skill: [row, ...]}, "errors": {skill: message},
     "key_errors": [{"key": "Key N", "error": message}, ...]}.
+
+    `role` (students): the job role the resources are for; they are saved under that role.
 
     Every key in api_keys.txt is tried: when a key fails (quota, rate limit,
     invalid key...) it is dropped for the rest of the run and the same skill is
@@ -513,7 +531,8 @@ def generate_for_skills(skills: list, audience: str = "professor", context: str 
             try:
                 resources = _call_gemini(client, MODEL, skill, audience, context)
                 stamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                rows = [{"skill": skill, "context": context, "generated_at": stamp, **r} for r in resources]
+                rows = [{"skill": skill, "context": context, "generated_at": stamp, "role": role, **r}
+                        for r in resources]
                 results[skill] = rows
                 break
             except RecommendationError as e:
@@ -546,10 +565,10 @@ def generate_for_skills(skills: list, audience: str = "professor", context: str 
 
     # Re-read just before writing so two people generating at once don't drop each other's rows.
     with _WRITE_LOCK:
-        by_skill = load_recommendations(audience)
+        by_key = load_all_recommendations(audience)
         for skill, rows in results.items():
-            by_skill[skill.strip().lower()] = rows
-        _write_recommendations(by_skill, audience)
+            by_key[(skill.strip().lower(), role)] = rows
+        _write_recommendations(by_key, audience)
     return {
         "results": results,
         "errors": errors,

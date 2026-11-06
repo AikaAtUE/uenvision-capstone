@@ -28,8 +28,10 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from . import curriculum_data, email_verification, feedback_nudge, gap_analysis, job_roles, ontology, recommendations, skill_suggestions, skills_catalog
-from .models import MIN_PASSWORD_LENGTH, CurriculumSurveyResponse, CustomUser
+from django.utils.http import url_has_allowed_host_and_scheme
+
+from . import curriculum_data, email_verification, feedback_nudge, gap_analysis, job_roles, ontology, rec_context, rec_queue, recommendations, skill_suggestions, skills_catalog, subject_profiles
+from .models import MIN_PASSWORD_LENGTH, AssumedSkillChoice, CurriculumSurveyResponse, CustomUser
 
 REGISTER_SALT = "uenvision-register"
 REGISTER_MAX_AGE = 3 * 24 * 3600   # a survey's "create your account" link works for 3 days
@@ -430,6 +432,9 @@ YOU_LEVELS = [
      "own yet. Does not count toward job readiness yet."),
     ("missing", "Not yet", "missing", "You haven’t reported this skill in any of your subjects."),
 ]
+# Put in front of a pill's meaning when the level was assumed (rec_context.py), not reported.
+ASSUMED_TEXT = ("Assumed: you didn't answer for this subject's year level, so this is the level other "
+                "students and professors reported there.")
 # Answers saved before the Introduced / Practiced / Applied levels (Beginner ... Expert).
 OLD_LEVEL_TEXT = {
     "strong": "From an older survey answer (Intermediate or higher). Counts toward job readiness.",
@@ -466,28 +471,25 @@ def render_student_dashboard(request, active_page="student_dashboard", as_kind=N
     is_alumni = as_kind == "alumni" if as_kind else user.role == CustomUser.Role.ALUMNI
     feedback_nudge.record_use(user)
     has_survey = CurriculumSurveyResponse.objects.filter(user=user).exists()
-    mine = _my_skills(user)
-    stats = job_roles.skill_stats(user.target_role, TOP_SKILLS)
-    role = stats.get("role") if stats.get("exists") else None
-    compare = (role["skills"] if role else stats["overall"]["skills"]) if stats.get("exists") else []
-    for s in compare:
-        s["status"], s["my_level"] = _status(mine, s["key"])
-        s["level_key"] = _you_level_key(s["status"], s["my_level"])
-    overall = stats["overall"]["skills"] if stats.get("exists") else []
-    for s in overall:
-        s["status"], s["my_level"] = _status(mine, s["key"])
-        s["level_key"] = _you_level_key(s["status"], s["my_level"])
+    plan = rec_context.student_plan(user, TOP_SKILLS, MAX_TO_BUILD)
+    ctx = plan["ctx"]
+    stats, role, compare, overall = plan["stats"], plan["role"], plan["compare"], plan["overall"]
     level_text = {key: text for key, _, _, text in YOU_LEVELS}
     level_text.update({f"old_{k}": v for k, v in OLD_LEVEL_TEXT.items()})
     for s in list(compare) + list(overall):
+        s["level_key"] = _you_level_key(s["status"], s["my_level"])
         s["level_text"] = level_text[s["level_key"]]
+        if s["assumed"]:
+            s["level_text"] = ASSUMED_TEXT + " " + s["level_text"]
 
-    have = sum(1 for s in compare if s["status"] == "strong")
-    readiness = round(have / len(compare) * 100) if compare else None
-    to_build = [s for s in compare if s["status"] != "strong"][:MAX_TO_BUILD]
-    cached = recommendations.load_recommendations("student")
+    have, readiness, to_build = plan["have"], plan["readiness"], plan["to_build"]
+    role_key = role["key"] if role else ""
+    loaded = recommendations.load_all_recommendations("student")
+    waiting = rec_queue.queued_keys("student", role_key)
     for s in to_build:
-        s["cached_resources"] = cached.get(s["skill"].strip().lower(), [])
+        s["cached_resources"] = recommendations.resources_for(s["skill"], role_key, loaded=loaded)
+        s["finding"] = not s["cached_resources"] and s["key"] in waiting
+    assumed = sorted(ctx["assumed"].values(), key=lambda a: (a["confirmed"], -a["weight"], a["skill"].lower()))
 
     return render(request, "student_dashboard.html", {
         "active_page": active_page,
@@ -504,7 +506,14 @@ def render_student_dashboard(request, active_page="student_dashboard", as_kind=N
         "have": have,
         "to_build": to_build,
         "you_levels": [{"key": k, "label": label, "status": status, "text": text} for k, label, status, text in YOU_LEVELS],
-        "my_skills": sorted(mine.values(), key=lambda m: (-m["weight"], m["skill"].lower())),
+        "my_skills": sorted(ctx["reported"].values(), key=lambda m: (-m["weight"], m["skill"].lower())),
+        "have_assumed": plan["have_assumed"],
+        "assumed": assumed,
+        "removed_assumed": ctx["removed"],
+        "coming_up": plan["coming_up"],
+        "context_program": curriculum_data.PROGRAM_LABELS.get(ctx["program"], ""),
+        "context_year": ctx["year"],
+        "min_respondents": subject_profiles.min_respondents(),
         "max_per_run": recommendations.MAX_SKILLS_PER_STUDENT_RUN,
         "default_photo": recommendations.DEFAULT_PHOTO,
     })
@@ -516,6 +525,7 @@ def student_role_view(request):
     role = request.POST.get("role", "")
     request.user.target_role = role if role in job_roles.ROLE_LABELS else ""
     request.user.save(update_fields=["target_role"])
+    rec_queue.after_survey(request.user)   # the new role needs its own learning resources
     # developers pick a role from the student view of their Dashboard
     return redirect("student_dashboard" if request.user.is_learner else "dashboard")
 
@@ -528,10 +538,10 @@ def student_generate_view(request):
     skills = skills[:recommendations.MAX_SKILLS_PER_STUDENT_RUN]
     if not skills:
         return JsonResponse({"ok": False, "error": "Choose at least one skill."}, status=400)
-    role = job_roles.ROLE_LABELS.get(request.user.target_role, "")
-    context = f"the learner wants to work as a {role}" if role else ""
+    role_key = request.user.target_role if request.user.target_role in job_roles.ROLE_LABELS else ""
+    context = rec_context.gemini_context(job_roles.ROLE_LABELS.get(role_key, ""), "")
     try:
-        out = recommendations.generate_for_skills(skills, "student", context)
+        out = recommendations.generate_for_skills(skills, "student", context, role_key)
     except recommendations.RecommendationError as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
     return JsonResponse({"ok": True, **out})
@@ -720,4 +730,25 @@ def my_skills_save_view(request):
     data["edited_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     response.data = data
     response.save(update_fields=["data"])
+    rec_queue.after_survey(request.user)
     return JsonResponse({"ok": True, "edited_at": data["edited_at"]})
+
+
+# ---------------------------------------------------------------------------
+# Assumed skills (rec_context.py): "I have this" / "Remove" / "Undo"
+# ---------------------------------------------------------------------------
+@login_required
+@require_POST
+def assumed_skill_view(request):
+    key = str(request.POST.get("skill_key") or "")[:120]
+    choice = request.POST.get("choice", "")
+    if key:
+        if choice in (AssumedSkillChoice.CONFIRMED, AssumedSkillChoice.REMOVED):
+            AssumedSkillChoice.objects.update_or_create(user=request.user, skill_key=key, defaults={"choice": choice})
+        elif choice == "undo":
+            AssumedSkillChoice.objects.filter(user=request.user, skill_key=key).delete()
+        rec_queue.after_survey(request.user)
+    nxt = request.POST.get("next", "")
+    if not url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        nxt = reverse("student_dashboard")
+    return redirect(nxt + "#assumed-skills")

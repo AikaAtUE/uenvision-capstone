@@ -13,6 +13,8 @@ from .. import feedback_nudge
 from .. import gap_analysis
 from .. import ghost_jobs
 from .. import job_roles
+from .. import rec_context
+from .. import rec_queue
 from .. import recommendations
 from .common import _sees_dummy_results, _sees_student_view, administrator_required
 
@@ -200,14 +202,20 @@ def recommendations_view(request):
     subject = None
     dummy = _sees_dummy_results(request)
     gap = gap_analysis.compute(top=10, dummy=dummy)
+    faculty = None
     if subject_value in dict(choices) or subject_value in custom:
-        subject = gap_analysis.subject_targets(subject_value, info=custom.get(subject_value), dummy=dummy)
-        rows = list(subject.get("targets") or []) if subject.get("exists") else []
+        # context-aware: taught by you / learned by students / earlier year levels / demand
+        faculty = rec_context.faculty_subject(subject_value, info=custom.get(subject_value), user=request.user,
+                                              dummy=dummy)
+        subject = faculty
+        rows = list(faculty.get("rows") or []) if faculty.get("exists") else []
     else:
         subject_value = ""
         rows = list(gap.get("under_taught") or []) if gap.get("exists") else []
+    waiting = rec_queue.queued_keys("professor")
     for row in rows:
         row["cached_resources"] = cached.get(row["skill"].strip().lower(), [])
+        row["finding"] = not row["cached_resources"] and row.get("key") in waiting
     return render(request, "recommendations.html", {
         "curriculum_suggestions": _curriculum_suggestions(request.user, gap, subject_value),
         "ghost": job_roles.ghost_summary(),
@@ -215,6 +223,7 @@ def recommendations_view(request):
         "gap": gap,
         "under_taught": rows,
         "subject": subject,
+        "faculty": faculty,
         "subject_value": subject_value,
         "subject_choices": choices,
         "my_subjects": _my_subjects(request.user),
