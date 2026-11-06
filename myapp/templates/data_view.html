@@ -3,7 +3,7 @@
 {% block title %}View Data{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
 {% block page_content %}
-<section class="page is-active" id="page-data" data-table-url="{% url 'data_table' %}"{% if user.is_administrator %} data-import-url="{% url 'data_import' %}" data-scrape-url="{% url 'data_scrape' %}"{% endif %}>
+<section class="page is-active" id="page-data" data-table-url="{% url 'data_table' %}"{% if user.is_administrator %} data-import-url="{% url 'data_import' %}" data-scrape-url="{% url 'data_extraction' %}"{% endif %}>
   <header class="page-header"><h1>Data</h1></header>
   <div class="page-body">
     {% include "_data_tabs.html" %}

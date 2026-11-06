@@ -1,0 +1,236 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Data Extraction{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/data-pages.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-data-extraction">
+  <header class="page-header"><h1>Data</h1></header>
+  <div class="page-body">
+    {% include "_data_tabs.html" %}
+    {% include "_messages.html" %}
+    <h2 class="section-title">Data extraction</h2>
+    <p class="muted data-lede">Scrape job postings, extract their skills with Gemini and check them for possible ghost jobs, in one run. Pick the steps under <strong>What to run</strong>, or let <strong>Automation</strong> run everything on a schedule. Everything is saved in the <code>data/</code> folder, and every step resumes where it left off if a run is stopped and started again.</p>
+
+    {% if run.status != 'idle' %}
+    <p class="run-note"><span class="run-badge" data-s="{{ run.status }}">{{ run.status|title }}</span>
+      <span class="muted">{% if run.status == 'running' %}A run is in progress{% if run.kind == 'automation' %} (automatic run){% endif %}.{% else %}Last run: {{ run.status }}{% if run.kind == 'automation' %} (automatic run){% endif %}.{% endif %}</span>
+      <a href="{% url 'console' %}">Open the console</a></p>
+    {% endif %}
+
+    <form class="dx-form" method="post" action="{% url 'data_extraction' %}" id="extraction-form">
+      {% csrf_token %}
+
+      {# ---------------- Scrape Data ---------------- #}
+      <details class="dx-section" id="scrape" data-key="scrape" open{% if errors.run %} data-keep{% endif %}>
+        <summary>
+          <span class="dx-sum-title">Scrape Data</span>
+          <span class="dx-sum-meta" id="scrape-meta">{% for s in job_sources %}{% if s.key in form.sources %}{{ s.label }} {% endif %}{% endfor %}· {% if form.search_mode == 'multiple' %}Multiple search ({{ multiple_count }} searches){% else %}Single search{% endif %}</span>
+        </summary>
+        <div class="dx-body">
+          <fieldset class="field-group">
+            <legend>Job sources</legend>
+            <div class="source-choice">
+              {% for s in job_sources %}
+              <label class="source-opt source-opt--check"><input type="checkbox" name="sources" value="{{ s.key }}"{% if s.key in form.sources %} checked{% endif %}>
+                <span><strong>{{ s.label }}</strong><small>{{ s.site }}</small></span></label>
+              {% endfor %}
+            </div>
+            <small class="field-hint">Tick more than one to scrape them at the same time, each at its own pace. The ticked sources are also the ones Skill Extraction reads.</small>
+          </fieldset>
+
+          <fieldset class="field-group">
+            <legend>Search</legend>
+            <div class="dx-seg" role="radiogroup" aria-label="Search mode">
+              <label><input type="radio" name="search_mode" value="single"{% if form.search_mode != 'multiple' %} checked{% endif %}><span>Single search</span></label>
+              <label><input type="radio" name="search_mode" value="multiple"{% if form.search_mode == 'multiple' %} checked{% endif %}><span>Multiple search</span></label>
+            </div>
+            <small class="field-hint">This switch is for runs you start yourself. Automation always uses the multiple search list.</small>
+          </fieldset>
+
+          <div class="dx-mode" data-mode="single"{% if form.search_mode == 'multiple' %} hidden{% endif %}>
+            <label class="field"><span>Search keyword</span>
+              <input type="text" name="keyword" value="{{ form.keyword }}" maxlength="100" placeholder="computer science">
+            </label>
+          </div>
+
+          <div class="dx-mode" data-mode="multiple"{% if form.search_mode != 'multiple' %} hidden{% endif %}>
+            <p class="dx-note">Each line is one search. These <strong>{{ locked_searches|length }}</strong> expected job roles of BSCS and BSIT graduates are set by <strong>CHED Memorandum Order No. 25, s. 2015</strong>, so they are always searched and can't be edited or removed.</p>
+            <ol class="dx-locked" aria-label="Searches that are always run">
+              {% for s in locked_searches %}
+              <li><svg class="dx-lock" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2h.5A1.5 1.5 0 0 1 13.5 8.5v5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 4 7zm1.5 0h4V5a2 2 0 0 0-4 0z" fill="currentColor"/></svg>
+                <span class="dx-term">{{ s.term }}</span>
+                <span class="dx-tags">{% for t in s.tags %}<span class="dx-tag">{{ t }}</span>{% endfor %}</span></li>
+              {% endfor %}
+            </ol>
+            <label class="field"><span>Add more searches <em class="opt">(one per line)</em></span>
+              <textarea name="extra_searches" id="extra-searches" rows="5" spellcheck="false" placeholder="DevOps Engineer&#10;Cloud Engineer">{{ extra_text }}</textarea>
+            </label>
+            <small class="field-hint" id="search-count" data-locked="{{ locked_searches|length }}">{{ multiple_count }} searches in all: {{ locked_searches|length }} from CHED and {{ form.extra_searches|length }} added.</small>
+          </div>
+
+          <div class="field-row">
+            <label class="field"><span>Minimum interval (seconds)</span>
+              <input type="number" name="delay_min" value="{{ form.delay_min }}" min="0" max="600" step="0.1" required>
+            </label>
+            <label class="field"><span>Maximum interval (seconds)</span>
+              <input type="number" name="delay_max" value="{{ form.delay_max }}" min="0" max="600" step="0.1" required>
+            </label>
+          </div>
+          <small class="field-hint">A random pause between these two values is taken before every request, so the site isn't hammered. Longer is gentler.</small>
+
+          <label class="field"><span>Max new jobs per search <em class="opt">(optional)</em></span>
+            <input type="number" name="max_jobs" value="{{ form.max_jobs }}" min="1" step="1" placeholder="No limit">
+            <small class="field-hint">Handy for a quick test run. Jobs already downloaded are skipped and don't count.</small>
+          </label>
+        </div>
+      </details>
+
+      {# ---------------- Skill Extraction ---------------- #}
+      <details class="dx-section" id="skills" data-key="skills" open{% if errors.run %} data-keep{% endif %}>
+        <summary>
+          <span class="dx-sum-title">Skill Extraction</span>
+          <span class="dx-sum-meta">{{ form.model }} · {{ form.batch_size }} rows per prompt · {{ key_count }} API key{{ key_count|pluralize }}</span>
+        </summary>
+        <div class="dx-body">
+          <p class="dx-note">Gemini reads the compiled job postings of the ticked sources and pulls out the skills of each one into <code>data/extracted_skills.csv</code> (a <code>source</code> column says where each row came from). Jobs already extracted are not sent again. Standardizing then matches each hard skill to one name in the skills ontology; your original wording is kept in <code>hard_skills_raw</code>.</p>
+
+          <label class="field"><span>Rows per prompt</span>
+            <input type="number" name="batch_size" value="{{ form.batch_size }}" min="1" max="{{ max_batch }}" step="1" required>
+            <small class="field-hint">How many job postings are sent to Gemini in one request (1–{{ max_batch }}, default 20). Smaller batches are slower but fail less often.</small>
+          </label>
+
+          <label class="field"><span>Gemini model</span>
+            <input type="text" name="model" value="{{ form.model }}" placeholder="{{ default_model }}" spellcheck="false" autocomplete="off" maxlength="80" required>
+            <small class="field-hint">Any model name your API keys can use, e.g. <code>{{ default_model }}</code>. If Gemini answers “model not found”, change it here.</small>
+          </label>
+
+          <label class="field"><span>api_keys.txt <em class="opt">(Gemini API keys, one per line)</em></span>
+            <textarea name="keys" id="keys-text" rows="4" spellcheck="false" autocomplete="off" wrap="off" placeholder="AIza…">{{ keys_text }}</textarea>
+            <small class="field-hint">When a key runs out of daily quota or is rejected, extraction moves on to the next line. Lines starting with <code>#</code> are ignored. Currently {{ key_count }} key{{ key_count|pluralize }}.</small>
+          </label>
+          <button type="submit" class="btn btn-ghost" formaction="{% url 'api_keys_save' %}" formnovalidate>Save api_keys.txt</button>
+        </div>
+      </details>
+
+      {# ---------------- Ghost Job Detection ---------------- #}
+      <details class="dx-section" id="ghost" data-key="ghost"{% if errors.ghost %} open data-keep{% endif %}>
+        <summary>
+          <span class="dx-sum-title">Ghost Job Detection</span>
+          <span class="dx-sum-meta">{% if ghost_has_data %}{{ flagged|length }} of {{ ghost_total }} posting{{ ghost_total|pluralize }} marked{% else %}No extracted postings yet{% endif %}</span>
+        </summary>
+        <div class="dx-body">
+          <p class="dx-note">Postings that look like ghost jobs (not a real, open position) are only <strong>marked</strong>. Nothing is removed from the data sets, and every result still counts them unless someone turns on <em>Exclude possible ghost jobs</em> in the Dashboard's Filter. The marks follow these settings as soon as they are saved.</p>
+          <label class="checkbox"><input type="checkbox" name="flag_duplicates"{% if ghost.flag_duplicates %} checked{% endif %}>
+            <span><strong>Flag the same job posted twice</strong><br><small class="field-hint">Same company and same job title under a different job ID, on any source. This alone marks a posting. When excluded, the newest copy is kept so the job still counts once.</small></span></label>
+          <fieldset class="field-group ghost-weak">
+            <legend>Weak signs</legend>
+            <label class="checkbox"><input type="checkbox" name="flag_hidden_salary"{% if ghost.flag_hidden_salary %} checked{% endif %}>
+              <span><strong>Salary is hidden</strong></span></label>
+            <label class="checkbox"><input type="checkbox" name="flag_unverified"{% if ghost.flag_unverified %} checked{% endif %}>
+              <span><strong>Company is not verified</strong> <small class="muted">(Kalibrr only)</small></span></label>
+            <div class="field-row">
+              <label class="field"><span>Description shorter than (characters)</span>
+                <input type="number" name="min_description_chars" value="{{ ghost.min_description_chars }}" min="0" max="{{ max_chars }}" step="1" required>
+              </label>
+              <label class="field"><span>Weak signs needed</span>
+                <select name="weak_signs_needed">
+                  <option value="1"{% if ghost.weak_signs_needed == 1 %} selected{% endif %}>1 sign</option>
+                  <option value="2"{% if ghost.weak_signs_needed == 2 %} selected{% endif %}>2 signs</option>
+                </select>
+              </label>
+            </div>
+            <small class="field-hint">0 characters turns the description check off. The description is read from the compiled job files.</small>
+          </fieldset>
+
+          <h3 class="card-title dx-subhead">Marked postings</h3>
+          {% if not ghost_has_data %}
+            <p class="muted">No extracted skills yet, so there's nothing to check.</p>
+          {% else %}
+            <p class="muted table-count"><strong>{{ flagged|length }}</strong> of {{ ghost_total }} posting{{ ghost_total|pluralize }} marked as possible ghost jobs. With the exclude switch on, {{ ghost_excluded }} of them are left out of the results.</p>
+            {% if flagged %}
+            <div class="table-wrap dx-ghost-table">
+              <table class="sr-table ghost-table">
+                <thead><tr><th>Job</th><th>Company</th><th>Source</th><th>Why it's marked</th><th>When excluded</th></tr></thead>
+                <tbody>
+                {% for r in flagged %}
+                  <tr>
+                    <td>{% if r.job_url %}<a href="{{ r.job_url }}" target="_blank" rel="noopener noreferrer">{{ r.job_name }}</a>{% else %}{{ r.job_name }}{% endif %}<br><span class="muted">#{{ r.job_id }}{% if r.date %} · {{ r.date|slice:":10" }}{% endif %}</span></td>
+                    <td>{{ r.company_name|default:"—" }}</td>
+                    <td>{{ r.source|capfirst }}</td>
+                    <td><span class="pill pill--ghost">Possible ghost job</span><ul class="ghost-reasons">{% for reason in r.reasons %}<li>{{ reason }}</li>{% endfor %}</ul></td>
+                    <td>{% if r.excluded %}Left out{% else %}Kept (newest copy){% endif %}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p class="muted">No postings match the current settings.</p>
+            {% endif %}
+          {% endif %}
+        </div>
+      </details>
+
+      {# ---------------- What to run ---------------- #}
+      <div class="settings-card dx-run" id="run">
+        <h3 class="card-title">What to run</h3>
+        <div class="dx-steps">
+          <label class="checkbox"><input type="checkbox" name="do_scrape"{% if form.do_scrape %} checked{% endif %}><span><strong>1. Scrape</strong> job postings into <code>data/jsons/&lt;source&gt;/</code></span></label>
+          <label class="checkbox"><input type="checkbox" name="do_compile"{% if form.do_compile %} checked{% endif %}><span><strong>2. Compile</strong> the JSONs into <code>data/compiled_&lt;source&gt;.csv</code></span></label>
+          <label class="checkbox"><input type="checkbox" name="do_extract"{% if form.do_extract %} checked{% endif %}><span><strong>3. Extract skills</strong> with Gemini into <code>data/extracted_skills.csv</code></span></label>
+          <label class="checkbox"><input type="checkbox" name="standardize"{% if form.standardize %} checked{% endif %}><span><strong>4. Standardize hard skills</strong> using the skills ontology</span></label>
+          <label class="checkbox"><input type="checkbox" name="do_ghost"{% if form.do_ghost %} checked{% endif %}><span><strong>5. Ghost job detection</strong>: check the postings and report how many are marked</span></label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" name="action" value="run" class="btn btn-navy" id="run-btn"{% if run.status == 'running' %} disabled{% endif %}>Run now</button>
+          <button type="submit" name="action" value="save" class="btn btn-ghost">Save settings</button>
+        </div>
+        <small class="field-hint" id="run-hint">{% if run.status == 'running' %}A run is in progress — see the console.{% else %}Both buttons save every section on this page. Run now also starts the ticked steps in the background; progress shows in the Console.{% endif %}</small>
+      </div>
+
+      {# ---------------- Automation ---------------- #}
+      <details class="dx-section" id="automation" data-key="automation" open{% if errors.auto %} data-keep{% endif %}>
+        <summary>
+          <span class="dx-sum-title">Automation</span>
+          <span class="dx-sum-meta">{% if auto_form.enabled %}<span class="dx-on">On</span> · {{ auto.describe }}{% else %}Off{% endif %}</span>
+        </summary>
+        <div class="dx-body">
+          <label class="dx-switch"><input type="checkbox" name="auto_enabled" id="auto-enabled" role="switch"{% if auto_form.enabled %} checked{% endif %}>
+            <span class="dx-switch-track" aria-hidden="true"></span><span><strong>Run the whole data extraction automatically</strong></span></label>
+          <p class="dx-note">An automatic run follows the settings above: the ticked job sources, the <strong>multiple search list</strong> ({{ multiple_count }} searches), and every step from scraping to ghost job detection. A run that is already going is never interrupted; the automatic one starts after it ends.</p>
+
+          <fieldset class="field-group dx-auto-fields">
+            <legend>How often</legend>
+            <label class="checkbox dx-freq"><input type="radio" name="auto_frequency" value="days"{% if auto_form.frequency != 'weekdays' %} checked{% endif %}>
+              <span>Every <input type="number" name="auto_every_days" value="{{ auto_form.every_days }}" min="1" max="{{ max_every_days }}" step="1" aria-label="Number of days" class="dx-days"> day(s)</span></label>
+            <label class="checkbox dx-freq"><input type="radio" name="auto_frequency" value="weekdays"{% if auto_form.frequency == 'weekdays' %} checked{% endif %}>
+              <span>On these days of the week</span></label>
+            <div class="dx-weekdays" role="group" aria-label="Days of the week">
+              {% for n, day in weekdays %}
+              <label><input type="checkbox" name="auto_weekdays" value="{{ n }}"{% if n in auto_form.weekdays %} checked{% endif %}><span>{{ day|slice:":3" }}</span></label>
+              {% endfor %}
+            </div>
+          </fieldset>
+
+          <label class="field dx-auto-fields dx-time"><span>Time of day <em class="opt">(Philippine time)</em></span>
+            <input type="time" name="auto_time" value="{{ auto_form.time }}" required>
+          </label>
+
+          <dl class="dx-auto-status">
+            <div><dt>Next run</dt><dd>{% if auto.next_run %}{{ auto.next_run_text }} <span class="muted">PHT</span>{% elif auto_form.enabled %}Set when you save{% else %}—{% endif %}</dd></div>
+            <div><dt>Last automatic run</dt><dd>{% if auto.last_run %}{{ auto.last_run_text }} · {{ auto.last_result|default:"—" }}{% if auto.last_error %} <span class="muted">({{ auto.last_error }})</span>{% endif %}{% else %}None yet{% endif %}</dd></div>
+            <div><dt>Scheduler</dt><dd>{% if auto.running %}<span class="dx-ok">Running an automatic run now</span>{% elif auto.scheduler_active %}<span class="dx-ok">Active</span> · last checked {{ auto.last_check_text }}{% else %}<span class="dx-warn">Not running here</span> · on the server it is the <code>uenvision-automation</code> timer (see <code>deploy/DEPLOY.md</code>){% endif %}</dd></div>
+          </dl>
+          <button type="submit" name="action" value="save" class="btn btn-navy">Save automation</button>
+        </div>
+      </details>
+    </form>
+
+    <h2 class="section-title settings-section-gap">What's in data/ right now</h2>
+    <div id="summary-wrap">{% include "_data_summary.html" %}</div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/data-extraction.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

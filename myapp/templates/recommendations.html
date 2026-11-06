@@ -80,7 +80,7 @@
 
     {% if gap.exists %}{% include "_data_updated.html" %}{% endif %}
     {% if not gap.exists %}
-      <p class="empty-note">No extracted job-market data yet. An administrator can create it on Data → Extract Skills.</p>
+      <p class="empty-note">No extracted job-market data yet. An administrator can create it on Data → Data Extraction.</p>
     {% elif not under_taught %}
       <p class="empty-note">{% if subject %}None of this subject's suggested skills appear in the job postings collected so far.{% else %}No skill-demand data to rank yet.{% endif %}</p>
     {% else %}

@@ -21,6 +21,11 @@ as_app "venv/bin/python manage.py migrate --noinput"
 echo "==> Collecting static files"
 as_app "venv/bin/python manage.py collectstatic --noinput"
 
+echo "==> Installing the automatic data extraction timer"
+cp "$APP_DIR/deploy/uenvision-automation.service" "$APP_DIR/deploy/uenvision-automation.timer" /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now uenvision-automation.timer
+
 echo "==> Restarting the site"
 systemctl restart uenvision
 systemctl --no-pager --lines=5 status uenvision

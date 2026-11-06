@@ -465,7 +465,7 @@
         if (my !== reqId) return;
         errEl.textContent = '';
         if (!ok || !j.ok) { errEl.textContent = j.error || 'Could not load the dashboard data.'; return; }
-        if (!j.exists) { showEmpty('No extracted skills yet. An administrator can create them on Data → Extract Skills.'); return; }
+        if (!j.exists) { showEmpty('No extracted skills yet. An administrator can create them on Data → Data Extraction.'); return; }
         data = j;
         if (!filtersBuilt) buildFilters(j);
         setStats(j); drawBars(j); drawTrend(j); drawGaps(j); setSources(j); drawTraining(j.training); setGhostNote(j.ghost);

@@ -114,15 +114,18 @@ class GhostJobTests(IsolatedDataMixin, TestCase):
         self.client.logout()
         self.assertContains(self.client.get(reverse("home")), f"According to {len(ROWS)} IT/CS job postings")
 
-    # ---- Data -> Ghost Jobs ------------------------------------------------
+    # ---- Data -> Data Extraction -> Ghost Job Detection (Administrators) ----
     def test_ghost_jobs_page_and_settings(self):
         self.login_admin()
-        page = self.client.get(reverse("data_ghost_jobs"))
+        # Administrators find ghost jobs in Data Extraction now; the old page sends them there.
+        self.assertRedirects(self.client.get(reverse("data_ghost_jobs")),
+                             reverse("data_extraction") + "#ghost", fetch_redirect_response=False)
+        page = self.client.get(reverse("data_extraction"))
         self.assertContains(page, "3</strong> of 7 postings marked")
         self.assertContains(page, "Kept (newest copy)")
         resp = self.client.post(reverse("data_ghost_jobs"), {"flag_hidden_salary": "on", "flag_unverified": "on",
                                                               "min_description_chars": "500", "weak_signs_needed": "1"})
-        self.assertRedirects(resp, reverse("data_ghost_jobs"))
+        self.assertRedirects(resp, reverse("data_extraction") + "#ghost", fetch_redirect_response=False)
         saved = json.loads((settings.DATA_DIR / ".state" / "ghost_settings.json").read_text())
         self.assertFalse(saved["flag_duplicates"])
         self.assertEqual(saved["weak_signs_needed"], 1)
@@ -135,6 +138,7 @@ class GhostJobTests(IsolatedDataMixin, TestCase):
                                                  last_name="G", role=CustomUser.Role.FACULTY)
         self.client.force_login(faculty)
         page = self.client.get(reverse("data_ghost_jobs"))
+        self.assertContains(page, "3</strong> of 7 postings marked")
         self.assertContains(page, "Only Administrators can change")
         self.assertNotContains(page, 'id="ghost-form"')
         self.assertEqual(self.client.post(reverse("data_ghost_jobs"), {"weak_signs_needed": "1"}).status_code, 403)

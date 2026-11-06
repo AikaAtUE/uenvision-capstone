@@ -180,7 +180,7 @@ chmod 600 /home/uenvision/uenvision-capstone/api_keys.txt
 ```
 
 (Skipping `api_keys.txt` is fine if you put keys in `GEMINI_API_KEYS` in `.env` instead, or
-plan to paste them on the Data → Extract Skills page.)
+plan to paste them on the Data → Data Extraction page, under Skill Extraction.)
 
 Now prepare the database and static files as the app user:
 
@@ -297,6 +297,37 @@ step 7 and run `systemctl daemon-reload` / `systemctl reload nginx`.
 
 Restarting stops any scrape or skill extraction running on the Data page, so update when none
 is running.
+
+---
+
+## Automatic data extraction (Automation)
+
+Data → Data Extraction → **Automation** runs the whole pipeline on a schedule. On the server
+the schedule is checked every 5 minutes by a systemd timer, `uenvision-automation.timer`,
+which runs `manage.py run_automation` as the `uenvision` user. `update.sh` installs and
+enables it, so nothing else has to be set up. (The first time, run `update.sh` twice: the
+copy of the script that runs is the one from before `git pull`.)
+
+Check it:
+
+```
+systemctl list-timers uenvision-automation.timer     # when it checks next
+journalctl -u uenvision-automation -n 30             # what the last checks said
+```
+
+The Automation section also says **Scheduler: Active** once the timer has checked in.
+
+An automatic run is its own service, so `update.sh` restarting the site does **not** stop it.
+To stop one, use **Stop** on the Console page.
+
+To try an automatic run right away (even with Automation off):
+
+```
+sudo -u uenvision bash -c 'cd /home/uenvision/uenvision-capstone && set -a && . ./.env && set +a && venv/bin/python manage.py run_automation --now --no-wait'
+```
+
+On your PC nothing checks the schedule. `python manage.py run_automation --now` starts an
+automatic run there for testing.
 
 ---
 

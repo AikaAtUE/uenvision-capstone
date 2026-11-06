@@ -373,9 +373,10 @@
      Student/Alumni, I/P/A for Professor. With a single option there is no
      select. Returns an API object the caller uses to read the chosen skills. */
   var MAX_LOCAL_MATCHES = 8;
-  // Suggestions shown at once in an empty skill box. The subject's list is longer: picking a
-  // skill (or "Select all shown") brings up the next ones, and typing searches the whole list.
-  var MAX_SHOWN_SUGGESTIONS = 16;
+  // Suggestions shown at once in an empty skill box (few enough that the list never scrolls).
+  // The subject's list is longer: picking a skill (or "Select all shown") brings up the next
+  // ones until the list runs out, and typing searches the whole list.
+  var MAX_SHOWN_SUGGESTIONS = 6;
 
   function buildSkillPicker(container, suggestedNames, levelOptions, idPrefix, initial) {
     // The suggestion list is positioned against .cs-skill-picker; without it the list was placed
@@ -477,8 +478,11 @@
       var html = '';
       if (!low && names.length) {
         html += '<div class="cs-skill-results-head"><span>Suggested for this subject</span>' +
-          (names.length > 1 ? '<button type="button" class="cs-suggest-all" tabindex="-1" data-suggest-all="1">Select all shown (' + names.length + ')</button>' : '') +
+          (names.length ? '<button type="button" class="cs-suggest-all" tabindex="-1" data-suggest-all="1">Select all shown (' + names.length + ')</button>' : '') +
           '</div>';
+      } else if (!low && suggestedNames.length) {
+        html += '<div class="cs-skill-results-head cs-skill-results-head--done">' +
+          '<span>All suggested skills for this subject are added. Type to search for more.</span></div>';
       }
       html += names.map(function (n) {
         var alias = aliases[n.toLowerCase()];

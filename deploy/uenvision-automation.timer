@@ -1,0 +1,11 @@
+# Runs uenvision-automation.service every 5 minutes. Whether anything actually runs is
+# decided by the Automation section on Data -> Data Extraction (on/off, how often, time).
+[Unit]
+Description=Check the UEnvision automatic data extraction schedule every 5 minutes
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+
+[Install]
+WantedBy=timers.target

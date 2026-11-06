@@ -130,18 +130,19 @@ class LongerSuggestionTests(IsolatedDataMixin, TestCase):
         for subject, names in SUBJECT_SKILLS.items():
             lowered = [n.lower() for n in names]
             self.assertEqual(len(lowered), len(set(lowered)), subject)
-        self.assertGreater(sum(len(v) > 16 for v in SUBJECT_SKILLS.values()), 30)
+        self.assertGreater(sum(len(v) > 12 for v in SUBJECT_SKILLS.values()), 50)
         for soft in ("Teamwork", "Communication", "Critical Thinking", "Time Management"):
             self.assertFalse(any(soft in v for v in SUBJECT_SKILLS.values()), soft)
 
     def test_the_page_gets_the_whole_list(self):
         from .. import skill_suggestions
         ranked = skill_suggestions.ranked_subject_skill_map()
-        self.assertTrue(any(len(v) > 16 for v in ranked.values()))
+        self.assertTrue(all(len(v) > 6 for v in ranked.values()))
 
     def test_select_all_takes_only_the_shown_suggestions_without_a_level(self):
         js = (STATIC / "curriculum-survey.js").read_text(encoding="utf-8")
-        self.assertIn("var MAX_SHOWN_SUGGESTIONS = 16;", js)
+        self.assertIn("var MAX_SHOWN_SUGGESTIONS = 6;", js)
+        self.assertIn("All suggested skills for this subject are added", js)
         self.assertIn("data-suggest-all", js)
         self.assertIn("names.forEach(function (n) { addChip(n, '', true); });", js)
         # the visible list skips skills already picked, so it refills from the rest

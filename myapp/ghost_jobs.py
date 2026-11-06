@@ -8,7 +8,7 @@ switched on "Exclude possible ghost jobs" (Dashboard filters). That switch is re
 in their session and read by job_roles.it_postings(), so the homepage, Dashboard, skill
 gap analysis and Recommendations all leave the same postings out.
 
-Warning signs (each one can be turned on / off on Data -> Ghost Jobs):
+Warning signs (each one can be turned on / off on Data -> Data Extraction -> Ghost Job Detection):
 
   * Same job posted twice: the same company and the same job title under a different
     job ID (also across Kalibrr and Trabajo). This sign alone marks a posting. When

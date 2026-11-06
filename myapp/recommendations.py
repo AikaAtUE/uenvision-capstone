@@ -482,7 +482,7 @@ def generate_for_skills(skills: list, audience: str = "professor", context: str 
     keys = list(dict.fromkeys(keys + pipeline.env_api_keys()))
     if not keys:
         raise RecommendationError(
-            "No Gemini API key is set. Add one on Data → Extract Skills first.")
+            "No Gemini API key is set. Add one on Data → Data Extraction first.")
 
     limit = MAX_SKILLS_PER_RUN if audience == "professor" else MAX_SKILLS_PER_STUDENT_RUN
     results, errors = {}, {}

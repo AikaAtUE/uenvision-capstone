@@ -1,0 +1,22 @@
+# Checks the Data Extraction "Automation" schedule and, when a run is due, runs the whole
+# pipeline (scrape -> compile -> extract skills -> standardize -> ghost job check).
+# Started every 5 minutes by uenvision-automation.timer; it stays active while a run is
+# going, so a second check never starts while one is running.
+# Install (update.sh does this):
+#   sudo cp deploy/uenvision-automation.service deploy/uenvision-automation.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now uenvision-automation.timer
+[Unit]
+Description=UEnvision automatic data extraction (schedule check)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=uenvision
+Group=www-data
+WorkingDirectory=/home/uenvision/uenvision-capstone
+EnvironmentFile=/home/uenvision/uenvision-capstone/.env
+UMask=0007
+ExecStart=/home/uenvision/uenvision-capstone/venv/bin/python manage.py run_automation
+# A full run (every search on every source, then Gemini) can take hours.
+TimeoutStartSec=infinity

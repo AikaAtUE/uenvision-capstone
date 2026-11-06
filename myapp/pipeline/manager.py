@@ -1,5 +1,5 @@
 """
-Backend helpers for the Data pages (View / Import / Scrape / Extract Skills).
+Backend helpers for the Data pages (View / Import / Data Extraction).
 
 Disk layout (all under settings.DATA_DIR):
 
@@ -29,18 +29,20 @@ from pathlib import Path
 
 from django.conf import settings
 
+from . import search_terms
 from .dedupe_trabajo import EXTRA_COLUMNS as TRABAJO_DEDUPE_COLUMNS, dedupe_rows
 from .skills_schema import (SKILL_CSVS, UNIVERSAL_COLUMNS, normalize_record,
                             write_skill_csvs)
+from .sources import BY_KEY as SOURCE_INFO, REGISTRY as SOURCE_REGISTRY
 
 PIPELINE_DIR = Path(__file__).resolve().parent
-SOURCES = ("kalibrr", "trabajo")
-SOURCE_LABELS = {"kalibrr": "Kalibrr", "trabajo": "Trabajo"}
+# The job sources come from sources.py (add a third one there).
+SOURCES = tuple(s.key for s in SOURCE_REGISTRY)
+SOURCE_LABELS = {s.key: s.label for s in SOURCE_REGISTRY}
 
 # What the View Data dropdown can show: key -> (label, csv filename)
 TABLES = {
-    "kalibrr": ("Raw Job Data — Kalibrr", "compiled_kalibrr.csv"),
-    "trabajo": ("Raw Job Data — Trabajo", "compiled_trabajo.csv"),
+    **{s.key: (f"Raw Job Data — {s.label}", f"compiled_{s.key}.csv") for s in SOURCE_REGISTRY},
     "extracted": ("Extracted Skills", "extracted_skills.csv"),
     "custom_skills": ("Custom Skills (not in the ontology)", "ontology/custom_skills.csv"),
     "hard_skills": ("Hard Skills", SKILL_CSVS["hard_skills"]),
@@ -478,11 +480,17 @@ def save_api_keys_text(text: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Remembered Scrape Data form values
+# Remembered Data Extraction settings
+#   scrape_settings.json   Scrape Data section + the scrape / compile steps of "What to run"
+#   extract_settings.json  Skill Extraction section + the extract / standardize / ghost steps
+# Ghost job detection keeps its own file (ghost_jobs.py), automation too (automation.py).
 # ---------------------------------------------------------------------------
+SEARCH_MODES = ("single", "multiple")
 DEFAULT_SCRAPE_SETTINGS = {
-    "source": "trabajo",
+    "sources": list(SOURCES),
+    "search_mode": "single",
     "keyword": "computer science",
+    "extra_searches": [],
     "delay_min": 1.5,
     "delay_max": 4.0,
     "max_jobs": "",
@@ -490,8 +498,9 @@ DEFAULT_SCRAPE_SETTINGS = {
     "do_compile": True,
 }
 DEFAULT_EXTRACT_SETTINGS = {
-    "sources": list(SOURCES),
+    "do_extract": True,
     "standardize": True,
+    "do_ghost": True,
     "batch_size": DEFAULT_BATCH_SIZE,
     "model": DEFAULT_MODEL,
 }
@@ -505,18 +514,30 @@ def _extract_settings_file() -> Path:
     return state_dir() / "extract_settings.json"
 
 
-def _load_saved(path: Path, cfg: dict) -> dict:
+def _read_json(path: Path) -> dict:
     try:
         saved = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(saved, dict):
-            cfg.update({k: v for k, v in saved.items() if k in cfg})
     except (OSError, ValueError):
-        pass
+        return {}
+    return saved if isinstance(saved, dict) else {}
+
+
+def _load_saved(path: Path, cfg: dict) -> dict:
+    cfg.update({k: v for k, v in _read_json(path).items() if k in cfg})
     return cfg
 
 
 def get_scrape_settings() -> dict:
-    return _load_saved(_settings_file(), dict(DEFAULT_SCRAPE_SETTINGS))
+    saved = _read_json(_settings_file())
+    cfg = _load_saved(_settings_file(), dict(DEFAULT_SCRAPE_SETTINGS))
+    if "sources" not in saved and saved.get("source") in SOURCES:
+        cfg["sources"] = [saved["source"]]      # saved before both sources could be scraped in one run
+    cfg["sources"] = [s for s in SOURCES if s in (cfg.get("sources") or [])]
+    if cfg.get("search_mode") not in SEARCH_MODES:
+        cfg["search_mode"] = "single"
+    if not isinstance(cfg.get("extra_searches"), list):
+        cfg["extra_searches"] = []
+    return cfg
 
 
 def get_extract_settings() -> dict:
@@ -527,23 +548,46 @@ def get_extract_settings() -> dict:
     return _load_saved(_extract_settings_file(), cfg)
 
 
+def get_extraction_settings() -> dict:
+    """Everything the Data Extraction page (and an automatic run) uses, in one dict."""
+    return {**get_scrape_settings(), **get_extract_settings()}
+
+
+def searches_for(cfg: dict, mode: str | None = None) -> list[str]:
+    """The searches a run scrapes: the one keyword, or the multiple list
+    (the locked CHED roles plus the extra searches)."""
+    if (mode or cfg.get("search_mode")) == "multiple":
+        return search_terms.multiple_list(cfg.get("extra_searches"))
+    kw = " ".join(str(cfg.get("keyword") or "").split())
+    return [kw] if kw else []
+
+
 _MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/\-]{0,80}$")
 
 
-def parse_scrape_form(post) -> tuple[dict, str | None]:
-    """Validate the Scrape Data form. Returns (settings, error)."""
-    cfg = dict(DEFAULT_SCRAPE_SETTINGS)
-    cfg["source"] = post.get("source", "")
+def _getlist(post, name):
+    return post.getlist(name) if hasattr(post, "getlist") else list(post.get(name, []))
+
+
+def parse_extraction_form(post, for_run: bool = True) -> tuple[dict, str | None]:
+    """Validate the Data Extraction form (Scrape Data + Skill Extraction + What to run).
+    for_run=False is the "Save settings" button: the values are checked, but no step
+    has to be ticked. Returns (settings, error)."""
+    cfg = {**DEFAULT_SCRAPE_SETTINGS, **DEFAULT_EXTRACT_SETTINGS}
+    picked = _getlist(post, "sources")
+    cfg["sources"] = [s for s in SOURCES if s in picked]
+    cfg["search_mode"] = post.get("search_mode", "single")
     cfg["keyword"] = " ".join(post.get("keyword", "").split())
-    cfg["do_scrape"] = post.get("do_scrape") == "on"
-    cfg["do_compile"] = post.get("do_compile") == "on"
+    cfg["extra_searches"], extra_error = search_terms.parse_extra(post.get("extra_searches", ""))
     cfg["max_jobs"] = post.get("max_jobs", "").strip()
+    cfg["model"] = post.get("model", "").strip()
+    for step in ("do_scrape", "do_compile", "do_extract", "standardize", "do_ghost"):
+        cfg[step] = post.get(step) == "on"
 
-    if cfg["source"] not in SOURCES:
-        return cfg, "Choose a data source (Trabajo or Kalibrr)."
-    if not (cfg["do_scrape"] or cfg["do_compile"]):
-        return cfg, "Tick at least one step to run."
-
+    if cfg["search_mode"] not in SEARCH_MODES:
+        return cfg, "Choose Single search or Multiple search."
+    if extra_error:
+        return cfg, extra_error
     try:
         cfg["delay_min"] = float(post.get("delay_min", ""))
         cfg["delay_max"] = float(post.get("delay_max", ""))
@@ -551,30 +595,12 @@ def parse_scrape_form(post) -> tuple[dict, str | None]:
         return cfg, "Minimum and maximum interval must be numbers (seconds)."
     if not (0 <= cfg["delay_min"] <= cfg["delay_max"] <= 600):
         return cfg, "Intervals must satisfy 0 ≤ minimum ≤ maximum ≤ 600 seconds."
-
     if cfg["max_jobs"]:
         if not cfg["max_jobs"].isdigit() or int(cfg["max_jobs"]) < 1:
-            return cfg, "Max jobs must be a whole number of at least 1 (or left blank)."
+            return cfg, "Max new jobs must be a whole number of at least 1 (or left blank)."
         cfg["max_jobs"] = int(cfg["max_jobs"])
-
-    if cfg["do_scrape"] and (not cfg["keyword"] or len(cfg["keyword"]) > 100):
-        return cfg, "Enter a search keyword (up to 100 characters)."
-    return cfg, None
-
-
-def parse_extract_form(post) -> tuple[dict, str | None]:
-    """Validate the Extract Skills form. Returns (settings, error).
-    The "Standardize only" button (action=standardize) skips extraction."""
-    cfg = dict(DEFAULT_EXTRACT_SETTINGS)
-    standardize_only = post.get("action") == "standardize"
-    picked = post.getlist("sources") if hasattr(post, "getlist") else list(post.get("sources", []))
-    cfg["sources"] = [s for s in SOURCES if s in picked]
-    cfg["model"] = post.get("model", "").strip()
-    cfg["standardize"] = standardize_only or post.get("standardize") == "on"
-    cfg["do_extract"] = not standardize_only
-    cfg["do_standardize"] = cfg["standardize"]
-    if cfg["do_extract"] and not cfg["sources"]:
-        return cfg, "Tick at least one source to extract skills from (Kalibrr and/or Trabajo)."
+    if len(cfg["keyword"]) > search_terms.MAX_SEARCH_CHARS:
+        return cfg, f"The search keyword can be up to {search_terms.MAX_SEARCH_CHARS} characters."
     try:
         cfg["batch_size"] = int(post.get("batch_size", ""))
     except ValueError:
@@ -583,7 +609,29 @@ def parse_extract_form(post) -> tuple[dict, str | None]:
         return cfg, f"Rows per prompt must be between 1 and {MAX_BATCH_SIZE}."
     if not _MODEL_RE.match(cfg["model"]):
         return cfg, "Enter a valid Gemini model name, e.g. " + DEFAULT_MODEL + "."
+
+    if for_run:
+        error = check_run_choices(cfg)
+        if error:
+            return cfg, error
     return cfg, None
+
+
+def check_run_choices(cfg: dict, mode: str | None = None) -> str | None:
+    """What a run needs from the form, beyond valid values."""
+    if not any(cfg.get(k) for k in ("do_scrape", "do_compile", "do_extract", "standardize", "do_ghost")):
+        return "Tick at least one step under What to run."
+    if not cfg["sources"] and any(cfg.get(k) for k in ("do_scrape", "do_compile", "do_extract")):
+        return "Tick at least one job source (" + " and/or ".join(SOURCE_LABELS.values()) + ")."
+    if cfg.get("do_scrape") and not searches_for(cfg, mode):
+        return "Enter a search keyword."
+    return None
+
+
+def run_config(cfg: dict, mode: str | None = None) -> dict:
+    """The settings as start_run() / build_steps() take them."""
+    return {**cfg, "searches": searches_for(cfg, mode) if cfg.get("do_scrape") else [],
+            "do_standardize": bool(cfg.get("standardize"))}
 
 
 def save_scrape_settings(cfg: dict) -> None:
@@ -598,44 +646,53 @@ def save_extract_settings(cfg: dict) -> None:
     _atomic_write_text(_extract_settings_file(), json.dumps(keep, indent=2))
 
 
+def save_extraction_settings(cfg: dict) -> None:
+    save_scrape_settings(cfg)
+    save_extract_settings(cfg)
+
+
 # ---------------------------------------------------------------------------
 # Building the command lines
 # ---------------------------------------------------------------------------
-
 def build_steps(cfg: dict) -> list[dict]:
+    """One run of the Data Extraction pipeline. The scrape + compile steps of each source
+    form a "lane"; the lanes run at the same time (each source is a different site, so
+    neither is asked for more than before). Skill extraction, standardizing and the ghost
+    job check write shared files, so they run one after the other once every lane is done.
+    A search, a compile or one source's extraction that fails is logged and the run goes on;
+    a failed standardize step stops it."""
     py = sys.executable
-    src = cfg.get("source") or (cfg.get("sources") or [""])[0]   # extraction runs have "sources", not "source"
-    jd, csv_path = json_dir(src), compiled_csv(src)
+    sources = [s for s in cfg.get("sources") or [] if s in SOURCES]
     steps = []
 
-    if cfg.get("do_scrape"):
-        if src == "kalibrr":
-            argv = [py, "-u", str(PIPELINE_DIR / "kalibrr_scraper.py"),
-                    f"--text={cfg['keyword']}", f"--output-dir={jd}",
-                    f"--delay-min={cfg['delay_min']}", f"--delay-max={cfg['delay_max']}"]
-        else:
-            argv = [py, "-u", str(PIPELINE_DIR / "trabajo_scraper.py"),
-                    f"--keyword={cfg['keyword']}", f"--output-dir={jd}",
-                    f"--delay-min={cfg['delay_min']}", f"--delay-max={cfg['delay_max']}"]
-        if cfg["max_jobs"]:
-            argv.append(f"--max-jobs={cfg['max_jobs']}")
-        steps.append({"name": "scrape", "label": f"Scrape {SOURCE_LABELS[src]}", "argv": argv})
-
-    if cfg.get("do_compile"):
-        steps.append({"name": "compile", "label": f"Compile {SOURCE_LABELS[src]} JSONs to CSV",
-                      "argv": [py, "-u", str(PIPELINE_DIR / "compile_jobs_to_csv.py"),
-                               f"--source={src}", f"--input-dir={jd}", f"--output-csv={csv_path}"]})
+    for src in sources:
+        info = SOURCE_INFO[src]
+        if cfg.get("do_scrape"):
+            for term in cfg.get("searches") or []:
+                steps.append({
+                    "name": f"scrape_{src}_{len(steps)}", "label": f"Scrape {info.label}: “{term}”",
+                    "lane": src, "continue_on_fail": True,
+                    "argv": info.scrape_argv(py, PIPELINE_DIR, term, json_dir(src),
+                                             cfg["delay_min"], cfg["delay_max"], cfg.get("max_jobs"))})
+        if cfg.get("do_compile"):
+            # A source whose searches found nothing new fails to compile; the others go on, and
+            # its existing compiled CSV (if any) is still extracted.
+            steps.append({"name": f"compile_{src}", "label": f"Compile {info.label} JSONs to CSV", "lane": src,
+                          "continue_on_fail": True,
+                          "argv": [py, "-u", str(PIPELINE_DIR / "compile_jobs_to_csv.py"),
+                                   f"--source={src}", f"--input-dir={json_dir(src)}",
+                                   f"--output-csv={compiled_csv(src)}"]})
 
     if cfg.get("do_extract"):
-        # One step per ticked source; they all append to the same extracted_skills.csv / resume file.
-        for ex_src in cfg.get("sources") or [src]:
-            argv = [py, "-u", str(PIPELINE_DIR / "extract_skills_gemini.py"), str(compiled_csv(ex_src)),
+        # One step per source; they all append to the same extracted_skills.csv / resume file.
+        for src in sources:
+            argv = [py, "-u", str(PIPELINE_DIR / "extract_skills_gemini.py"), str(compiled_csv(src)),
                     f"--keys={api_keys_path()}", "--output=extracted_skills",
                     f"--output-dir={data_dir()}", f"--json-dir={state_dir()}",
                     f"--model={cfg['model']}", f"--batch-size={cfg['batch_size']}",
-                    f"--source-label={ex_src}"]
-            steps.append({"name": f"extract_{ex_src}", "label": f"Extract skills — {SOURCE_LABELS[ex_src]}",
-                          "argv": argv})
+                    f"--source-label={src}"]
+            steps.append({"name": f"extract_{src}", "label": f"Extract skills — {SOURCE_LABELS[src]}",
+                          "continue_on_fail": True, "argv": argv})
 
     if cfg.get("do_standardize"):
         # After extraction: map the hard skills onto the ontology (exact -> fuzzy candidates -> Gemini).
@@ -644,6 +701,10 @@ def build_steps(cfg: dict) -> list[dict]:
             f"--json={state_dir() / 'extracted_skills.json'}", f"--output-dir={data_dir()}",
             f"--ontology-dir={ontology_dir()}", f"--temp-csv={state_dir() / 'standardize_pending.csv'}",
             f"--keys={api_keys_path()}", f"--model={cfg['model']}", f"--batch-size={cfg['batch_size']}"]})
+
+    if cfg.get("do_ghost"):
+        steps.append({"name": "ghost", "label": "Ghost job detection", "argv": [
+            py, "-u", str(Path(settings.BASE_DIR) / "manage.py"), "ghost_job_check"]})
     return steps
 
 
@@ -709,30 +770,37 @@ def read_log_tail(max_bytes: int = 24000) -> str:
     return "\n".join(line.rsplit("\r", 1)[-1] for line in text.split("\n")).strip("\n")
 
 
-def start_run(cfg: dict, kind: str = "scrape") -> str | None:
-    """Launch the pipeline in a detached process. kind: 'scrape' (scrape + compile) or
-    'extract' (skill extraction). Returns an error string or None."""
+def start_run(cfg: dict, kind: str = "extraction", wait: bool = False) -> str | None:
+    """Launch the pipeline in a detached process. cfg is run_config(...) of the Data Extraction
+    settings. kind: 'extraction' (started from the page) or 'automation' (started by the
+    scheduler). wait=True blocks until the run ends (the scheduler uses it).
+    Returns an error string or None."""
     ensure_dirs()
     if is_running():
         return "A run is already in progress. Wait for it to finish or stop it first."
 
     steps = build_steps(cfg)
-    src = cfg.get("source") or (cfg.get("sources") or [""])[0]
+    if not steps:
+        return "Nothing to run: tick at least one step and one job source."
+    sources = [s for s in cfg.get("sources") or [] if s in SOURCES]
 
     if cfg.get("do_extract"):
         if count_api_keys() == 0:
-            return "Skill extraction needs at least one Gemini API key — add one in api_keys.txt below."
-        for ex_src in cfg.get("sources") or []:
-            if not compiled_csv(ex_src).is_file():
-                return (f"There's no compiled {SOURCE_LABELS[ex_src]} CSV yet. Scrape and compile it on the "
-                        f"Scrape Data page (or import a CSV) first — or untick {SOURCE_LABELS[ex_src]}.")
+            return "Skill extraction needs at least one Gemini API key — add one in api_keys.txt (Skill Extraction)."
+        for src in sources:
+            if not cfg.get("do_compile") and not compiled_csv(src).is_file():
+                return (f"There's no compiled {SOURCE_LABELS[src]} CSV yet. Tick “Compile” (and “Scrape”), "
+                        f"import a CSV first, or untick {SOURCE_LABELS[src]}.")
     if cfg.get("do_standardize"):
         if not (ontology_dir() / "mind_tech_ontology.csv").is_file():
             return "The ontology file is missing: put mind_tech_ontology.csv in data/ontology/."
         if not cfg.get("do_extract") and not (state_dir() / "extracted_skills.json").is_file():
-            return "There are no extracted skills to standardize yet. Run Extract Skills first."
-    if cfg.get("do_compile") and not cfg.get("do_scrape") and count_json(src) == 0:
-        return f"There are no {SOURCE_LABELS[src]} job JSONs to compile yet. Tick “Scrape” (or import JSONs first)."
+            return "There are no extracted skills to standardize yet. Tick “Extract skills” too."
+    if cfg.get("do_compile") and not cfg.get("do_scrape"):
+        for src in sources:
+            if count_json(src) == 0:
+                return (f"There are no {SOURCE_LABELS[src]} job JSONs to compile yet. Tick “Scrape” "
+                        f"(or import JSONs first), or untick {SOURCE_LABELS[src]}.")
 
     # A stale resume file with no CSV would make the extractor think everything is already done.
     state_json = state_dir() / "extracted_skills.json"
@@ -744,18 +812,20 @@ def start_run(cfg: dict, kind: str = "scrape") -> str | None:
                    "It keeps going in the background, so you can leave this page.", "INFO")
     state = {
         "status": "running", "kind": kind,
-        "source": (" + ".join(SOURCE_LABELS[x].lower() for x in cfg["sources"]) if cfg.get("do_extract")
-                   else "standardize" if cfg.get("do_standardize") else src), "started_at": _now(), "heartbeat": _now(),
+        "source": (" + ".join(SOURCE_LABELS[x] for x in sources) if sources else "Skills data")
+                  + (" (automatic run)" if kind == "automation" else ""),
+        "started_at": _now(), "heartbeat": _now(),
         "finished_at": None, "current": None, "pid": None, "error": None,
         "steps": [{"name": s["name"], "label": s["label"], "status": "pending"} for s in steps],
-        "summary": {"keyword": cfg.get("keyword") if cfg.get("do_scrape") else None,
+        "summary": {"searches": cfg.get("searches") if cfg.get("do_scrape") else None,
                     "delay_min": cfg.get("delay_min"), "delay_max": cfg.get("delay_max"),
                     "model": cfg.get("model") if cfg.get("do_extract") else None,
                     "batch_size": cfg.get("batch_size") if cfg.get("do_extract") else None},
     }
     _atomic_write_text(_run_file(), json.dumps(state, indent=2))
     run_cfg = {"state_file": str(_run_file()), "log_file": str(_log_file()),
-               "cwd": str(settings.BASE_DIR), "steps": steps}
+               "cwd": str(settings.BASE_DIR), "steps": steps,
+               "lane_labels": {s: SOURCE_LABELS[s] for s in SOURCES}}
     cfg_path = state_dir() / "run_config.json"
     _atomic_write_text(cfg_path, json.dumps(run_cfg, indent=2))
 
@@ -781,6 +851,8 @@ def start_run(cfg: dict, kind: str = "scrape") -> str | None:
     if st.get("status") == "running" and not st.get("pid"):
         st["pid"] = proc.pid
         _atomic_write_text(_run_file(), json.dumps(st, indent=2))
+    if wait:
+        proc.wait()
     return None
 
 
@@ -823,10 +895,8 @@ def stop_run() -> bool:
 # Import Data
 # ---------------------------------------------------------------------------
 IMPORT_TYPES = {
-    "json_kalibrr": ("Kalibrr job JSONs", "json", "kalibrr"),
-    "json_trabajo": ("Trabajo job JSONs", "json", "trabajo"),
-    "csv_kalibrr": ("Compiled Kalibrr CSV", "csv", "kalibrr"),
-    "csv_trabajo": ("Compiled Trabajo CSV", "csv", "trabajo"),
+    **{f"json_{s.key}": (f"{s.label} job JSONs", "json", s.key) for s in SOURCE_REGISTRY},
+    **{f"csv_{s.key}": (f"Compiled {s.label} CSV", "csv", s.key) for s in SOURCE_REGISTRY},
     "csv_extracted": ("Extracted skills CSV", "csv", "extracted"),
 }
 
@@ -906,8 +976,7 @@ def import_json_files(source: str, uploads, overwrite: bool) -> dict:
 
 
 CSV_REQUIRED = {
-    "kalibrr": {"job_id", "job_title", "description"},
-    "trabajo": {"job_id", "job_title", "description"},
+    **{s: {"job_id", "job_title", "description"} for s in SOURCES},
     "extracted": {"job_id", "hard_skills"},
 }
 _EXTRACTED_LIST_COLS = ("hard_skills", "hard_skills_raw", "soft_skills", "certifications_or_licenses")

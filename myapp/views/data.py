@@ -14,9 +14,9 @@ from .common import administrator_required
 
 
 # ---------------------------------------------------------------------------
-# Data  (four separate pages: View Data / Import Data / Scrape Data / Extract Skills)
-# View Data is open to every logged-in user. Import, Scrape and Extract Skills change files on the
-# server (and Scrape spends API quota / makes outbound requests), so they are
+# Data  (View Data / Import Data / Data Extraction, plus Ghost Jobs for everyone else)
+# View Data is open to every logged-in user. Import and Data Extraction change files on the
+# server (and scraping / extraction make outbound requests and spend API quota), so they are
 # Administrator-only.
 # ---------------------------------------------------------------------------
 def _data_ctx(request, tab, **extra):
@@ -155,87 +155,96 @@ def data_import_view(request):
         request, "import", summary=pipeline.disk_summary(), import_types=pipeline.IMPORT_TYPES))
 
 
-def _scrape_ctx(request, form=None):
+def _extraction_ctx(request, form=None, ghost_form=None, auto_form=None, errors=None):
+    """Data Extraction: Scrape Data, Skill Extraction, Ghost Job Detection, What to run and
+    Automation, on one page."""
+    from .. import automation, ghost_jobs
+    from ..pipeline import search_terms
+
+    form = form or pipeline.get_extraction_settings()
+    extra = form.get("extra_searches") or []
+    pipeline.ensure_skill_csvs()
+    found = ghost_jobs.detect()
+    flagged = ghost_jobs.flagged_postings()
+    auto = automation.status()
     return _data_ctx(
-        request, "scrape",
-        form=form or pipeline.get_scrape_settings(),
+        request, "extraction",
+        form=form,
+        extra_text="\n".join(extra),
+        locked_searches=search_terms.default_searches(),
+        multiple_count=len(search_terms.multiple_list(extra)),
+        job_sources=[{"key": s.key, "label": s.label, "site": s.site} for s in pipeline.SOURCE_REGISTRY],
         run=pipeline.get_run_state(),
         summary=pipeline.disk_summary(),
-    )
-
-
-def _extract_ctx(request, form=None):
-    summary = pipeline.disk_summary()
-    return _data_ctx(
-        request, "extract",
-        form=form or pipeline.get_extract_settings(),
-        run=pipeline.get_run_state(),
-        summary=summary,
         keys_text=pipeline.read_api_keys_text(),
         key_count=pipeline.count_api_keys(),
         max_batch=pipeline.MAX_BATCH_SIZE,
         default_model=pipeline.DEFAULT_MODEL,
+        ghost=ghost_form or ghost_jobs.get_settings(),
+        flagged=flagged, ghost_total=len(found or {}), ghost_has_data=found is not None,
+        ghost_excluded=sum(1 for r in flagged if r["excluded"]),
+        max_chars=ghost_jobs.MAX_DESCRIPTION_CHARS,
+        auto=auto,
+        auto_form=auto_form or auto["settings"],
+        weekdays=list(enumerate(automation.WEEKDAYS)),
+        max_every_days=automation.MAX_EVERY_DAYS,
+        errors=errors or {},
     )
 
 
 @administrator_required
-def data_scrape_view(request):
-    return render(request, "data_scrape.html", _scrape_ctx(request))
+def data_extraction_view(request):
+    """GET shows the page. POST (action=save | run) saves every section's settings; run
+    also starts the pipeline with them and opens the Console."""
+    from .. import automation, ghost_jobs
+
+    if request.method != "POST":
+        return render(request, "data_extraction.html", _extraction_ctx(request))
+
+    run = request.POST.get("action") == "run"
+    form, error = pipeline.parse_extraction_form(request.POST, for_run=run)
+    ghost_form, ghost_error = ghost_jobs.parse_settings_form(request.POST)
+    auto_form, auto_error = automation.parse_form(request.POST)
+    if not (error or auto_error) and auto_form["enabled"]:
+        auto_error = pipeline.check_run_choices(
+            {**form, "do_scrape": True, "do_compile": True, "do_extract": True}, mode="multiple")
+        if auto_error:
+            auto_error = "Automation: " + auto_error
+    errors = {k: v for k, v in (("run", error), ("ghost", ghost_error), ("auto", auto_error)) if v}
+    if errors:
+        for msg in errors.values():
+            messages.error(request, msg)
+        return render(request, "data_extraction.html",
+                      _extraction_ctx(request, form=form, ghost_form=ghost_form, auto_form=auto_form,
+                                      errors=errors), status=400)
+
+    pipeline.save_extraction_settings(form)
+    ghost_jobs.save_settings(ghost_form)
+    automation.save_settings(auto_form)
+    if not run:
+        messages.success(request, "Data Extraction settings saved.")
+        return redirect("data_extraction")
+    start_error = pipeline.start_run(pipeline.run_config(form), kind="extraction")
+    if start_error:      # a problem with the run itself goes in the Console, not on the form
+        pipeline.log_to_console(start_error)
+    return redirect("console")
 
 
 @administrator_required
-@require_POST
-def scrape_run_view(request):
-    cfg, error = pipeline.parse_scrape_form(request.POST)
-    if not error:
-        start_error = pipeline.start_run(cfg, kind="scrape")
-        if start_error:      # a problem with the run itself goes in the Console, not on the form
-            pipeline.log_to_console(start_error)
-            return redirect("console")
-    if error:
-        messages.error(request, error)
-        return render(request, "data_scrape.html", _scrape_ctx(request, form=cfg))
-    pipeline.save_scrape_settings(cfg)
-    return redirect("console")
+def data_scrape_view(request):
+    """Old Scrape Data / Extract Skills addresses: both are sections of Data Extraction now."""
+    return redirect(reverse("data_extraction") + "#scrape")
 
 
 @administrator_required
 def data_extract_view(request):
-    return render(request, "data_extract.html", _extract_ctx(request))
-
-
-@administrator_required
-@require_POST
-def extract_run_view(request):
-    cfg, error = pipeline.parse_extract_form(request.POST)
-    if not error:
-        start_error = pipeline.start_run(cfg, kind="extract")
-        if start_error:
-            pipeline.log_to_console(start_error)
-            return redirect("console")
-    if error:
-        messages.error(request, error)
-        return render(request, "data_extract.html", _extract_ctx(request, form=cfg))
-    pipeline.save_extract_settings(cfg)
-    return redirect("console")
+    return redirect(reverse("data_extraction") + "#skills")
 
 
 def _stop_and_redirect(request, target):
     # The outcome is written to the run log, so it shows in the Console either way.
     pipeline.stop_run()
     return redirect("console")
-
-
-@administrator_required
-@require_POST
-def scrape_stop_view(request):
-    return _stop_and_redirect(request, "data_scrape")
-
-
-@administrator_required
-@require_POST
-def extract_stop_view(request):
-    return _stop_and_redirect(request, "data_extract")
 
 
 @administrator_required
@@ -276,7 +285,7 @@ def api_keys_save_view(request):
     else:
         n = pipeline.count_api_keys()
         messages.success(request, f"api_keys.txt saved ({n} key{'s' if n != 1 else ''}).")
-    return redirect("data_extract")
+    return redirect(reverse("data_extraction") + "#skills")
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +305,10 @@ def data_ghost_jobs_view(request):
         else:
             ghost_jobs.save_settings(form)
             messages.success(request, "Ghost job settings saved. The marked postings below are updated.")
-            return redirect("data_ghost_jobs")
+            return redirect(reverse("data_extraction") + "#ghost")
+    elif request.user.is_administrator:
+        # Administrators change the settings and see the marked postings on Data Extraction.
+        return redirect(reverse("data_extraction") + "#ghost")
     pipeline.ensure_skill_csvs()
     found = ghost_jobs.detect()
     flagged = ghost_jobs.flagged_postings()
