@@ -19,7 +19,8 @@
 
     <form class="dx-form" method="post" action="{% url 'data_extraction' %}" id="extraction-form">
       {% csrf_token %}
-      {# Pressing Enter in a field submits the form's first button: make that "Save settings", never Run or api_keys.txt. #}
+      {# Every change is saved automatically (data-extraction.js). Pressing Enter in a field submits the
+         form's first button, so that is "save", never Run; without JavaScript it is also the way to save. #}
       <button type="submit" name="action" value="save" class="dx-default-submit" tabindex="-1" aria-hidden="true">Save settings</button>
 
       {# ---------------- Scrape Data ---------------- #}
@@ -91,7 +92,7 @@
       <details class="dx-section" id="skills" data-key="skills" open{% if errors.run %} data-keep{% endif %}>
         <summary>
           <span class="dx-sum-title">Skill Extraction</span>
-          <span class="dx-sum-meta">{{ form.model }} · {{ form.batch_size }} rows per prompt · {{ key_count }} API key{{ key_count|pluralize }}</span>
+          <span class="dx-sum-meta" id="skills-meta">{{ form.model }} · {{ form.batch_size }} rows per prompt · {{ key_count }} API key{{ key_count|pluralize }}</span>
         </summary>
         <div class="dx-body">
           <p class="dx-note">Gemini reads the compiled job postings of the ticked sources and pulls out the skills of each one into <code>data/extracted_skills.csv</code> (a <code>source</code> column says where each row came from). Jobs already extracted are not sent again. Standardizing then matches each hard skill to one name in the skills ontology; your original wording is kept in <code>hard_skills_raw</code>.</p>
@@ -108,9 +109,9 @@
 
           <label class="field"><span>api_keys.txt <em class="opt">(Gemini API keys, one per line)</em></span>
             <textarea name="keys" form="api-keys-form" id="keys-text" rows="4" spellcheck="false" autocomplete="off" wrap="off" placeholder="AIza…">{{ keys_text }}</textarea>
-            <small class="field-hint">When a key runs out of daily quota or is rejected, extraction moves on to the next line. Lines starting with <code>#</code> are ignored. Currently {{ key_count }} key{{ key_count|pluralize }}.</small>
+            <small class="field-hint">When a key runs out of daily quota or is rejected, extraction moves on to the next line. Lines starting with <code>#</code> are ignored. Currently <span id="key-count">{{ key_count }} key{{ key_count|pluralize }}</span>.</small>
           </label>
-          <button type="submit" form="api-keys-form" class="btn btn-ghost">Save api_keys.txt</button>
+          <noscript><button type="submit" form="api-keys-form" class="btn btn-ghost">Save api_keys.txt</button></noscript>
         </div>
       </details>
 
@@ -118,7 +119,7 @@
       <details class="dx-section" id="ghost" data-key="ghost"{% if errors.ghost %} open data-keep{% endif %}>
         <summary>
           <span class="dx-sum-title">Ghost Job Detection</span>
-          <span class="dx-sum-meta">{% if ghost_has_data %}{{ flagged|length }} of {{ ghost_total }} posting{{ ghost_total|pluralize }} marked{% else %}No extracted postings yet{% endif %}</span>
+          <span class="dx-sum-meta" id="ghost-meta">{% if ghost_has_data %}{{ flagged|length }} of {{ ghost_total }} posting{{ ghost_total|pluralize }} marked{% else %}No extracted postings yet{% endif %}</span>
         </summary>
         <div class="dx-body">
           <p class="dx-note">Postings that look like ghost jobs (not a real, open position) are only <strong>marked</strong>. Nothing is removed from the data sets, and every result still counts them unless someone turns on <em>Exclude possible ghost jobs</em> in the Dashboard's Filter. The marks follow these settings as soon as they are saved.</p>
@@ -145,31 +146,7 @@
           </fieldset>
 
           <h3 class="card-title dx-subhead">Marked postings</h3>
-          {% if not ghost_has_data %}
-            <p class="muted">No extracted skills yet, so there's nothing to check.</p>
-          {% else %}
-            <p class="muted table-count"><strong>{{ flagged|length }}</strong> of {{ ghost_total }} posting{{ ghost_total|pluralize }} marked as possible ghost jobs. With the exclude switch on, {{ ghost_excluded }} of them are left out of the results.</p>
-            {% if flagged %}
-            <div class="table-wrap dx-ghost-table">
-              <table class="sr-table ghost-table">
-                <thead><tr><th>Job</th><th>Company</th><th>Source</th><th>Why it's marked</th><th>When excluded</th></tr></thead>
-                <tbody>
-                {% for r in flagged %}
-                  <tr>
-                    <td>{% if r.job_url %}<a href="{{ r.job_url }}" target="_blank" rel="noopener noreferrer">{{ r.job_name }}</a>{% else %}{{ r.job_name }}{% endif %}<br><span class="muted">#{{ r.job_id }}{% if r.date %} · {{ r.date|slice:":10" }}{% endif %}</span></td>
-                    <td>{{ r.company_name|default:"—" }}</td>
-                    <td>{{ r.source|capfirst }}</td>
-                    <td><span class="pill pill--ghost">Possible ghost job</span><ul class="ghost-reasons">{% for reason in r.reasons %}<li>{{ reason }}</li>{% endfor %}</ul></td>
-                    <td>{% if r.excluded %}Left out{% else %}Kept (newest copy){% endif %}</td>
-                  </tr>
-                {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            {% else %}
-            <p class="muted">No postings match the current settings.</p>
-            {% endif %}
-          {% endif %}
+          <div id="ghost-marked">{% include "_dx_ghost_marked.html" %}</div>
         </div>
       </details>
 
@@ -185,16 +162,16 @@
         </div>
         <div class="form-actions">
           <button type="submit" name="action" value="run" class="btn btn-navy" id="run-btn"{% if run.status == 'running' %} disabled{% endif %}>Run now</button>
-          <button type="submit" name="action" value="save" class="btn btn-ghost">Save settings</button>
+          <noscript><button type="submit" name="action" value="save" class="btn btn-ghost">Save settings</button></noscript>
         </div>
-        <small class="field-hint" id="run-hint">{% if run.status == 'running' %}A run is in progress — see the console.{% else %}Both buttons save every section on this page. Run now also starts the ticked steps in the background; progress shows in the Console.{% endif %}</small>
+        <small class="field-hint" id="run-hint">{% if run.status == 'running' %}A run is in progress — see the console.{% else %}Changes on this page are saved automatically. Run now starts the ticked steps in the background; progress shows in the Console.{% endif %}</small>
       </div>
 
       {# ---------------- Automation ---------------- #}
       <details class="dx-section" id="automation" data-key="automation" open{% if errors.auto %} data-keep{% endif %}>
         <summary>
           <span class="dx-sum-title">Automation</span>
-          <span class="dx-sum-meta">{% if auto_form.enabled %}<span class="dx-on">On</span> · {{ auto.describe }}{% else %}Off{% endif %}</span>
+          <span class="dx-sum-meta" id="auto-meta">{% if auto_form.enabled %}<span class="dx-on">On</span> · {{ auto.describe }}{% else %}Off{% endif %}</span>
         </summary>
         <div class="dx-body">
           <label class="dx-switch"><input type="checkbox" name="auto_enabled" id="auto-enabled" role="switch"{% if auto_form.enabled %} checked{% endif %}>
@@ -218,18 +195,10 @@
             <input type="time" name="auto_time" value="{{ auto_form.time }}" required>
           </label>
 
-          <dl class="dx-auto-status">
-            <div><dt>Next run</dt><dd>{% if auto.next_run %}{{ auto.next_run_text }} <span class="muted">PHT</span>{% elif auto_form.enabled %}Set when you save{% else %}—{% endif %}</dd></div>
-            <div><dt>Last automatic run</dt><dd>{% if auto.last_run %}{{ auto.last_run_text }} · {{ auto.last_result|default:"—" }}{% if auto.last_error %} <span class="muted">({{ auto.last_error }})</span>{% endif %}{% else %}None yet{% endif %}</dd></div>
-            <div><dt>Scheduler</dt><dd>{% if auto.running %}<span class="dx-ok">Running an automatic run now</span>{% elif auto.scheduler_active %}<span class="dx-ok">Active</span> · last checked {{ auto.last_check_text }}{% else %}<span class="dx-warn">Not running here</span> · on the server it is the <code>uenvision-automation</code> timer (see <code>deploy/DEPLOY.md</code>){% endif %}</dd></div>
-          </dl>
-          <button type="submit" name="action" value="save-automation" class="btn btn-navy">Save automation</button>
+          <div id="auto-status">{% include "_dx_auto_status.html" %}</div>
         </div>
       </details>
-      <div class="dx-unsaved" id="dx-unsaved" role="status" hidden>
-        <span>You have unsaved changes.</span>
-        <button type="submit" name="action" value="save" class="btn btn-navy btn-sm">Save settings</button>
-      </div>
+      <div class="dx-save-status" id="dx-save-status" role="status" aria-live="polite" data-state="idle" hidden></div>
     </form>
     {# api_keys.txt is saved on its own (its textarea and button point here with form="api-keys-form") #}
     <form method="post" action="{% url 'api_keys_save' %}" id="api-keys-form">{% csrf_token %}</form>

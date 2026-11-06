@@ -1,0 +1,6 @@
+{# Data Extraction > Automation: next run / last run / scheduler (re-rendered after an automatic save). #}
+<dl class="dx-auto-status">
+  <div><dt>Next run</dt><dd>{% if auto.next_run %}{{ auto.next_run_text }} <span class="muted">PHT</span>{% elif auto_form.enabled %}Being set…{% else %}—{% endif %}</dd></div>
+  <div><dt>Last automatic run</dt><dd>{% if auto.last_run %}{{ auto.last_run_text }} · {{ auto.last_result|default:"—" }}{% if auto.last_error %} <span class="muted">({{ auto.last_error }})</span>{% endif %}{% else %}None yet{% endif %}</dd></div>
+  <div><dt>Scheduler</dt><dd>{% if auto.running %}<span class="dx-ok">Running an automatic run now</span>{% elif auto.scheduler_active %}<span class="dx-ok">Active</span> · last checked {{ auto.last_check_text }}{% else %}<span class="dx-warn">Not running here</span> · on the server it is the <code>uenvision-automation</code> timer (see <code>deploy/DEPLOY.md</code>){% endif %}</dd></div>
+</dl>

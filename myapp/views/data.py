@@ -192,44 +192,83 @@ def _extraction_ctx(request, form=None, ghost_form=None, auto_form=None, errors=
     )
 
 
+def _save_extraction_sections(post) -> dict:
+    """Saves each part of the Data Extraction form that is valid: the pipeline settings
+    (Scrape Data, Skill Extraction, What to run), Ghost Job Detection and Automation are
+    checked and saved separately, so a mistake in one never throws away the others.
+    Returns {"run" | "ghost" | "auto": error message} for the parts that weren't saved."""
+    from .. import automation, ghost_jobs
+
+    form, error = pipeline.parse_extraction_form(post, for_run=False)
+    ghost_form, ghost_error = ghost_jobs.parse_settings_form(post)
+    auto_form, auto_error = automation.parse_form(post)
+    if not auto_error and auto_form["enabled"]:
+        sources = form["sources"] if not error else pipeline.get_scrape_settings()["sources"]
+        if not sources:
+            auto_error = "Automation: tick at least one job source under Scrape Data before turning it on."
+    if not error:
+        pipeline.save_extraction_settings(form)
+    if not ghost_error:
+        ghost_jobs.save_settings(ghost_form)
+    if not auto_error:
+        automation.save_settings(auto_form)
+    return {k: v for k, v in (("run", error), ("ghost", ghost_error), ("auto", auto_error)) if v}
+
+
+def _wants_json(request):
+    return request.headers.get("X-Requested-With") == "fetch"
+
+
 @administrator_required
 def data_extraction_view(request):
-    """GET shows the page. POST (action=save | run) saves every section's settings; run
-    also starts the pipeline with them and opens the Console."""
-    from .. import automation, ghost_jobs
+    """GET shows the page. Every change on it is saved automatically: the page posts the whole
+    form with action=autosave and gets JSON back (what was saved, what wasn't and why, and the
+    refreshed summaries). action=run saves too, then starts the ticked steps and opens the
+    Console. action=save is the no-JavaScript fallback (and what Enter does)."""
+    from django.template.loader import render_to_string
+    from .. import automation
 
     if request.method != "POST":
         return render(request, "data_extraction.html", _extraction_ctx(request))
 
     action = request.POST.get("action")
-    run = action == "run"
-    form, error = pipeline.parse_extraction_form(request.POST, for_run=run)
-    ghost_form, ghost_error = ghost_jobs.parse_settings_form(request.POST)
-    auto_form, auto_error = automation.parse_form(request.POST)
-    if not (error or auto_error) and auto_form["enabled"]:
-        auto_error = pipeline.check_run_choices(
-            {**form, "do_scrape": True, "do_compile": True, "do_extract": True}, mode="multiple")
-        if auto_error:
-            auto_error = "Automation: " + auto_error
-    errors = {k: v for k, v in (("run", error), ("ghost", ghost_error), ("auto", auto_error)) if v}
-    if errors:
-        for msg in errors.values():
-            messages.error(request, msg)
-        return render(request, "data_extraction.html",
-                      _extraction_ctx(request, form=form, ghost_form=ghost_form, auto_form=auto_form,
-                                      errors=errors), status=400)
+    errors = _save_extraction_sections(request.POST)
 
-    pipeline.save_extraction_settings(form)
-    ghost_jobs.save_settings(ghost_form)
-    automation.save_settings(auto_form)
-    if not run:
-        if action == "save-automation":
-            messages.success(request, "Automation saved: " + (
-                f"on, {automation.describe(auto_form)}." if auto_form["enabled"] else "off."))
-            return redirect(reverse("data_extraction") + "#automation")
-        messages.success(request, "Data Extraction settings saved.")
+    if action == "autosave" or (action == "save" and _wants_json(request)):
+        ctx = _extraction_ctx(request)
+        auto = ctx["auto"]
+        cfg = ctx["form"]
+        return JsonResponse({
+            "ok": not errors,
+            "errors": errors,
+            "meta": {
+                "skills": f"{cfg['model']} · {cfg['batch_size']} rows per prompt · {ctx['key_count']} API key"
+                          + ("" if ctx["key_count"] == 1 else "s"),
+                "ghost": (f"{len(ctx['flagged'])} of {ctx['ghost_total']} posting"
+                          + ("" if ctx["ghost_total"] == 1 else "s") + " marked")
+                         if ctx["ghost_has_data"] else "No extracted postings yet",
+                "auto_on": auto["settings"]["enabled"],
+                "auto": auto["describe"],
+            },
+            "ghost_html": render_to_string("_dx_ghost_marked.html", ctx, request=request),
+            "auto_html": render_to_string("_dx_auto_status.html", ctx, request=request),
+        }, status=200)
+
+    # Plain form posts always end in a redirect, so refreshing the page never asks to resend it.
+    for msg in errors.values():
+        messages.error(request, msg)
+    if action != "run":
+        if not errors:
+            messages.success(request, "Data Extraction settings saved.")
         return redirect("data_extraction")
-    start_error = pipeline.start_run(pipeline.run_config(form), kind="extraction")
+    if "run" in errors:
+        return redirect("data_extraction")
+    run_cfg = pipeline.get_extraction_settings()
+    choice_error = pipeline.check_run_choices(run_cfg)
+    if choice_error:
+        messages.error(request, choice_error)
+        return redirect("data_extraction")
+    start_error = pipeline.start_run(pipeline.run_config(run_cfg), kind="extraction")
     if start_error:      # a problem with the run itself goes in the Console, not on the form
         pipeline.log_to_console(start_error)
     return redirect("console")
@@ -285,6 +324,9 @@ def scrape_status_view(request):
 @require_POST
 def api_keys_save_view(request):
     error = pipeline.save_api_keys_text(request.POST.get("keys", ""))
+    if _wants_json(request):       # saved automatically from Data Extraction
+        n = pipeline.count_api_keys()
+        return JsonResponse({"ok": not error, "error": error, "count": n})
     if error:
         messages.error(request, error)
     else:

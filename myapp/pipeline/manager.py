@@ -659,8 +659,8 @@ def build_steps(cfg: dict) -> list[dict]:
     form a "lane"; the lanes run at the same time (each source is a different site, so
     neither is asked for more than before). Skill extraction, standardizing and the ghost
     job check write shared files, so they run one after the other once every lane is done.
-    A search, a compile or one source's extraction that fails is logged and the run goes on;
-    a failed standardize step stops it."""
+    A step that fails is logged and the run goes on with the next one, so the ghost job check
+    at the end always runs on whatever data there is."""
     py = sys.executable
     sources = [s for s in cfg.get("sources") or [] if s in SOURCES]
     steps = []
@@ -696,7 +696,7 @@ def build_steps(cfg: dict) -> list[dict]:
 
     if cfg.get("do_standardize"):
         # After extraction: map the hard skills onto the ontology (exact -> fuzzy candidates -> Gemini).
-        steps.append({"name": "standardize", "label": "Standardize hard skills", "argv": [
+        steps.append({"name": "standardize", "label": "Standardize hard skills", "continue_on_fail": True, "argv": [
             py, "-u", str(PIPELINE_DIR / "standardize_skills_gemini.py"),
             f"--json={state_dir() / 'extracted_skills.json'}", f"--output-dir={data_dir()}",
             f"--ontology-dir={ontology_dir()}", f"--temp-csv={state_dir() / 'standardize_pending.csv'}",

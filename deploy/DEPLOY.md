@@ -305,8 +305,8 @@ is running.
 Data → Data Extraction → **Automation** runs the whole pipeline on a schedule. On the server
 the schedule is checked every 5 minutes by a systemd timer, `uenvision-automation.timer`,
 which runs `manage.py run_automation` as the `uenvision` user. `update.sh` installs and
-enables it, so nothing else has to be set up. (The first time, run `update.sh` twice: the
-copy of the script that runs is the one from before `git pull`.)
+enables it, so nothing else has to be set up. (`update.sh` restarts itself after `git pull`,
+so a change to the script itself takes effect in the same run.)
 
 Check it:
 

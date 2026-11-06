@@ -111,15 +111,17 @@ def parse_form(post) -> tuple[dict, str | None]:
         cfg["every_days"] = 0
 
     if cfg["frequency"] not in FREQUENCIES:
-        return cfg, "Choose how often the automatic run happens."
+        return cfg, "Automation: choose how often it runs."
     if not 1 <= cfg["every_days"] <= MAX_EVERY_DAYS:
-        return cfg, f"Run every 1 to {MAX_EVERY_DAYS} days."
+        if cfg["frequency"] == "days":
+            return cfg, f"Automation: run every 1 to {MAX_EVERY_DAYS} days."
+        cfg["every_days"] = get_settings()["every_days"]     # not used by "days of the week"
     if cfg["frequency"] == "weekdays" and not cfg["weekdays"]:
-        return cfg, "Tick at least one day of the week for the automatic run."
+        return cfg, "Automation: tick at least one day of the week."
     if not cfg["weekdays"]:
         cfg["weekdays"] = list(DEFAULT_SETTINGS["weekdays"])
     if not _parse_time(cfg["time"]):
-        return cfg, "Enter the time of day for the automatic run (HH:MM)."
+        return cfg, "Automation: enter the time of day (HH:MM)."
     return cfg, None
 
 

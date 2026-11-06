@@ -1,0 +1,26 @@
+{# Data Extraction > Ghost Job Detection: the marked postings (re-rendered after an automatic save). #}
+{% if not ghost_has_data %}
+  <p class="muted">No extracted skills yet, so there's nothing to check.</p>
+{% else %}
+  <p class="muted table-count"><strong>{{ flagged|length }}</strong> of {{ ghost_total }} posting{{ ghost_total|pluralize }} marked as possible ghost jobs. With the exclude switch on, {{ ghost_excluded }} of them are left out of the results.</p>
+  {% if flagged %}
+  <div class="table-wrap dx-ghost-table">
+    <table class="sr-table ghost-table">
+      <thead><tr><th>Job</th><th>Company</th><th>Source</th><th>Why it's marked</th><th>When excluded</th></tr></thead>
+      <tbody>
+      {% for r in flagged %}
+        <tr>
+          <td>{% if r.job_url %}<a href="{{ r.job_url }}" target="_blank" rel="noopener noreferrer">{{ r.job_name }}</a>{% else %}{{ r.job_name }}{% endif %}<br><span class="muted">#{{ r.job_id }}{% if r.date %} · {{ r.date|slice:":10" }}{% endif %}</span></td>
+          <td>{{ r.company_name|default:"—" }}</td>
+          <td>{{ r.source|capfirst }}</td>
+          <td><span class="pill pill--ghost">Possible ghost job</span><ul class="ghost-reasons">{% for reason in r.reasons %}<li>{{ reason }}</li>{% endfor %}</ul></td>
+          <td>{% if r.excluded %}Left out{% else %}Kept (newest copy){% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No postings match the current settings.</p>
+  {% endif %}
+{% endif %}

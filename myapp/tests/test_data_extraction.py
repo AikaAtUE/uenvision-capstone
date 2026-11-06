@@ -152,12 +152,15 @@ class DataExtractionPageTests(IsolatedDataMixin, TestCase):
 
     def test_run_needs_a_step_and_a_source(self):
         none = {k: None for k in ("do_scrape", "do_compile", "do_extract", "standardize", "do_ghost")}
-        resp = self.client.post(reverse("data_extraction"), form(action="run", **none))
-        self.assertContains(resp, "Tick at least one step", status_code=400)
-        resp = self.client.post(reverse("data_extraction"), form(action="run", sources=[]))
-        self.assertContains(resp, "Tick at least one job source", status_code=400)
-        resp = self.client.post(reverse("data_extraction"), form(action="run", keyword=""))
-        self.assertContains(resp, "Enter a search keyword", status_code=400)
+        # A problem always ends in a redirect back to the page (refreshing never resends the form),
+        # with the message shown there; the settings themselves are still saved.
+        for over, msg in ((none, "Tick at least one step"), ({"sources": []}, "Tick at least one job source"),
+                          ({"keyword": ""}, "Enter a search keyword")):
+            with mock.patch.object(pipeline, "start_run") as start:
+                resp = self.client.post(reverse("data_extraction"), form(action="run", **over))
+            start.assert_not_called()
+            self.assertRedirects(resp, reverse("data_extraction"), fetch_redirect_response=False)
+            self.assertContains(self.client.get(reverse("data_extraction")), msg)
         # only ghost detection: no source needed
         with mock.patch.object(pipeline, "start_run", return_value=None) as start:
             self.client.post(reverse("data_extraction"), form(action="run", sources=[], **{**none, "do_ghost": "on"}))
@@ -180,8 +183,57 @@ class DataExtractionPageTests(IsolatedDataMixin, TestCase):
                           pipeline.start_run({**cfg, "do_scrape": False, "do_compile": False}) or "")
 
     def test_automation_needs_a_source(self):
-        resp = self.client.post(reverse("data_extraction"), form(action="save", sources=[], auto_enabled="on"))
-        self.assertContains(resp, "Automation: Tick at least one job source", status_code=400)
+        data = self.autosave(sources=[], auto_enabled="on")
+        self.assertIn("tick at least one job source", data["errors"]["auto"])
+        self.assertFalse(json.loads((settings.DATA_DIR / ".state" / "automation.json").read_text())["enabled"]
+                         if (settings.DATA_DIR / ".state" / "automation.json").is_file() else False)
+
+    # ---- automatic saving ----
+    def autosave(self, **over):
+        resp = self.client.post(reverse("data_extraction"), form(action="autosave", **over),
+                                HTTP_X_REQUESTED_WITH="fetch")
+        self.assertEqual(resp.status_code, 200)
+        return resp.json()
+
+    def test_autosave_saves_and_returns_the_refreshed_summaries(self):
+        data = self.autosave(search_mode="multiple", extra_searches="Cloud Engineer", weak_signs_needed="1",
+                             auto_enabled="on", auto_time="05:45")
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["errors"], {})
+        self.assertEqual(pipeline.get_extraction_settings()["extra_searches"], ["Cloud Engineer"])
+        self.assertTrue(data["meta"]["auto_on"])
+        self.assertEqual(data["meta"]["auto"], "every day at 5:45 AM")
+        self.assertIn("rows per prompt", data["meta"]["skills"])
+        self.assertIn("Next run", data["auto_html"])
+        self.assertIn("5:45 AM", data["auto_html"])
+        self.assertIn("table-count", data["ghost_html"])
+
+    def test_days_of_the_week_saves_even_with_the_days_box_empty(self):
+        # The bug behind "Run every 1 to 30 days": with "days of the week" picked, the browser didn't
+        # send the every-N-days box, and that rejected the whole save.
+        data = self.autosave(auto_enabled="on", auto_frequency="weekdays", auto_weekdays=["0", "4"],
+                             auto_every_days=None)
+        self.assertTrue(data["ok"], data["errors"])
+        from .. import automation
+        cfg = automation.get_settings()
+        self.assertEqual((cfg["enabled"], cfg["frequency"], cfg["weekdays"]), (True, "weekdays", [0, 4]))
+        self.assertEqual(data["meta"]["auto"], "every Monday and Friday at 2:00 AM")
+
+    def test_a_mistake_in_one_part_does_not_lose_the_others(self):
+        data = self.autosave(delay_min="9", delay_max="2", weak_signs_needed="1", auto_enabled="on")
+        self.assertFalse(data["ok"])
+        self.assertEqual(set(data["errors"]), {"run"})
+        self.assertIn("minimum", data["errors"]["run"])
+        from .. import automation, ghost_jobs
+        self.assertEqual(ghost_jobs.get_settings()["weak_signs_needed"], 1)    # saved anyway
+        self.assertTrue(automation.get_settings()["enabled"])                  # saved anyway
+        self.assertEqual(pipeline.get_extraction_settings()["delay_max"], 4.0)  # the bad part kept its old value
+
+    def test_page_uses_automatic_saving(self):
+        page = self.client.get(reverse("data_extraction"))
+        self.assertContains(page, 'id="dx-save-status"')
+        self.assertContains(page, "Changes on this page are saved automatically.")
+        self.assertNotContains(page, "Save automation")
 
     def test_enter_key_saves_instead_of_running_or_saving_only_the_keys(self):
         page = self.client.get(reverse("data_extraction")).content.decode()
@@ -191,16 +243,18 @@ class DataExtractionPageTests(IsolatedDataMixin, TestCase):
         self.assertIn('form="api-keys-form"', page)
         self.assertNotIn("formaction=", page)
 
-    def test_save_automation_returns_to_its_section(self):
-        resp = self.client.post(reverse("data_extraction"), form(action="save-automation", auto_enabled="on"))
-        self.assertRedirects(resp, reverse("data_extraction") + "#automation", fetch_redirect_response=False)
-        self.assertContains(self.client.get(reverse("data_extraction")), "Automation saved: on, every day at 2:00 AM.")
+    def test_plain_save_without_javascript_redirects(self):
+        resp = self.client.post(reverse("data_extraction"), form(action="save", auto_enabled="on"))
+        self.assertRedirects(resp, reverse("data_extraction"), fetch_redirect_response=False)
+        self.assertContains(self.client.get(reverse("data_extraction")), "Data Extraction settings saved.")
 
     def test_api_keys_button_returns_to_the_page(self):
         with self.settings(API_KEYS_FILE=settings.DATA_DIR / "keys.txt"):
             resp = self.client.post(reverse("api_keys_save"), form(keys="AIzaONE\nAIzaTWO"))
             self.assertRedirects(resp, reverse("data_extraction") + "#skills", fetch_redirect_response=False)
             self.assertEqual(pipeline.count_api_keys(), 2)
+            resp = self.client.post(reverse("api_keys_save"), {"keys": "AIzaONE"}, HTTP_X_REQUESTED_WITH="fetch")
+            self.assertEqual(resp.json(), {"ok": True, "error": None, "count": 1})
 
     def test_ghost_job_check_command(self):
         out = StringIO()

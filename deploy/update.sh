@@ -6,11 +6,16 @@ set -euo pipefail
 APP_DIR=/home/uenvision/uenvision-capstone
 as_app() { sudo -u uenvision bash -c "cd '$APP_DIR' && set -a && . ./.env && set +a && $1"; }
 
-echo "==> Backing up the database"
-cp "$APP_DIR/db.sqlite3" "$APP_DIR/db.sqlite3.$(date +%Y%m%d-%H%M%S).bak"
+if [ "${1:-}" != "--pulled" ]; then
+    echo "==> Backing up the database"
+    cp "$APP_DIR/db.sqlite3" "$APP_DIR/db.sqlite3.$(date +%Y%m%d-%H%M%S).bak"
 
-echo "==> Pulling the latest code"
-as_app "git pull --ff-only"
+    echo "==> Pulling the latest code"
+    as_app "git pull --ff-only"
+
+    # Carry on with the update.sh that was just pulled, so changes to this script apply right away.
+    exec bash "$APP_DIR/deploy/update.sh" --pulled
+fi
 
 echo "==> Installing requirements"
 as_app "venv/bin/pip install -q -r requirements.txt"
@@ -25,6 +30,9 @@ echo "==> Installing the automatic data extraction timer"
 cp "$APP_DIR/deploy/uenvision-automation.service" "$APP_DIR/deploy/uenvision-automation.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now uenvision-automation.timer
+# Check the schedule once now (in the background), so the page shows "Scheduler: Active" right away.
+systemctl start --no-block uenvision-automation.service
+systemctl --no-pager list-timers uenvision-automation.timer
 
 echo "==> Restarting the site"
 systemctl restart uenvision
