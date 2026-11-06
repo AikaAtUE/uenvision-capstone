@@ -46,8 +46,14 @@
         earlier year levels in the same program already build each one up, and the job-market demand. Updated by itself
         after every survey.
       </p>
+      <ul class="rc-facts" aria-label="About this subject">
+        <li class="rc-fact"><span class="muted">Students who answered for it</span><strong>{{ subject.people.learners }}</strong></li>
+        <li class="rc-fact"><span class="muted">Other professors of this subject</span><strong>{{ subject.people.professors }}</strong></li>
+        <li class="rc-fact"><span class="muted">Year level</span><strong>{{ subject.year_label|default:"—" }}</strong></li>
+        <li class="rc-fact"><span class="muted">Skills reported here</span><strong>{{ subject.skills_reported }}</strong></li>
+      </ul>
       <section class="panel rc-signals">
-        <h2 class="section-title">Skills in this subject</h2>
+        <h2 class="section-title">Skills in this subject, four signals</h2>
         <div class="rc-table-wrap">
           <table class="rc-table">
             <thead><tr><th>Skill</th><th>You teach</th><th>Students learned</th><th>Earlier year levels</th><th>Job demand</th><th>Suggestion</th></tr></thead>
@@ -65,7 +71,7 @@
             </tbody>
           </table>
         </div>
-        <p class="muted rc-small">A skill counts as taught or learned in a subject once at least {{ subject.min_respondents }} people report it there. Job demand is the share of IT/CS job postings in the data set that ask for it.</p>
+        <p class="muted rc-small">A skill counts as taught or learned in a subject once at least {{ subject.min_respondents }} people report it there. Job demand is the share of IT/CS job postings in the data set that ask for it. Point at an "Earlier year levels" count to see which subjects.</p>
       </section>
       {% else %}
       <p class="form-msg rec-note">{{ subject.error }}</p>
@@ -117,9 +123,10 @@
         </div>
         <p class="form-msg is-error" id="rec-error" role="alert"></p>
 
-        <div class="rec-list">
+        <div class="rec-list{% if subject %} rr-grid{% endif %}">
           {% for row in under_taught %}
-          <div class="rec-skill" data-skill="{{ row.skill }}">
+          <div class="rec-skill{% if subject %} rr-card{% endif %}" data-skill="{{ row.skill }}">
+            {% if row.tag %}<span class="rc-kind rc-kind--{{ row.tag }}">{{ row.tag_label }}</span>{% endif %}
             <div class="rec-skill-head">
               <label class="rec-skill-pick">
                 <input type="checkbox" name="skills" value="{{ row.skill }}" {% if not row.cached_resources and not row.finding and row.tag != "on_track" %}checked{% endif %}>
@@ -128,7 +135,6 @@
               <span class="rec-skill-stats muted">
                 {{ row.industry_pct }}% of postings{% if subject %}{% elif gap.has_survey_data %} · {{ row.academic_pct }}% depth-weighted coverage{% endif %}
               </span>
-              {% if row.tag %}<span class="rc-tag rc-tag--{{ row.tag }}">{{ row.tag_label }}</span>{% endif %}
               {% if row.cached_resources %}<span class="pill rec-pill-generated">generated</span>{% endif %}
             </div>
             {% if row.why %}<p class="rc-why"><strong>Why:</strong> {{ row.why }}</p>{% endif %}

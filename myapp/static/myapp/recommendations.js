@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   var form = document.getElementById('rec-form');
-  if (!form) return;
+  if (!form || !document.getElementById('rec-generate-btn')) return;   // nothing left to find
 
   var btn = document.getElementById('rec-generate-btn');
   var status = document.getElementById('rec-status');

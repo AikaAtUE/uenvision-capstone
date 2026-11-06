@@ -67,7 +67,7 @@ def student_context(user):
     from .student_views import _my_skills, latest_response
 
     reported = _my_skills(user)
-    out = {"program": "", "year": None, "reported": reported, "assumed": {}, "removed": [], "later": {},
+    out = {"program": "", "year": None, "term": "", "reported": reported, "assumed": {}, "removed": [], "later": {},
            "mine": dict(reported)}
     if user.role != CustomUser.Role.STUDENT and not (user.is_developer and user.learner_info):
         return out
@@ -79,6 +79,7 @@ def student_context(user):
         return out
     dummy = user.answers_are_dummy
     current, _previous, _summer, earlier = curriculum_data.student_eligible_terms(program, year)
+    out["term"] = (current or {}).get("label", "")
     if current is None:
         return out
 
@@ -291,12 +292,14 @@ def faculty_subject(code, info=None, user=None, dummy=False, limit=FACULTY_LIMIT
             "priority": round(pct * (1 - depth_here), 2),
         })
     order = {t: i for i, t in enumerate(("not_landing", "add", "build", "deepen", "on_track"))}
-    rows.sort(key=lambda r: (r["tag"] == "on_track", -r["priority"], order[r["tag"]], -r["industry_pct"]))
+    rows.sort(key=lambda r: (order[r["tag"]], -r["priority"], -r["industry_pct"]))
     rows = rows[:limit]
     return {
         "exists": True, "code": code, "name": info["name"], "programs": years,
         "year_label": ", ".join(f"{p} {y}{_ordinal(y)} Year" for p, y in years.items() if y) or info.get("term_label", ""),
         "respondents": max([h["people"] for h in here.values()] or [0]),
+        "people": subject_profiles.subject_people(key, dummy, exclude_user=getattr(user, "pk", None)),
+        "skills_reported": len(here),
         "rows": rows, "cards": [r for r in rows if r["tag"] in ACTIONABLE][:6], "min_respondents": need,
     }
 

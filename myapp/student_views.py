@@ -463,10 +463,11 @@ def student_dashboard_view(request):
     return render_student_dashboard(request)
 
 
-def render_student_dashboard(request, active_page="student_dashboard", as_kind=None):
-    """The student / alumni skill gap page. Developers also get it on Dashboard and
-    Recommendations when their view switch is on Student or Alumni (as_kind; active_page
-    then keeps that menu item highlighted)."""
+def render_student_dashboard(request, active_page="student_dashboard", as_kind=None,
+                             template="student_dashboard.html"):
+    """The student / alumni skill gap page, or (template) their Recommendations page.
+    Developers also get them on Dashboard and Recommendations when their view switch is
+    on Student or Alumni (as_kind; active_page then keeps that menu item highlighted)."""
     user = request.user
     is_alumni = as_kind == "alumni" if as_kind else user.role == CustomUser.Role.ALUMNI
     feedback_nudge.record_use(user)
@@ -491,7 +492,9 @@ def render_student_dashboard(request, active_page="student_dashboard", as_kind=N
         s["finding"] = not s["cached_resources"] and s["key"] in waiting
     assumed = sorted(ctx["assumed"].values(), key=lambda a: (a["confirmed"], -a["weight"], a["skill"].lower()))
 
-    return render(request, "student_dashboard.html", {
+    top_n = len(compare) or 1
+    have_reported = max(have - plan["have_assumed"], 0)
+    return render(request, template, {
         "active_page": active_page,
         "has_survey": has_survey,
         "survey_url": reverse("alumni_survey" if is_alumni else "student_survey"),
@@ -505,6 +508,7 @@ def render_student_dashboard(request, active_page="student_dashboard", as_kind=N
         "readiness": readiness,
         "have": have,
         "to_build": to_build,
+        "any_to_find": any(not s["cached_resources"] and not s["finding"] for s in to_build),
         "you_levels": [{"key": k, "label": label, "status": status, "text": text} for k, label, status, text in YOU_LEVELS],
         "my_skills": sorted(ctx["reported"].values(), key=lambda m: (-m["weight"], m["skill"].lower())),
         "have_assumed": plan["have_assumed"],
@@ -513,6 +517,10 @@ def render_student_dashboard(request, active_page="student_dashboard", as_kind=N
         "coming_up": plan["coming_up"],
         "context_program": curriculum_data.PROGRAM_LABELS.get(ctx["program"], ""),
         "context_year": ctx["year"],
+        "context_term": ctx.get("term", ""),
+        "have_reported": have_reported,
+        "bar_reported": round(have_reported / top_n * 100),
+        "bar_assumed": round(plan["have_assumed"] / top_n * 100),
         "min_respondents": subject_profiles.min_respondents(),
         "max_per_run": recommendations.MAX_SKILLS_PER_STUDENT_RUN,
         "default_photo": recommendations.DEFAULT_PHOTO,
@@ -526,6 +534,9 @@ def student_role_view(request):
     request.user.target_role = role if role in job_roles.ROLE_LABELS else ""
     request.user.save(update_fields=["target_role"])
     rec_queue.after_survey(request.user)   # the new role needs its own learning resources
+    nxt = request.POST.get("next", "")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return redirect(nxt)
     # developers pick a role from the student view of their Dashboard
     return redirect("student_dashboard" if request.user.is_learner else "dashboard")
 

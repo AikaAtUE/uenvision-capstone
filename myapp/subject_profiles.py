@@ -115,9 +115,9 @@ def subject_names() -> list:
 # ---------------------------------------------------------------------------
 # Rebuilding
 # ---------------------------------------------------------------------------
-def _current_responses(dummy):
+def _current_rows(dummy):
     """Each account's latest record per side (like gap_analysis._academic_responses), plus
-    every response without an account. -> [(respondent_type, data)]"""
+    every response without an account. -> [(respondent_type, data, user_id)]"""
     rows = list(CurriculumSurveyResponse.objects.filter(is_dummy=dummy).order_by("created_at", "pk")
                 .values_list("respondent_type", "data", "user_id"))
     side = lambda t: "professor" if t == CurriculumSurveyResponse.PROFESSOR else "learner"   # noqa: E731
@@ -125,8 +125,36 @@ def _current_responses(dummy):
     for i, (rtype, _, uid) in enumerate(rows):
         if uid:
             latest[(uid, side(rtype))] = i
-    return [(rtype, data) for i, (rtype, data, uid) in enumerate(rows)
+    return [(rtype, data, uid) for i, (rtype, data, uid) in enumerate(rows)
             if isinstance(data, dict) and (not uid or latest[(uid, side(rtype))] == i)]
+
+
+def _current_responses(dummy):
+    """-> [(respondent_type, data)] (see _current_rows)."""
+    return [(rtype, data) for rtype, data, _uid in _current_rows(dummy)]
+
+
+def subject_people(subject_key, dummy=False, exclude_user=None) -> dict:
+    """How many people answered for this subject (canonical name key), from their latest
+    records. -> {"professors": n (without exclude_user), "learners": n}"""
+    by_code = curriculum_data.subject_by_code()
+    aliases = alias_map()
+    out = {"professors": 0, "learners": 0}
+    for rtype, data, uid in _current_rows(dummy):
+        for subj in data.get("subjects") or []:
+            if not isinstance(subj, dict) or not subj.get("code"):
+                continue
+            info = by_code.get(str(subj["code"]))
+            name = info["name"] if info else str(subj.get("name") or subj["code"])
+            if canonical(name, aliases) != subject_key:
+                continue
+            if rtype == CurriculumSurveyResponse.PROFESSOR:
+                if not (exclude_user and uid == exclude_user):
+                    out["professors"] += 1
+            else:
+                out["learners"] += 1
+            break
+    return out
 
 
 def build(dummy=False) -> list:
