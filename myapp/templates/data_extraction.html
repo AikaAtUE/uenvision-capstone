@@ -19,6 +19,8 @@
 
     <form class="dx-form" method="post" action="{% url 'data_extraction' %}" id="extraction-form">
       {% csrf_token %}
+      {# Pressing Enter in a field submits the form's first button: make that "Save settings", never Run or api_keys.txt. #}
+      <button type="submit" name="action" value="save" class="dx-default-submit" tabindex="-1" aria-hidden="true">Save settings</button>
 
       {# ---------------- Scrape Data ---------------- #}
       <details class="dx-section" id="scrape" data-key="scrape" open{% if errors.run %} data-keep{% endif %}>
@@ -105,10 +107,10 @@
           </label>
 
           <label class="field"><span>api_keys.txt <em class="opt">(Gemini API keys, one per line)</em></span>
-            <textarea name="keys" id="keys-text" rows="4" spellcheck="false" autocomplete="off" wrap="off" placeholder="AIza…">{{ keys_text }}</textarea>
+            <textarea name="keys" form="api-keys-form" id="keys-text" rows="4" spellcheck="false" autocomplete="off" wrap="off" placeholder="AIza…">{{ keys_text }}</textarea>
             <small class="field-hint">When a key runs out of daily quota or is rejected, extraction moves on to the next line. Lines starting with <code>#</code> are ignored. Currently {{ key_count }} key{{ key_count|pluralize }}.</small>
           </label>
-          <button type="submit" class="btn btn-ghost" formaction="{% url 'api_keys_save' %}" formnovalidate>Save api_keys.txt</button>
+          <button type="submit" form="api-keys-form" class="btn btn-ghost">Save api_keys.txt</button>
         </div>
       </details>
 
@@ -221,10 +223,16 @@
             <div><dt>Last automatic run</dt><dd>{% if auto.last_run %}{{ auto.last_run_text }} · {{ auto.last_result|default:"—" }}{% if auto.last_error %} <span class="muted">({{ auto.last_error }})</span>{% endif %}{% else %}None yet{% endif %}</dd></div>
             <div><dt>Scheduler</dt><dd>{% if auto.running %}<span class="dx-ok">Running an automatic run now</span>{% elif auto.scheduler_active %}<span class="dx-ok">Active</span> · last checked {{ auto.last_check_text }}{% else %}<span class="dx-warn">Not running here</span> · on the server it is the <code>uenvision-automation</code> timer (see <code>deploy/DEPLOY.md</code>){% endif %}</dd></div>
           </dl>
-          <button type="submit" name="action" value="save" class="btn btn-navy">Save automation</button>
+          <button type="submit" name="action" value="save-automation" class="btn btn-navy">Save automation</button>
         </div>
       </details>
+      <div class="dx-unsaved" id="dx-unsaved" role="status" hidden>
+        <span>You have unsaved changes.</span>
+        <button type="submit" name="action" value="save" class="btn btn-navy btn-sm">Save settings</button>
+      </div>
     </form>
+    {# api_keys.txt is saved on its own (its textarea and button point here with form="api-keys-form") #}
+    <form method="post" action="{% url 'api_keys_save' %}" id="api-keys-form">{% csrf_token %}</form>
 
     <h2 class="section-title settings-section-gap">What's in data/ right now</h2>
     <div id="summary-wrap">{% include "_data_summary.html" %}</div>

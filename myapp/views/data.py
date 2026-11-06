@@ -201,7 +201,8 @@ def data_extraction_view(request):
     if request.method != "POST":
         return render(request, "data_extraction.html", _extraction_ctx(request))
 
-    run = request.POST.get("action") == "run"
+    action = request.POST.get("action")
+    run = action == "run"
     form, error = pipeline.parse_extraction_form(request.POST, for_run=run)
     ghost_form, ghost_error = ghost_jobs.parse_settings_form(request.POST)
     auto_form, auto_error = automation.parse_form(request.POST)
@@ -222,6 +223,10 @@ def data_extraction_view(request):
     ghost_jobs.save_settings(ghost_form)
     automation.save_settings(auto_form)
     if not run:
+        if action == "save-automation":
+            messages.success(request, "Automation saved: " + (
+                f"on, {automation.describe(auto_form)}." if auto_form["enabled"] else "off."))
+            return redirect(reverse("data_extraction") + "#automation")
         messages.success(request, "Data Extraction settings saved.")
         return redirect("data_extraction")
     start_error = pipeline.start_run(pipeline.run_config(form), kind="extraction")

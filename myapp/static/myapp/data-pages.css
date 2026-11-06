@@ -300,3 +300,11 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 @media (prefers-reduced-motion: reduce){
   .dx-section > summary::before, .dx-switch-track, .dx-switch-track::after{transition:none;}
 }
+.dx-default-submit{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); padding:0; border:0;}
+.dx-unsaved{
+  position:sticky; bottom:16px; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:12px 16px; border-radius:10px; background:var(--navy); color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.18); font-size:.9rem; font-weight:600;
+}
+.dx-unsaved[hidden]{display:none;}
+.dx-unsaved .btn{background:#fff; color:var(--navy); border-color:#fff;}
+[data-theme="dark"] .dx-unsaved .btn{color:#16233f;}

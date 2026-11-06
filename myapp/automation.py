@@ -229,7 +229,8 @@ def status() -> dict:
         "describe": describe(cfg),
         "next_run": next_run,
         "last_run": last_run,
-        "last_result": state.get("last_result"),
+        "last_result": (run.get("status") if state.get("last_result") == "running" and not auto_running
+                        and run.get("kind") == "automation" else state.get("last_result")),
         "last_error": state.get("last_error"),
         "last_check": last_check,
         "scheduler_active": fresh or auto_running,

@@ -69,6 +69,21 @@
   if (enabled) enabled.addEventListener('change', updateAuto);
   updateAuto();
 
+  // ---- Unsaved changes: say so, and ask before leaving the page ----
+  const bar = document.getElementById('dx-unsaved');
+  let dirty = false, submitting = false;
+  function markDirty(e) {
+    if (e.target.form !== form) return;            // the api_keys.txt textarea belongs to its own form
+    dirty = true;
+    if (bar) bar.hidden = false;
+  }
+  form.addEventListener('input', markDirty);
+  form.addEventListener('change', markDirty);
+  form.addEventListener('submit', () => { submitting = true; });
+  window.addEventListener('beforeunload', (e) => {
+    if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; }
+  });
+
   // ---- Collapsible sections: remember open / closed, open one that has a problem ----
   const KEY = 'ue_dx_open';
   let saved = null;

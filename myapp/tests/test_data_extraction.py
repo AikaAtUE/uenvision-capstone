@@ -183,6 +183,19 @@ class DataExtractionPageTests(IsolatedDataMixin, TestCase):
         resp = self.client.post(reverse("data_extraction"), form(action="save", sources=[], auto_enabled="on"))
         self.assertContains(resp, "Automation: Tick at least one job source", status_code=400)
 
+    def test_enter_key_saves_instead_of_running_or_saving_only_the_keys(self):
+        page = self.client.get(reverse("data_extraction")).content.decode()
+        form_html = page[page.index('id="extraction-form"'):page.index("</form>", page.index('id="extraction-form"'))]
+        first_button = form_html[form_html.index("<button"):form_html.index("</button>")]
+        self.assertIn('value="save"', first_button)       # Enter in a field = Save settings
+        self.assertIn('form="api-keys-form"', page)
+        self.assertNotIn("formaction=", page)
+
+    def test_save_automation_returns_to_its_section(self):
+        resp = self.client.post(reverse("data_extraction"), form(action="save-automation", auto_enabled="on"))
+        self.assertRedirects(resp, reverse("data_extraction") + "#automation", fetch_redirect_response=False)
+        self.assertContains(self.client.get(reverse("data_extraction")), "Automation saved: on, every day at 2:00 AM.")
+
     def test_api_keys_button_returns_to_the_page(self):
         with self.settings(API_KEYS_FILE=settings.DATA_DIR / "keys.txt"):
             resp = self.client.post(reverse("api_keys_save"), form(keys="AIzaONE\nAIzaTWO"))
