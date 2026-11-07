@@ -191,6 +191,20 @@
   var SAVED = {};
   try { SAVED = JSON.parse((qs('#saved-feedback') || {}).textContent || '{}') || {}; } catch (e) { SAVED = {}; }
 
+  // "Not sent yet" on the survey list when unsent answers are waiting.
+  function markInProgress(kind) {
+    var link = qs('.feedback-item[data-survey="' + kind + '"]', page);
+    if (!link || qs('.fb-draft-badge', link)) return;
+    var badge = document.createElement('span');
+    badge.className = 'fb-draft-badge';
+    badge.textContent = 'Not sent yet';
+    link.insertBefore(badge, link.lastElementChild);
+  }
+  function clearInProgress(kind) {
+    var badge = qs('.feedback-item[data-survey="' + kind + '"] .fb-draft-badge', page);
+    if (badge) badge.remove();
+  }
+
   function markAnswered(kind) {
     var link = qs('.feedback-item[data-survey="' + kind + '"]', page);
     if (link && !qs('.fb-done-badge', link)) {
@@ -201,9 +215,50 @@
     }
   }
 
+  /* ---------- unsent answers ----------
+     While someone answers (or edits) a survey, what they've picked so far is kept in this
+     browser, so leaving the page by accident doesn't lose it. The key comes from the page
+     (views/feedback.py: ue_survey_draft:feedback:<account>:<login session>) plus the survey,
+     so it only lasts for this login; logging out clears it (base.html). Submitting or
+     pressing Cancel removes it. */
+  var DRAFT_BASE = page.dataset.draftKey || '';
+  function draftKey(kind) {
+    if (!DRAFT_BASE) return '';
+    var parts = DRAFT_BASE.split(':');            // ue_survey_draft, feedback, <account>, <session>
+    if (parts.length < 4) return '';
+    parts[1] = 'feedback-' + kind;                 // one draft per survey
+    return parts.join(':');
+  }
+  function readDraft(kind) {
+    var key = draftKey(kind);
+    if (!key) return null;
+    try {
+      // Drafts of this account and survey from an older login session are dropped.
+      var prefix = key.split(':').slice(0, 3).join(':') + ':';
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (k && k !== key && k.indexOf(prefix) === 0) localStorage.removeItem(k);
+      }
+      var d = JSON.parse(localStorage.getItem(key) || 'null');
+      return d && d.answers ? d.answers : null;
+    } catch (e) { return null; }
+  }
+  function writeDraft(kind, answers) {
+    var key = draftKey(kind);
+    if (!key) return;
+    try { localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), answers: answers })); } catch (e) { /* storage blocked */ }
+  }
+  function dropDraft(kind) {
+    clearInProgress(kind);
+    var key = draftKey(kind);
+    if (!key) return;
+    try { localStorage.removeItem(key); } catch (e) { /* storage blocked */ }
+  }
+
   // kind: "sus" / "uat" / "functional"; fill(saved) puts the saved answers in the form,
-  // blank() empties it (for a first answer).
-  function makeEditable(kind, form, fill, blank) {
+  // blank() empties it (for a first answer), snapshot() reads what is on the form now
+  // (same shape as fill takes) for the unsent-answers draft.
+  function makeEditable(kind, form, fill, blank, snapshot) {
     var fieldset = qs('#' + kind + '-fields');
     var bar = qs('#' + kind + '-saved');
     var submitBtn = qs('button[type=submit]', form);
@@ -241,18 +296,71 @@
       var first = fieldset && qs('input:not([type=hidden]), textarea', fieldset);
       if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
     }
+    // The note shown when unsent answers were filled back in.
+    var note = null;
+    function hideNote() { if (note) { note.remove(); note = null; } }
+    function showNote() {
+      hideNote();
+      note = document.createElement('div');
+      note.className = 'fb-draft-note';
+      note.setAttribute('role', 'status');
+      note.innerHTML = '<span>We filled in the answers you started earlier but haven\u2019t ' +
+        (SAVED[kind] ? 'saved' : 'submitted') + ' yet.</span>' +
+        '<button type="button" class="link-inline" data-draft-discard>Discard them</button>';
+      var anchor = fieldset || form.firstChild;
+      form.insertBefore(note, anchor);
+      qs('[data-draft-discard]', note).addEventListener('click', function () {
+        dropDraft(kind);
+        hideNote();
+        if (SAVED[kind]) lock(); else { blank(); lock(); }
+      });
+    }
+    var draftTimer = null;
+    function keepDraft() {
+      if (!snapshot || (fieldset && fieldset.disabled)) return;   // read-only: nothing being typed
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(function () { writeDraft(kind, snapshot()); }, 300);
+    }
+    form.addEventListener('input', keepDraft);
+    form.addEventListener('change', keepDraft);
+
     if (editBtn) editBtn.addEventListener('click', edit);
-    if (cancelBtn) cancelBtn.addEventListener('click', lock);
+    if (cancelBtn) cancelBtn.addEventListener('click', function () {
+      clearTimeout(draftTimer);
+      dropDraft(kind);          // Cancel throws away the unsaved edit
+      hideNote();
+      lock();
+    });
     lock();
+    var draft = snapshot ? readDraft(kind) : null;
+    if (draft) {
+      try {
+        fill(draft);
+        if (SAVED[kind]) edit();          // a saved answer being edited: reopen the edit
+        showNote();
+        markInProgress(kind);
+      } catch (e) { dropDraft(kind); if (SAVED[kind]) lock(); else blank(); }
+    }
     return {
       // After a save: show the new answers read-only (or empty the form if the server
       // wasn't reached and they were only kept in this browser).
       saved: function (result) {
-        if (result && !result.usedFallback && result.answers) { SAVED[kind] = result.answers; lock(); }
+        clearTimeout(draftTimer);
+        hideNote();
+        if (result && !result.usedFallback && result.answers) { dropDraft(kind); SAVED[kind] = result.answers; lock(); }
         else { blank(); lock(); }
       },
       wasEditing: function () { return !!SAVED[kind]; }
     };
+  }
+  // What is picked so far (unanswered statements left out), for the unsent-answers draft.
+  function likertSnapshot(prefix, count, comments) {
+    var out = { comments: comments || '' };
+    for (var n = 1; n <= count; n++) {
+      var checked = qs('input[name="' + prefix + '-q' + n + '"]:checked');
+      if (checked) out['q' + n] = Number(checked.value);
+    }
+    return out;
   }
   // -> array of answers (1-5), or null if a statement was skipped
   function readLikert(prefix, count) {
@@ -288,7 +396,9 @@
       form.reset();
       fillLikert('sus', SUS_QUESTIONS.length, d);
       qs('#sus-comments').value = d.comments || '';
-    }, function () { form.reset(); });
+    }, function () { form.reset(); }, function () {
+      return likertSnapshot('sus', SUS_QUESTIONS.length, qs('#sus-comments').value);
+    });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('sus-error', '');
@@ -318,7 +428,9 @@
       form.reset();
       fillLikert('uat', questions.length, d);
       qs('#uat-comments').value = d.comments || '';
-    }, function () { form.reset(); });
+    }, function () { form.reset(); }, function () {
+      return likertSnapshot('uat', questions.length, qs('#uat-comments').value);
+    });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       setFormError('uat-error', '');
@@ -426,7 +538,9 @@
   function initFunctionalForm() {
     renderFunctionalTable();
     var form = qs('#functional-form');
-    var editor = makeEditable('functional', form, fillFunctional, blankFunctional);
+    var editor = makeEditable('functional', form, fillFunctional, blankFunctional, function () {
+      return { rows: collectFunctionalRows() };
+    });
 
     // (+ Add test case is for developers only and opens Edit form: see initFormEditors)
 

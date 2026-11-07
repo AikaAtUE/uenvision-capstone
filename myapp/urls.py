@@ -62,6 +62,7 @@ urlpatterns = [
     path("settings/change-password/", views.change_password_view, name="change_password"),
     path("settings/account/", views.update_account_view, name="update_account"),
     path("settings/theme/", views.theme_save_view, name="theme_save"),
+    path("tour/seen/", views.tour_seen_view, name="tour_seen"),
     path("settings/photo/", views.profile_photo_upload_view, name="profile_photo_upload"),
     path("photo/<int:pk>/", views.profile_photo_view, name="profile_photo"),
     path("settings/confirm-email/", views.send_my_verification_view, name="send_my_verification"),

@@ -1,0 +1,47 @@
+/* UEnvision — onboarding tours (onboarding-tour.js): dimmed page, spotlight, arrow and card.
+   Colours come from styles.css tokens, so the card follows light and dark mode. */
+.uet{position:fixed; inset:0; z-index:1000; pointer-events:none;}
+/* catches clicks so the page underneath can't be changed mid-tour */
+.uet-block{position:fixed; inset:0; pointer-events:auto;}
+.uet-hole{
+  position:fixed; border-radius:10px; pointer-events:none;
+  box-shadow:0 0 0 2px #fff, 0 0 0 6px rgba(200,32,47,.85), 0 0 0 200vmax rgba(7,11,20,.68);
+  transition:left .3s cubic-bezier(.3,.7,.3,1), top .3s cubic-bezier(.3,.7,.3,1), width .3s cubic-bezier(.3,.7,.3,1), height .3s cubic-bezier(.3,.7,.3,1);
+}
+.uet-hole::after{content:""; position:absolute; inset:-6px; border-radius:14px; border:2px solid rgba(255,255,255,.7); animation:uet-pulse 1.8s ease-out infinite;}
+.uet-hole.is-none{box-shadow:0 0 0 200vmax rgba(7,11,20,.68);}
+.uet-hole.is-none::after{display:none;}
+@keyframes uet-pulse{0%{opacity:.9; transform:scale(1);} 100%{opacity:0; transform:scale(1.06);}}
+.uet-arrow{position:fixed; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none;}
+.uet-arrow-line{fill:none; stroke:#ffd25e; stroke-width:3; stroke-linecap:round;}
+.uet-arrow-head{fill:#ffd25e;}
+.uet-tip{
+  position:fixed; pointer-events:auto; background:var(--surface); color:var(--ink);
+  border-radius:12px; padding:16px 18px 14px; box-shadow:0 18px 44px rgba(0,0,0,.4);
+  font-family:var(--font-body); font-size:.92rem; line-height:1.5;
+  transition:left .3s cubic-bezier(.3,.7,.3,1), top .3s cubic-bezier(.3,.7,.3,1);
+}
+:root[data-theme="dark"] .uet-tip{background:#1d2a44; box-shadow:0 18px 44px rgba(0,0,0,.6), 0 0 0 1px #34456b;}
+.uet-step{margin:0; font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--red);}
+:root[data-theme="dark"] .uet-step{color:var(--red-text, #ff7a86);}
+.uet-title{font-family:var(--font-head); font-size:1.1rem; margin:4px 0 6px; text-wrap:balance;}
+.uet-text{margin:0;}
+.uet-foot{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; flex-wrap:wrap;}
+.uet-dots{display:flex; gap:4px; flex-wrap:wrap; max-width:45%;}
+.uet-dots i{width:6px; height:6px; border-radius:50%; background:var(--line-strong);}
+.uet-dots i.is-on{background:var(--red); width:16px; border-radius:3px;}
+.uet-btns{display:flex; align-items:center; gap:6px; margin-left:auto;}
+.uet-skip{background:none; border:0; padding:6px 4px; color:var(--muted); font:600 .8rem var(--font-body); cursor:pointer;}
+.uet-skip:hover{color:var(--ink); text-decoration:underline;}
+.uet-tip .btn:focus-visible, .uet-skip:focus-visible{outline:2px solid #ffd25e; outline-offset:2px;}
+.uet--still .uet-hole, .uet--still .uet-tip{transition:none;}
+.uet--still .uet-hole::after{animation:none;}
+@media (prefers-reduced-motion: reduce){
+  .uet-hole, .uet-tip{transition:none;}
+  .uet-hole::after{animation:none;}
+}
+
+/* How to use: the "Guided tours" replay buttons */
+.help-tours{margin:0 0 22px; padding:14px 16px; border:1px solid var(--line); border-radius:var(--radius); background:var(--soft);}
+.help-tours .section-title{margin-bottom:4px;}
+.help-tour-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}

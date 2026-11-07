@@ -720,13 +720,19 @@ def build_steps(cfg: dict) -> list[dict]:
     for src in sources:
         info = SOURCE_INFO[src]
         if cfg.get("do_scrape"):
-            for term in cfg.get("searches") or []:
-                steps.append({
+            # A source with parallel > 1 (Foundit) deals its searches out to that many slots; the
+            # slots of a lane run at the same time and its compile step waits for all of them.
+            slots = max(1, int(getattr(info, "parallel", 1) or 1))
+            for n, term in enumerate(cfg.get("searches") or []):
+                step = {
                     "name": f"scrape_{src}_{len(steps)}", "label": f"Scrape {info.label}: “{term}”",
                     "lane": src, "continue_on_fail": True,
                     "argv": info.scrape_argv(py, PIPELINE_DIR, term, json_dir(src),
                                              cfg["delay_min"], cfg["delay_max"], cfg.get("max_jobs"),
-                                             report_dir=failed_saves_run_dir())})
+                                             report_dir=failed_saves_run_dir())}
+                if slots > 1:
+                    step["slot"] = n % slots + 1
+                steps.append(step)
         if cfg.get("do_compile"):
             # A source whose searches found nothing new fails to compile; the others go on, and
             # its existing compiled CSV (if any) is still extracted.

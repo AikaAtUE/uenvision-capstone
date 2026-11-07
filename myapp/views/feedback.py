@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from ..models import SurveyResponse
 from .. import feedback_forms, feedback_nudge
 from .common import PH_TIME
+from .surveys import _survey_draft_key
 
 
 @login_required
@@ -24,6 +25,9 @@ def feedback_view(request):
                                              "uat_audience": uat_audience(request.user),
                                              "forms": content,
                                              "can_edit_forms": request.user.is_developer,
+                                             # Unsent answers are kept in this browser for this login
+                                             # session (survey.js), one key per survey: <base>:<kind>.
+                                             "draft_key": _survey_draft_key(request, "feedback"),
                                              "saved_feedback": saved_feedback(request.user)})
 
 

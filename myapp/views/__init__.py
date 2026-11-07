@@ -54,6 +54,7 @@ from .pages import (  # noqa: F401
     settings_view,
     update_account_view,
     theme_save_view,
+    tour_seen_view,
     change_password_view,
     MAX_PHOTO_BYTES,
     PHOTO_TYPES,

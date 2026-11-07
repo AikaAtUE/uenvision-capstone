@@ -82,11 +82,78 @@ class FounditScraperTests(TmpDirMixin, TestCase):
         with mock.patch.object(foundit_scraper, "fetch_search_page", side_effect=page), \
                 mock.patch.object(foundit_scraper, "fetch_job_detail", side_effect=lambda s, jid: detail(jid)), \
                 mock.patch.object(foundit_scraper, "random_delay"):
-            foundit_scraper.scrape("computer science", 100, self.tmp, 0, 0, None, None)
+            foundit_scraper.scrape("computer science", 100, self.tmp, 0, 0, None, None, fetch_details=True)
         self.assertEqual(searched, [0, 20])               # 20 a page, whatever --limit asks for
         self.assertEqual(len(list(self.tmp.glob("*.json"))), 22)
         saved = json.loads((self.tmp / "21_it-manager-co-philippines.json").read_text(encoding="utf-8"))
         self.assertEqual(saved["jobId"], 21)              # the jobDetail response, saved as-is
+
+    def test_saves_jobs_straight_from_the_search_results_by_default(self):
+        item = dict(search_item(7), score=123, jdMatched=[{"value": "x", "type": "query"}],
+                    description="<p>Build web apps</p>")
+        with mock.patch.object(foundit_scraper, "fetch_search_page",
+                               return_value={"data": [item], "meta": {"paging": {"total": 1}}}), \
+                mock.patch.object(foundit_scraper, "fetch_job_detail") as fetch, \
+                mock.patch.object(foundit_scraper, "random_delay") as nap:
+            foundit_scraper.scrape("x", 20, self.tmp, 0, 0, None, None)
+        fetch.assert_not_called()
+        self.assertEqual(nap.call_count, 1)               # only after the search page
+        saved = json.loads(next(self.tmp.glob("7_*.json")).read_text(encoding="utf-8"))
+        self.assertEqual(saved, {k: v for k, v in item.items() if k not in ("score", "jdMatched")})
+
+    def test_stops_after_max_pages_per_search(self):
+        searched = []
+
+        def page(session, query, limit, start, countries):
+            searched.append(start)
+            return {"data": [search_item(start + i) for i in range(1, 21)], "meta": {"paging": {"total": 5000}}}
+
+        with mock.patch.object(foundit_scraper, "fetch_search_page", side_effect=page), \
+                mock.patch.object(foundit_scraper, "fetch_job_detail", side_effect=lambda s, jid: detail(jid)), \
+                mock.patch.object(foundit_scraper, "random_delay"):
+            foundit_scraper.scrape("x", 20, self.tmp, 0, 0, None, None)          # default: 5 pages
+        self.assertEqual(searched, [0, 20, 40, 60, 80])
+        self.assertEqual(len(list(self.tmp.glob("*.json"))), 100)
+        searched.clear()
+        with mock.patch.object(foundit_scraper, "fetch_search_page", side_effect=page), \
+                mock.patch.object(foundit_scraper, "fetch_job_detail", side_effect=lambda s, jid: detail(jid)), \
+                mock.patch.object(foundit_scraper, "random_delay"):
+            foundit_scraper.scrape("x", 20, self.tmp / "b", 0, 0, None, None, max_pages=2)
+        self.assertEqual(searched, [0, 20])
+
+    def test_tech_job_filter(self):
+        tech = foundit_scraper.is_tech_job
+        self.assertEqual(tech({"title": "Software Engineer"}), "title")
+        self.assertEqual(tech({"title": "Network Engineer", "functions": ["Telecommunications"]}), "title")
+        self.assertEqual(tech({"title": "Business Analyst", "functions": ["Information Technology"]}), "function")
+        self.assertEqual(tech({"title": "QA Specialist",
+                               "description": "<p>Software testing with Selenium, SQL and Jira</p>"}), "description")
+        self.assertIsNone(tech({"title": "QA Specialist", "description": "Food safety and HACCP audits"}))
+        self.assertIsNone(tech({"title": "Junior Accountant", "functions": ["Accounting"]}))
+        self.assertIsNone(tech({"title": "Business Development Officer", "functions": ["Sales"]}))
+
+    def test_non_tech_results_are_skipped_before_the_detail_request(self):
+        jobs = [search_item(1, "Software Engineer"), search_item(2, "Junior Accountant"),
+                search_item(3, "Executive Assistant")]
+        fetched = []
+
+        def fetch(session, jid):
+            fetched.append(jid)
+            return detail(jid)
+
+        for tech_only, expected in ((True, [1]), (False, [1, 2, 3])):
+            fetched.clear()
+            with mock.patch.object(foundit_scraper, "fetch_search_page",
+                                   return_value={"data": jobs, "meta": {"paging": {"total": 3}}}), \
+                    mock.patch.object(foundit_scraper, "fetch_job_detail", side_effect=fetch), \
+                    mock.patch.object(foundit_scraper, "random_delay"):
+                foundit_scraper.scrape("x", 20, self.tmp / str(tech_only), 0, 0, None, None,
+                                       report_dir=self.tmp / f"run{tech_only}", tech_only=tech_only,
+                                       fetch_details=True)
+            self.assertEqual(fetched, expected)
+        # skipped jobs are not failed saves
+        with open(self.tmp / "runTrue" / "foundit_events.csv", encoding="utf-8", newline="") as f:
+            self.assertEqual([r["status"] for r in csv.DictReader(f)], ["saved"])
 
     def test_an_empty_answer_is_a_failed_save(self):
         resp = mock.Mock(status_code=200)
@@ -103,7 +170,8 @@ class FounditScraperTests(TmpDirMixin, TestCase):
                 mock.patch.object(foundit_scraper, "fetch_job_detail",
                                   side_effect=lambda s, jid: detail(jid) if jid == 1 else None), \
                 mock.patch.object(foundit_scraper, "random_delay"):
-            foundit_scraper.scrape("x", 20, self.tmp / "jsons", 0, 0, None, None, report_dir=self.tmp / "run")
+            foundit_scraper.scrape("x", 20, self.tmp / "jsons", 0, 0, None, None, report_dir=self.tmp / "run",
+                                   fetch_details=True)
         with open(self.tmp / "run" / "foundit_events.csv", encoding="utf-8", newline="") as f:
             rows = list(csv.DictReader(f))
         self.assertEqual([r["status"] for r in rows], ["saved", "failed"])
@@ -199,3 +267,48 @@ class FounditInSystemTests(IsolatedDataMixin, TestCase):
         self.assertEqual((res["added"], res["invalid"]), (1, 1))
         self.assertTrue((pipeline.json_dir("foundit")
                          / "69675292_it-manager-dempsey-resource-management-philippines.json").is_file())
+
+
+class FounditParallelSearchTests(TestCase):
+    """Foundit's searches run 3 at a time inside its lane; its compile step waits for all of them."""
+
+    def test_build_steps_deals_foundit_searches_to_three_slots(self):
+        cfg = {"sources": ["kalibrr", "foundit"], "do_scrape": True, "do_compile": True,
+               "searches": ["a", "b", "c", "d"], "delay_min": 1.5, "delay_max": 4.0}
+        steps = pipeline.build_steps(cfg)
+        found = [s for s in steps if s["lane"] == "foundit" and s["name"].startswith("scrape_")]
+        self.assertEqual([s["slot"] for s in found], [1, 2, 3, 1])
+        self.assertFalse(any("slot" in s for s in steps if s["lane"] == "kalibrr"))
+        self.assertNotIn("slot", next(s for s in steps if s["name"] == "compile_foundit"))
+
+    def test_slots_run_together_then_the_compile_step(self):
+        import time
+        tmp = Path(tempfile.mkdtemp())
+        py = sys.executable
+
+        def step(name, code, **extra):
+            return {"name": name, "label": name, "lane": "foundit", "argv": [py, "-c", code], **extra}
+
+        nap = "import time; time.sleep(1.2); print('%s')"
+        steps = [step("s1", nap % "one", slot=1), step("s2", nap % "two", slot=2),
+                 step("s3", "import sys; sys.exit(2)", slot=3, continue_on_fail=True),
+                 step("s4", nap % "four", slot=3, continue_on_fail=True),
+                 step("compile", "print('compiled')")]
+        state = {"status": "running", "steps": [{"name": s["name"], "label": s["label"], "status": "pending"}
+                                                for s in steps]}
+        (tmp / "run.json").write_text(json.dumps(state))
+        (tmp / "run.log").write_text("")
+        cfg = {"state_file": str(tmp / "run.json"), "log_file": str(tmp / "run.log"), "cwd": str(tmp),
+               "steps": steps, "lane_labels": {"foundit": "Foundit"}}
+        (tmp / "cfg.json").write_text(json.dumps(cfg))
+        started = time.time()
+        subprocess.run([py, str(Path(pipeline.PIPELINE_DIR) / "orchestrator.py"), str(tmp / "cfg.json")],
+                       check=True, timeout=60)
+        took = time.time() - started
+        result = json.loads((tmp / "run.json").read_text())
+        self.assertEqual([s["status"] for s in result["steps"]], ["done", "done", "failed", "done", "done"])
+        log = (tmp / "run.log").read_text()
+        for line in ("[Foundit 1] one", "[Foundit 2] two", "[Foundit 3] four"):
+            self.assertIn(line, log)
+        self.assertGreater(log.index("compiled"), max(log.index("one"), log.index("two"), log.index("four")))
+        self.assertLess(took, 2.4)      # three 1.2 s searches ran side by side

@@ -83,6 +83,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     # "light" (the default), "dark", or "system" (follow the phone / computer setting).
     THEMES = ("light", "dark", "system")
     theme = models.CharField(max_length=10, default="light", blank=True)
+    # Onboarding tours (onboarding-tour.js) this account has finished or skipped:
+    # "survey" (how to answer the survey), "results" (My skill gap / Dashboard) and
+    # "admin" (Data Extraction and Accounts). Promoting someone to administrator takes
+    # "admin" out again so they get that tour (views.accounts.account_edit_view).
+    TOURS = ("survey", "results", "admin")
+    tours_seen = models.JSONField(default=list, blank=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

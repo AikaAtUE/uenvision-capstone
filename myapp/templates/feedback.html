@@ -4,7 +4,7 @@
 {% block page_content %}
 {# If you add a URL named 'survey_submit', responses are POSTed there; otherwise they are kept in the browser only. #}
 {% url 'survey_submit' as survey_submit_url %}
-<section class="page is-active" id="page-feedback" data-submit-url="{{ survey_submit_url }}"{% if can_edit_forms %} data-form-url="{% url 'feedback_form_save' 'KEY' %}"{% endif %}>
+<section class="page is-active" id="page-feedback" data-submit-url="{{ survey_submit_url }}"{% if draft_key %} data-draft-key="{{ draft_key }}"{% endif %}{% if can_edit_forms %} data-form-url="{% url 'feedback_form_save' 'KEY' %}"{% endif %}>
   <header class="page-header"><h1>Feedback</h1></header>
   <div class="page-body page-body--photo">
 

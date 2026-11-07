@@ -7,7 +7,7 @@ It is started by myapp/pipeline/manager.py:    python -u orchestrator.py <run_co
 
 run_config.json:
     {"state_file": ..., "log_file": ..., "cwd": ..., "lane_labels": {lane: label},
-     "steps": [{"name", "label", "argv": [...], "lane"?: ..., "continue_on_fail"?: bool}, ...],
+     "steps": [{"name", "label", "argv": [...], "lane"?: ..., "slot"?: int, "continue_on_fail"?: bool}, ...],
      "finish_argv"?: [...]}     (run at the end whatever happened, e.g. the failed saves log)
 
 Progress is written to state_file (JSON) with a heartbeat, and all step output goes to
@@ -63,7 +63,8 @@ def save(path, state):
 class Runner:
     """Runs the steps in order. Consecutive steps that carry a "lane" (one lane per job source:
     its searches, then its compile step) run as parallel lanes, each lane in its own thread,
-    with its output prefixed by the lane's label in the shared log. A failed step with
+    with its output prefixed by the lane's label in the shared log. Searches that also carry a
+    "slot" run their slots side by side inside the lane (see run_slots). A failed step with
     "continue_on_fail" (a single search) is marked failed and its lane goes on; any other
     failed step skips everything after it."""
 
@@ -135,6 +136,31 @@ class Runner:
                 if self.state["steps"][j]["status"] == "pending":
                     self.state["steps"][j]["status"] = "skipped"
 
+    def run_slots(self, indexes, label):
+        """Steps of one lane that carry a "slot" (one source's searches, dealt out to slots):
+        each slot runs its steps in order in its own thread, the slots at the same time.
+        -> True when every slot got through (a search with continue_on_fail may fail)."""
+        slots = {}
+        for i in indexes:
+            slots.setdefault(self.cfg["steps"][i]["slot"], []).append(i)
+        ok = {}
+
+        def slot_worker(slot, items):
+            for n, i in enumerate(items):
+                if not self.run_step(i, f"[{label} {slot}] "):
+                    self.skip(items[n + 1:])
+                    ok[slot] = False
+                    return
+            ok[slot] = True
+
+        threads = [threading.Thread(target=slot_worker, args=(slot, items), daemon=True)
+                   for slot, items in slots.items()]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        return all(ok.get(slot) for slot in slots)
+
     def run_lanes(self, indexes):
         lanes = {}
         for i in indexes:
@@ -143,12 +169,23 @@ class Runner:
         ok = {}
 
         def lane_worker(lane, items):
-            prefix = f"[{labels.get(lane, lane)}] " if len(lanes) > 1 else ""
-            for n, i in enumerate(items):
-                if not self.run_step(i, prefix):
-                    self.skip(items[n + 1:])
+            label = labels.get(lane, lane)
+            prefix = f"[{label}] " if len(lanes) > 1 else ""
+            n = 0
+            while n < len(items):
+                if self.cfg["steps"][items[n]].get("slot"):
+                    m = n
+                    while m < len(items) and self.cfg["steps"][items[m]].get("slot"):
+                        m += 1
+                    good = self.run_slots(items[n:m], label)
+                else:
+                    m = n + 1
+                    good = self.run_step(items[n], prefix)
+                if not good:
+                    self.skip(items[m:])
                     ok[lane] = False
                     return
+                n = m
             ok[lane] = True
 
         threads = [threading.Thread(target=lane_worker, args=(lane, items), daemon=True)

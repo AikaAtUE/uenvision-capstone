@@ -17,9 +17,37 @@ from .common import home_url_for
 @login_required
 def help_view(request):
     # Developers test every role, so they see every section.
+    user = request.user
     idle_minutes = getattr(django_settings, "IDLE_TIMEOUT_SECONDS", 1800) // 60
-    return render(request, "help.html", {"active_page": "help", "show_all": request.user.is_developer,
-                                         "idle_minutes": idle_minutes})
+    # "Replay the tour" links: each opens the page the tour runs on with ?tour=<name>.
+    if user.is_learner:
+        survey_url = reverse("alumni_survey" if user.role == user.Role.ALUMNI else "student_survey")
+        results_url = reverse("student_dashboard")
+    else:
+        survey_url, results_url = reverse("professor_survey"), reverse("dashboard")
+    tours = [("survey", "How to answer the survey", survey_url),
+             ("results", "How to read your results" if user.is_learner else "How to use the Dashboard", results_url)]
+    if user.is_administrator:
+        tours.append(("admin", "Data Extraction and Accounts (administrators)", reverse("dashboard")))
+    return render(request, "help.html", {"active_page": "help", "show_all": user.is_developer,
+                                         "idle_minutes": idle_minutes,
+                                         "tours": [{"name": n, "label": l, "url": f"{u}?tour={n}"} for n, l, u in tours]})
+
+
+@login_required
+@require_POST
+def tour_seen_view(request):
+    """onboarding-tour.js posts here when a tour is finished or skipped, so it doesn't start
+    again (on this or any other device). How to use can still replay it."""
+    name = request.POST.get("tour", "")
+    if name not in request.user.TOURS:
+        return JsonResponse({"ok": False, "error": "Unknown tour."}, status=400)
+    seen = [t for t in (request.user.tours_seen or []) if t in request.user.TOURS]
+    if name not in seen:
+        seen.append(name)
+        request.user.tours_seen = seen
+        request.user.save(update_fields=["tours_seen"])
+    return JsonResponse({"ok": True, "seen": seen})
 
 
 @login_required

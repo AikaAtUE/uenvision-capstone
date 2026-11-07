@@ -6,6 +6,15 @@
   <div class="page-body">
     <div class="panel help-card">
       <p class="help-lede">UEnvision reads IT and Computer Science job postings, finds the skills employers ask for most, and compares them with what UE's BSIT and BSCS subjects teach. Below are the steps for your account{% if show_all %}, plus every other role{% endif %}.</p>
+      {% if tours %}
+      <div class="help-tours" id="help-tours">
+        <h2 class="section-title">Guided tours</h2>
+        <p class="muted">Each tour dims the page and points at one part at a time with a short explanation.</p>
+        <div class="help-tour-list">
+          {% for t in tours %}<a class="btn btn-ghost btn-sm" href="{{ t.url }}" data-tour-replay="{{ t.name }}">&#9654; {{ t.label }}</a>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
       <div class="help-grid">
 
       {% if user.is_learner or show_all %}

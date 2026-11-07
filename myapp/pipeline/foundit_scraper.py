@@ -16,15 +16,27 @@ How it works
 2. For every job in the results, we pull:
        job_id = job["jobId"]          (the number at the end of the job page URL)
        jd_url = job["jdUrl"]          ("/job/it-manager-dempsey-...-69675292")
-3. We fetch the full job post from
+3. We save the job straight from the search result as {job_id}_{slug}.json, without
+   the search-only "score" and "jdMatched" fields. The search result already holds the
+   whole job post: compared field by field with
        https://www.foundit.com.ph/home/api/jobDetail?jobId={job_id}
-   and save the JSON response as {job_id}_{slug}.json
+   (Nov 2026) the description, skills, salary, dates, location, functions and industries
+   are the same; the detail API only adds company fields compile_jobs_to_csv.py doesn't
+   read (the company's industries, location and account details). --fetch-details still
+   fetches and saves the detail API's version instead, one extra request per job
    (a job ID foundit no longer has comes back as HTTP 200 with an empty {}).
-4. start increases by `limit` each loop until start >= total (or --max-jobs is hit).
+4. start increases by `limit` each loop until start >= total, --max-pages search pages
+   have been read (default 5, so at most 100 jobs per search), or --max-jobs is hit.
 5. A random delay is inserted between *every* HTTP request.
+6. Only tech jobs are saved (see is_tech_job()); --all-jobs turns this off.
 
 Foundit returns at most 20 jobs per search page whatever `limit` asks for, so
---limit defaults to 20. Dates in the API (postedAt, createdAt, updatedAt,
+--limit defaults to 20.
+
+Why --max-pages: Foundit's search matches loosely and ranks by relevance, so one search
+reports thousands of jobs ("Software Engineer" ~2,900, "IT Audit Assistant" ~5,900) and
+only the first few pages actually fit the search; deeper pages are mostly unrelated jobs.
+Kalibrr's and Trabajo's searches are strict, so they don't need this. Dates in the API (postedAt, createdAt, updatedAt,
 closedAt) are Unix timestamps in milliseconds; compile_jobs_to_csv.py turns
 createdAt into the posting's date.
 
@@ -68,6 +80,7 @@ SEARCH_URL = SITE_URL + "/home/api/searchResultsPage"
 JOB_DETAIL_URL = SITE_URL + "/home/api/jobDetail"
 PAGE_SIZE_CAP = 20          # foundit never returns more than this per search page
 DEFAULT_COUNTRIES = ["Philippines"]
+DEFAULT_MAX_PAGES = 5       # per search; see "Why --max-pages" above (0 = no limit)
 
 # A small pool of realistic desktop User-Agents to rotate between requests.
 USER_AGENTS = [
@@ -91,6 +104,67 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("foundit_scraper")
+
+# --------------------------------------------------------------------------
+# Tech job filter
+# --------------------------------------------------------------------------
+# Foundit's search matches loosely: a "QA Specialist" search also brings back food-factory QA,
+# accounting and business development jobs. A search result counts as a tech job when
+#   1. its title names tech work (TECH_TITLE), or
+#   2. Foundit files it under a tech function (TECH_FUNCTIONS), or
+#   3. its description mentions at least DESC_MIN_TECH_WORDS different tech words (TECH_WORDS),
+#      which catches titles like "Business Analyst" or "QA Specialist" that are tech only
+#      sometimes.
+# Tuned on the first 5 pages of all 18 CHED searches (Nov 2026): 961 of 1,360 jobs kept; the
+# skipped ones were mostly non-IT QA, business development, accounting and admin jobs.
+TECH_TITLE = re.compile(
+    r"\b(software|developer|programmer|programming|devops|devsecops|sre|site reliability|web|"
+    r"front.?end|back.?end|full.?stack|mobile app|android|ios|java|javascript|typescript|python|"
+    r"\.net|react|angular|node\.?js|golang|database|dba|sql|"
+    r"data (analyst|engineer|scientist|architect|analytics)|data science|machine learning|ml|ai|"
+    r"artificial intelligence|network|"
+    r"systems? (administrator|admin|analyst|engineer|integration|integrator|support|developer|management)|"
+    r"it|i\.t\.|ict|information technology|information security|infosec|cyber ?security|cyber|soc|"
+    r"penetration|technical support|tech support|help ?desk|service ?desk|desktop support|"
+    r"infrastructure|cloud|aws|azure|gcp|sap|erp|salesforce|crm|ui|ux|computer|computing|it audit|"
+    r"application (support|analyst|developer|engineer)|applications? specialist|solutions? architect|"
+    r"software architect|scrum master|automation (engineer|tester|qa)|test (engineer|analyst|automation)|"
+    r"tester|qa (engineer|analyst|tester|automation)|quality assurance (engineer|analyst|tester)|"
+    r"bi developer|power bi|business intelligence|tableau|etl|blockchain|game developer|embedded|"
+    r"firmware|linux|unix|middleware|mulesoft|tibco|genesys|oracle|workday|as400|os administrator|"
+    r"integration (engineer|developer|specialist|architect|consultant))\b",
+    re.I,
+)
+TECH_FUNCTIONS = {
+    "information technology", "it", "ict", "software development", "software engineering",
+    "technical support", "it support", "network engineering", "networking", "data analysis",
+    "data analytics", "data science", "information security", "cybersecurity", "cyber security",
+    "it infrastructure", "web development", "software quality assurance", "security operations",
+    "it services", "it consulting", "technology consulting", "systems administration",
+    "database administration", "cloud", "devops", "application development", "it operations", "software",
+}
+TECH_WORDS = re.compile(
+    r"\b(software|sql|python|java|javascript|database|network|server|linux|windows server|cloud|aws|"
+    r"azure|api|programming|coding|testing|selenium|automation|application|it systems|"
+    r"information technology|helpdesk|help desk|troubleshoot|active directory|cybersecurity|firewall|"
+    r"devops|git|agile|scrum|jira|erp|sap|data analysis|power bi|tableau|excel vba|etl)\b",
+    re.I,
+)
+DESC_MIN_TECH_WORDS = 4
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def is_tech_job(job: dict) -> str | None:
+    """Why a search result counts as a tech job ("title", "function", "description"), or None."""
+    if TECH_TITLE.search(str(job.get("title") or "")):
+        return "title"
+    if any(str(f).strip().lower() in TECH_FUNCTIONS for f in job.get("functions") or []):
+        return "function"
+    text = _TAG_RE.sub(" ", str(job.get("description") or ""))
+    if len({m.lower() for m in TECH_WORDS.findall(text)}) >= DESC_MIN_TECH_WORDS:
+        return "description"
+    return None
+
 
 # Why the last get_json_with_retries() call returned None (for the failed saves log).
 LAST_ERROR = ""
@@ -194,6 +268,14 @@ def fetch_job_detail(session: requests.Session, job_id) -> dict | None:
     return data
 
 
+SEARCH_ONLY_FIELDS = ("score", "jdMatched")     # search ranking, not part of the job post
+
+
+def job_from_search(job: dict) -> dict:
+    """The job post as saved: the search result without its search-only fields."""
+    return {k: v for k, v in job.items() if k not in SEARCH_ONLY_FIELDS}
+
+
 def job_slug(job: dict) -> str:
     """'it-manager-dempsey-resource-management-philippines' from the jdUrl
     '/job/it-manager-dempsey-resource-management-philippines-69675292'."""
@@ -223,6 +305,9 @@ def scrape(
     max_start: int | None,
     countries: list[str] | None = None,
     report_dir: Path | None = None,
+    max_pages: int | None = DEFAULT_MAX_PAGES,
+    tech_only: bool = True,
+    fetch_details: bool = False,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     session = build_session()
@@ -231,9 +316,11 @@ def scrape(
     limit = max(1, min(limit, PAGE_SIZE_CAP))
 
     start = 0
+    pages = 0
     total_count = None
     saved = 0
     skipped_existing = 0
+    skipped_non_tech = 0
     failed = 0
 
     while True:
@@ -241,7 +328,13 @@ def scrape(
             log.info("Reached --max-start (%d). Stopping pagination.", max_start)
             break
 
+        if max_pages and pages >= max_pages:
+            log.info("Read %d search pages (--max-pages); the rest of the results are mostly "
+                     "unrelated to the search. Stopping.", pages)
+            break
+
         page = fetch_search_page(session, query, limit, start, countries)
+        pages += 1
         random_delay(delay_min, delay_max)
 
         if page is None:
@@ -260,7 +353,7 @@ def scrape(
         for job in jobs:
             if max_jobs is not None and saved >= max_jobs:
                 log.info("Reached --max-jobs (%d). Stopping.", max_jobs)
-                _print_summary(saved, skipped_existing, failed)
+                _print_summary(saved, skipped_existing, failed, skipped_non_tech)
                 return
 
             job_id = job.get("jobId") or job.get("id")
@@ -274,6 +367,11 @@ def scrape(
                 record.failed("The search result has no job ID", "", title, company, page_url)
                 continue
 
+            if tech_only and not is_tech_job(job):
+                log.info("Not a tech job; skipping %s (%s)", job_id, title)
+                skipped_non_tech += 1
+                continue
+
             slug = job_slug(job)
             out_path = job_output_path(output_dir, job_id, slug)
             if out_path.exists():
@@ -281,15 +379,17 @@ def scrape(
                 skipped_existing += 1
                 continue
 
-            log.info("Fetching job detail: id=%s slug=%s", job_id, slug)
-            detail = fetch_job_detail(session, job_id)
-            random_delay(delay_min, delay_max)
-
-            if detail is None:
-                failed += 1
-                record.failed("Couldn't fetch the job details: " + (LAST_ERROR or "no response"),
-                              job_id, title, company, page_url)
-                continue
+            if fetch_details:
+                log.info("Fetching job detail: id=%s slug=%s", job_id, slug)
+                detail = fetch_job_detail(session, job_id)
+                random_delay(delay_min, delay_max)
+                if detail is None:
+                    failed += 1
+                    record.failed("Couldn't fetch the job details: " + (LAST_ERROR or "no response"),
+                                  job_id, title, company, page_url)
+                    continue
+            else:
+                detail = job_from_search(job)
 
             try:
                 with open(out_path, "w", encoding="utf-8") as f:
@@ -312,13 +412,13 @@ def scrape(
             log.info("Start (%d) has reached total count (%d); stopping.", start, total_count)
             break
 
-    _print_summary(saved, skipped_existing, failed)
+    _print_summary(saved, skipped_existing, failed, skipped_non_tech)
 
 
-def _print_summary(saved: int, skipped_existing: int, failed: int) -> None:
+def _print_summary(saved: int, skipped_existing: int, failed: int, skipped_non_tech: int = 0) -> None:
     log.info(
-        "Done. Saved=%d, Skipped(existing)=%d, Failed=%d",
-        saved, skipped_existing, failed,
+        "Done. Saved=%d, Skipped(existing)=%d, Skipped(not tech)=%d, Failed=%d",
+        saved, skipped_existing, skipped_non_tech, failed,
     )
 
 
@@ -359,6 +459,19 @@ def parse_args() -> argparse.Namespace:
         help="Stop after saving this many new jobs (default: no limit).",
     )
     parser.add_argument(
+        "--max-pages", type=int, default=DEFAULT_MAX_PAGES,
+        help=f"Search pages to read per search, 20 jobs each (default: {DEFAULT_MAX_PAGES}; 0 = no limit).",
+    )
+    parser.add_argument(
+        "--all-jobs", action="store_true",
+        help="Save every search result, not only tech jobs (see is_tech_job()).",
+    )
+    parser.add_argument(
+        "--fetch-details", action="store_true",
+        help="Fetch each job from the job detail API (one extra request per job) instead of "
+             "saving it straight from the search results.",
+    )
+    parser.add_argument(
         "--max-start", type=int, default=None,
         help="Stop paginating once start reaches this value (default: no limit).",
     )
@@ -392,6 +505,9 @@ def main() -> None:
         max_start=args.max_start,
         countries=args.countries,
         report_dir=Path(args.report_dir) if args.report_dir else None,
+        max_pages=args.max_pages,
+        tech_only=not args.all_jobs,
+        fetch_details=args.fetch_details,
     )
 
 

@@ -11,7 +11,7 @@
       <div class="dash-toolbar-actions">
         {% include "_results_switch.html" %}
         {% if has_professor_record %}
-        <a class="btn btn-navy btn-sm" href="{% url 'professor_survey' %}">
+        <a class="btn btn-navy btn-sm" href="{% url 'professor_survey' %}" data-tour="edit-survey">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
           Edit your data
         </a>

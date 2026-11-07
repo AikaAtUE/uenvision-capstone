@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
+from django.db.models.functions import Lower
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
@@ -42,16 +43,18 @@ def _clean_account_fields(post, exclude_pk=None):
     return data, None
 
 
-# Account types offered on the Accounts page: the roles (Developer included) plus the two dummy
-# (test) types, which are a student / faculty role with is_dummy set.
+# Account types offered on the Accounts page: the roles (Developer included) plus the dummy
+# (test) types, which are a student / alumni / faculty role with is_dummy set.
 ACCOUNT_TYPES = [
     *CustomUser.Role.choices,
     ("dummy_student", "Dummy Student"),
+    ("dummy_alumni", "Dummy Alumni"),
     ("dummy_faculty", "Dummy Faculty"),
 
 
 ]
-DUMMY_TYPES = {"dummy_student": CustomUser.Role.STUDENT, "dummy_faculty": CustomUser.Role.FACULTY}
+DUMMY_TYPES = {"dummy_student": CustomUser.Role.STUDENT, "dummy_alumni": CustomUser.Role.ALUMNI,
+               "dummy_faculty": CustomUser.Role.FACULTY}
 
 
 # Filters on the Accounts page (its Filter drawer): value -> (label, queryset filter).
@@ -91,20 +94,24 @@ LEGACY_STATUS = {
 
 # Sort options on the Accounts page: value -> (label, order_by fields). The table's column
 # headers use these too (press a header to sort by it, press again for the other direction).
+# Names sort the way the Name column shows them (first, middle, last), ignoring capital
+# letters, so "dela Cruz" sits with "Dela Cruz" instead of after every capitalized name.
+_NAME = (Lower("first_name"), Lower("middle_name"), Lower("last_name"), "pk")
+_NAME_DESC = (Lower("first_name").desc(), Lower("middle_name").desc(), Lower("last_name").desc(), "-pk")
 ACCOUNT_SORTS = {
-    "": ("Not approved yet first", ("is_approved", "last_name", "first_name")),
-    "name": ("Name (A–Z)", ("last_name", "first_name")),
-    "-name": ("Name (Z–A)", ("-last_name", "-first_name")),
+    "": ("Not approved yet first", ("is_approved", *_NAME)),
+    "name": ("Name (A–Z)", _NAME),
+    "-name": ("Name (Z–A)", _NAME_DESC),
     "-joined": ("Newest first", ("-date_joined", "-pk")),
     "joined": ("Oldest first", ("date_joined", "pk")),
-    "role": ("Role (A–Z)", ("role", "is_dummy", "last_name", "first_name")),
-    "-role": ("Role (Z–A)", ("-role", "-is_dummy", "last_name", "first_name")),
-    "email": ("Email (A–Z)", ("email",)),
-    "-email": ("Email (Z–A)", ("-email",)),
+    "role": ("Role (A–Z)", ("role", "is_dummy", *_NAME)),
+    "-role": ("Role (Z–A)", ("-role", "-is_dummy", *_NAME)),
+    "email": ("Email (A–Z)", (Lower("email"), "pk")),
+    "-email": ("Email (Z–A)", (Lower("email").desc(), "-pk")),
     "id": ("ID (lowest first)", ("pk",)),
     "-id": ("ID (highest first)", ("-pk",)),
-    "status": ("Status (needs action first)", ("is_approved", "email_verified", "last_name", "first_name")),
-    "-status": ("Status (approved first)", ("-is_approved", "-email_verified", "last_name", "first_name")),
+    "status": ("Status (needs action first)", ("is_approved", "email_verified", *_NAME)),
+    "-status": ("Status (approved first)", ("-is_approved", "-email_verified", *_NAME)),
 }
 # Sortable column headers: (label, sort value for ascending, sort value for descending)
 ACCOUNT_COLUMNS = [
@@ -261,6 +268,11 @@ def account_edit_view(request, pk):
         moved = move_faculty_answers_to_learner(target, target.role)
         if moved:
             notes.append(f"Professor Survey answer{'' if moved == 1 else 's'} moved to the {target.get_role_display()} Survey.")
+    if target.is_administrator and old_role not in (CustomUser.Role.ADMINISTRATOR, CustomUser.Role.DEVELOPER):
+        # promoted to administrator: the next page they open starts the Data Extraction and
+        # Accounts tour (onboarding-tour.js), even if they saw it in an earlier admin stint
+        target.tours_seen = [t for t in (target.tours_seen or []) if t != "admin"]
+        data["tours_seen"] = target.tours_seen
     if target.role_label != old_label:
         notes.insert(0, f"Role changed from {old_label} to {target.role_label}.")
     target.save(update_fields=list(data))

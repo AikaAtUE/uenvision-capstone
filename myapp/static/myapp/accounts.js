@@ -118,8 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const wasDummy = dummyAnswers(before), isDummy = dummyAnswers(after);
       if (isDummy && !wasDummy) extra += ' Their survey answers will move to dummy (test) data and stop counting in the real results.';
       if (!isDummy && wasDummy) extra += ' Their survey answers will move back into the real results.';
-      const learner = t => ['student', 'alumni', 'dummy_student'].includes(t);
-      if (before.endsWith('faculty') && learner(after)) extra += ' Their Professor Survey answers will move to the ' + (after === 'alumni' ? 'Alumni' : 'Student') + ' Survey.';
+      const learner = t => ['student', 'alumni', 'dummy_student', 'dummy_alumni'].includes(t);
+      if (before.endsWith('faculty') && learner(after)) extra += ' Their Professor Survey answers will move to the ' + (after.endsWith('alumni') ? 'Alumni' : 'Student') + ' Survey.';
       if (after === 'administrator') extra += ' Administrators can manage every account and all data.';
       if (after === 'developer') extra += ' Developers can manage every account and all data, like an administrator.';
     }

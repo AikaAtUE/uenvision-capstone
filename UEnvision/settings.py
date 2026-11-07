@@ -108,6 +108,7 @@ TEMPLATES = [
                 'myapp.context_processors.skills_data_updated',
                 'myapp.feedback_nudge.banner',
                 'myapp.middleware.survey_first_context',
+                'myapp.context_processors.onboarding_tour',
             ],
         },
     },

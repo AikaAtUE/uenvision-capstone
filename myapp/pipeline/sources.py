@@ -24,6 +24,7 @@ class JobSource:
     site: str           # shown under the label
     scraper: str        # script in this folder
     search_option: str  # the scraper's option for the search words
+    parallel: int = 1   # how many of its searches run at the same time (see manager.build_steps)
 
     def scrape_argv(self, python: str, pipeline_dir: Path, search: str, output_dir: Path,
                     delay_min: float, delay_max: float, max_jobs=None, report_dir=None) -> list[str]:
@@ -40,6 +41,8 @@ class JobSource:
 REGISTRY = (
     JobSource("kalibrr", "Kalibrr", "kalibrr.com", "kalibrr_scraper.py", "--text"),
     JobSource("trabajo", "Trabajo", "ph.trabajo.org", "trabajo_scraper.py", "--keyword"),
-    JobSource("foundit", "Foundit", "foundit.com.ph", "foundit_scraper.py", "--query"),
+    # Foundit's searches are slow (one detail request per job, at most 100 jobs per search),
+    # so 3 run at the same time: about 1 request a second in all, still gentle on the site.
+    JobSource("foundit", "Foundit", "foundit.com.ph", "foundit_scraper.py", "--query", parallel=3),
 )
 BY_KEY = {s.key: s for s in REGISTRY}

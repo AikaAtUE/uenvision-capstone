@@ -869,6 +869,14 @@ a.btn { text-decoration: none; }
 .fb-fieldset:disabled textarea, .fb-fieldset:disabled input[type=text] { opacity: .85; }
 .fb-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 6px; }
 .fb-actions [hidden] { display: none; }
+/* Unsent answers kept in this browser (survey.js: drafts) */
+.fb-draft-badge { margin-left: auto; margin-right: 10px; font-size: .74rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: #fff4d6; color: #7a5200; white-space: nowrap; }
+.fb-done-badge + .fb-draft-badge { margin-left: 0; }
+.fb-done-badge:has(+ .fb-draft-badge) { margin-right: 6px; }
+.fb-draft-note { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; border: 1px solid #f0d58a; background: #fff8e6; color: #5c4300; border-radius: 10px; padding: 10px 14px; margin: 0 0 16px; font-size: .9rem; line-height: 1.5; }
+.fb-draft-note span { flex: 1 1 240px; }
+[data-theme="dark"] .fb-draft-badge { background: #4a3b12; color: #ffe2a0; }
+[data-theme="dark"] .fb-draft-note { background: #2d260f; border-color: #6b5718; color: #ffe8b0; }
 
 /* ============ On-page dialog (ue-modal.js) ============ */
 .ue-modal { width: 100%; max-width: 440px; padding: 28px 24px; }

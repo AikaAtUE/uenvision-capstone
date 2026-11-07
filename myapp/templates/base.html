@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 {# ?v= forces the browser to re-download after every change (remove once you deploy) #}
 <link rel="stylesheet" href="{% static 'myapp/styles.css' %}?v={% now 'U' %}">
+{% if tour_config %}<link rel="stylesheet" href="{% static 'myapp/onboarding-tour.css' %}?v={% now 'U' %}">{% endif %}
 <link rel="icon" type="image/png" href="{% static 'myapp/img/uenvision-mark.png' %}">
 {% block extra_head %}{% endblock %}
 </head>
@@ -56,5 +57,10 @@
 <script src="{% static 'myapp/survey-first.js' %}?v={% now 'U' %}"></script>
 {% endif %}
 {% block extra_js %}{% endblock %}
+{% if tour_config %}
+{# Onboarding tours: the survey, the results page and (administrators) Data Extraction and Accounts. #}
+{{ tour_config|json_script:"ue-tour-config" }}
+<script src="{% static 'myapp/onboarding-tour.js' %}?v={% now 'U' %}" data-page="{{ active_page|default:'' }}" data-csrf="{{ csrf_token }}"></script>
+{% endif %}
 </body>
 </html>
