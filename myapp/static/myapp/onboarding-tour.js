@@ -131,6 +131,8 @@
           ? 'Add as many technical skills as each subject covers, and choose how far each is taught: Introduced, Practiced or Applied. The more you add, the more accurate the curriculum gap.'
           : 'Add as many technical skills from each subject as you can, then choose how far you got: Introduced, Practiced or Applied. The more you add, the more accurate your skill gap.' });
     if (role === 'alumni') {
+      steps.push({ sel: ['#alumni-overall-skills .cs-tagbox', '#alumni-overall-skills'], title: 'Skills from your whole stay at UE',
+        text: 'Some skills don’t belong to one subject, like ones you picked up in your org, capstone or on your own while at UE. Add those here, with the same search.' });
       steps.push({ sel: ['.cs-section:has(#alumni-employed-branch)'], title: 'Tell us about your work',
         text: 'Choose your employment status, then answer a few questions about your job or job search.' });
     }
