@@ -829,6 +829,9 @@
       if (b.checked === !all) return;
       b.checked = !all;
       b.dispatchEvent(new Event('change', { bubbles: true }));
+      // earlier semesters sit in a closed "+ Also report ..." section: open it so the ticks show
+      var fold = !all && b.closest('details');
+      if (fold) fold.open = true;
     });
     refreshSelectAll();
   });

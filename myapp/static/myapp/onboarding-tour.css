@@ -31,6 +31,12 @@
 .uet-dots i{width:6px; height:6px; border-radius:50%; background:var(--line-strong);}
 .uet-dots i.is-on{background:var(--red); width:16px; border-radius:3px;}
 .uet-btns{display:flex; align-items:center; gap:6px; margin-left:auto;}
+.uet-tip .btn[aria-disabled="true"]{opacity:.45; cursor:not-allowed;}
+.uet-wait{margin:8px 0 0; font-size:.8rem; font-weight:600; color:var(--muted);}
+.uet-wait.is-nudge{color:var(--red); animation:uet-nudge .35s ease;}
+:root[data-theme="dark"] .uet-wait.is-nudge{color:var(--red-text, #ff7a86);}
+@keyframes uet-nudge{0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);}}
+.uet--hands .uet-hole::after{animation:none; opacity:.55;}
 .uet-skip{background:none; border:0; padding:6px 4px; color:var(--muted); font:600 .8rem var(--font-body); cursor:pointer;}
 .uet-skip:hover{color:var(--ink); text-decoration:underline;}
 .uet-tip .btn:focus-visible, .uet-skip:focus-visible{outline:2px solid #ffd25e; outline-offset:2px;}

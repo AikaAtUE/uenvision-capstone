@@ -1,0 +1,101 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% block title %}Job Market{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/job-market.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-job-market">
+  <header class="page-header"><h1>Job Market</h1></header>
+  <div class="page-body" id="jm" data-url="{% url 'job_market_data' %}">
+    <div class="jm-toolbar">
+      <p class="muted">How job postings change over time. <span id="jm-updated"></span></p>
+      <form class="jm-filters" id="jm-filters" method="get">
+        <label>Source
+          <select name="source" id="jm-source">
+            <option value="all"{% if source == 'all' %} selected{% endif %}>All sources</option>
+            {% for key, label in sources %}<option value="{{ key }}"{% if source == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>From
+          <select name="since" id="jm-since">
+            {% for y in years %}<option value="{{ y }}"{% if since == y %} selected{% endif %}>{{ y }}</option>{% endfor %}
+          </select>
+        </label>
+      </form>
+    </div>
+
+    <p class="form-msg is-error" id="jm-error" role="alert"></p>
+    <p class="form-msg" id="jm-empty" hidden></p>
+
+    <div id="jm-content" hidden>
+      <div class="stat-grid jm-stats">
+        <div class="stat-card"><p class="stat-label">Job postings</p><p class="stat-value" id="jm-total">—</p><p class="stat-note" id="jm-total-note"></p></div>
+        <div class="stat-card"><p class="stat-label">Tech postings</p><p class="stat-value" id="jm-tech">—</p><p class="stat-note" id="jm-tech-note"></p></div>
+        <div class="stat-card"><p class="stat-label">Companies hiring</p><p class="stat-value" id="jm-companies">—</p><p class="stat-note" id="jm-companies-note"></p></div>
+        <div class="stat-card"><p class="stat-label">Most requested skill</p><p class="stat-value" id="jm-topskill">—</p><p class="stat-note" id="jm-topskill-note"></p></div>
+      </div>
+
+      <div class="panel jm-panel">
+        <h2 class="section-title">Postings per quarter</h2>
+        <p class="jm-key"><span class="jm-sw jm-sw--tech"></span>Tech postings <span class="jm-sw jm-sw--other"></span>Non-tech postings</p>
+        <div class="jm-chart" id="jm-quarters" role="img" aria-label="Job postings per quarter, tech and non-tech"></div>
+        <p class="chart-source" id="jm-quarters-note"></p>
+      </div>
+
+      <div class="panel jm-panel" id="jm-shift-panel">
+        <h2 class="section-title">Rising and falling skills</h2>
+        <p class="muted" id="jm-shift-note"></p>
+        <div class="jm-shift" id="jm-shift" aria-label="Change in the share of tech postings naming each skill"></div>
+      </div>
+
+      <div class="jm-grid">
+        <div class="panel jm-panel">
+          <h2 class="section-title">Top hard skills</h2>
+          <p class="muted">Postings that list the skill in <em>hard_skills</em>, counted once per posting.</p>
+          <div class="jm-table-wrap"><table class="jm-table" id="jm-skills"></table></div>
+        </div>
+        <div class="panel jm-panel">
+          <h2 class="section-title">Job roles <small>share of tech postings</small></h2>
+          <div class="jm-table-wrap"><table class="jm-table" id="jm-roles"></table></div>
+        </div>
+      </div>
+
+      <div class="jm-grid">
+        <div class="panel jm-panel">
+          <h2 class="section-title">Top employers</h2>
+          <p class="muted" id="jm-employers-note"></p>
+          <div class="jm-hbars" id="jm-employers"></div>
+        </div>
+        <div class="panel jm-panel">
+          <h2 class="section-title">Top cities</h2>
+          <div class="jm-hbars" id="jm-cities"></div>
+        </div>
+      </div>
+
+      <div class="jm-grid">
+        <div class="panel jm-panel">
+          <h2 class="section-title">Pay by experience level</h2>
+          <p class="muted" id="jm-pay-note"></p>
+          <div class="jm-hbars" id="jm-pay"></div>
+        </div>
+        <div class="panel jm-panel">
+          <h2 class="section-title">Work setup <small>share of postings</small></h2>
+          <div class="jm-table-wrap"><table class="jm-table" id="jm-modes"></table></div>
+          <p class="muted jm-fresh" id="jm-fresh"></p>
+        </div>
+      </div>
+
+      <div class="panel jm-panel">
+        <h2 class="section-title">Entry-level vs senior skills</h2>
+        <p class="muted">Top hard skills in tech postings for Entry or Junior roles (or open to fresh graduates), and for Senior or Lead roles.</p>
+        <div class="jm-grid jm-grid--flat">
+          <div><h3 class="jm-sub" id="jm-entry-title">Entry-level</h3><div class="jm-hbars" id="jm-entry"></div></div>
+          <div><h3 class="jm-sub" id="jm-senior-title">Senior</h3><div class="jm-hbars" id="jm-senior"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block extra_js %}
+<script src="{% static 'myapp/job-market.js' %}?v={% now 'U' %}"></script>
+{% endblock %}

@@ -3,6 +3,7 @@
   common.py     shared helpers (home page per role, administrator_required, dummy results)
   auth.py       log in / sign up / log out, email confirmation, forgot password
   dashboard.py  faculty/admin dashboard and Recommendations page
+  market.py     Job Market page (posting trends over time)
   pages.py      Settings, Help, About
   feedback.py   Feedback page: SUS, UAT and functional test sheet
   accounts.py   Accounts page and notifications (administrators)
@@ -47,6 +48,10 @@ from .dashboard import (  # noqa: F401
     recommendations_generate_view,
     recommendations_download_view,
     developer_results_view,
+)
+from .market import (  # noqa: F401
+    job_market_view,
+    job_market_data_view,
 )
 from .pages import (  # noqa: F401
     help_view,

@@ -232,6 +232,7 @@
 .cs-select-all:hover, .cs-select-all:focus-visible { color: #c8202f; }
 .cs-select-all:disabled { color: #9a9ca3; cursor: default; text-decoration: none; }
 .cs-select-all.cs-select-all--page { text-decoration: none; margin-bottom: 10px; }
+.cs-select-all-row--page { justify-content: flex-start; margin: 4px 0 0; }
 
 /* × in the top-right corner of each "Skills per subject" box */
 .cs-subject-block { position: relative; }

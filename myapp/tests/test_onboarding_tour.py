@@ -160,7 +160,22 @@ class TourTargetTests(IsolatedDataMixin, TestCase):
         self.assertIn("cs-tag-input", cs)
         self.assertIn("cs-subject-block", cs)
         self.assertIn("What is a technical skill?", js)
-        self.assertIn("Search for any skill", js)
+        self.assertIn("Search for a skill and add it", js)
+        # the hands-on steps wait on the real subject boxes and skill chips
+        self.assertIn("cs-subject-pick:checked", js)
+        self.assertIn("cs-chip", cs)
+        self.assertIn('id="student-current-subjects"', self.client.get(reverse("student_survey")).content.decode())
+
+    def test_select_all_subjects_from_every_year(self):
+        from .helpers import login_administrator
+        login_administrator(self.client)
+        html = self.client.get(reverse("student_survey")).content.decode()
+        self.assertIn('id="student-select-all-years"', html)
+        self.assertIn("#student-earlier-subjects .cs-subject-grid", html)
+        self.assertNotIn("#student-later-subjects .cs-subject-grid", html)   # higher years stay optional
+        html = self.client.get(reverse("alumni_survey")).content.decode()
+        self.assertIn('id="alumni-select-all-years"', html)
+        self.assertIn("#alumni-earlier-subjects .cs-subject-grid", html)
 
     def test_admin_pages(self):
         admin = make("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR)

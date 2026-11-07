@@ -96,20 +96,35 @@
           ? 'Make sure your course and graduation year are right. Your subjects appear once your course is set.'
           : 'Make sure your course, year level and section are right. Your subjects appear once your course and year level are set.' });
     }
+    var form = '#' + p + '-survey-form';
+    function ticked() { return qsa(form + ' .cs-subject-pick:checked').length > 0; }
+    var gridSel = role === 'student' ? '#student-current-subjects'
+      : role === 'alumni' ? '#alumni-subjects' : '#professor-current-subjects';
     steps.push(role === 'student'
-      ? { sel: ['#student-subject-tools', '#student-hint'], title: 'Tick your subjects',
-          text: 'Tick this semester’s and last semester’s subjects. Select all ticks a whole semester, and Find a subject searches by code or name.' }
+      ? { sel: ['#student-subject-tools', '#student-hint'], title: 'Ways to pick your subjects',
+          text: 'Select all ticks this and last semester at once, or every subject from this and previous years. Find a subject searches by code or name.' }
       : role === 'alumni'
-      ? { sel: ['.cs-section:has(#alumni-subjects)'], title: 'Tick your last semester’s subjects',
-          text: 'Pick your last semester at UE, then tick its subjects. Earlier semesters are optional.' }
-      : { sel: ['.cs-subject-tools', '.cs-section:has(#professor-current-subjects)'], title: 'Tick the subjects you teach',
-          text: 'Tick what you teach this semester and taught last semester. Find a subject searches by code or name, and + Add a subject that isn’t listed is for electives.' });
+      ? { sel: ['#alumni-term'], title: 'Pick your last semester',
+          text: 'Choose your last term at UE. Its subjects appear below, and Select all subjects from every year ticks your whole curriculum.' }
+      : { sel: ['.cs-subject-tools', '.cs-section:has(#professor-current-subjects)'], title: 'Ways to find your subjects',
+          text: 'Find a subject searches by code or name, and + Add a subject that isn’t listed is for electives.' });
     steps.push(
+      // hands-on: the tour waits here until a subject is ticked
+      { sel: [gridSel + ' .cs-subject-grid', gridSel], keep: true, hands: true, need: ticked,
+        title: role === 'faculty' ? 'Now tick a subject you teach' : 'Now tick a subject',
+        text: role === 'faculty'
+          ? 'Click a subject you teach this semester. A skill box for it opens below. You can tick the rest after the tour.'
+          : 'Click a subject you took. A skill box for it opens below. You can tick the rest after the tour.',
+        doneText: 'Nice! Tick any others now if you like, then press Next.' },
       { sel: [skillsSection], title: 'What is a technical skill?',
         text: 'A tool, language or method you can actually use' + (role === 'faculty' ? ' and teach' : '') + ' in IT work, like Python, SQL, Git, Figma or setting up a network. Teamwork and communication are soft skills, so leave those out here.' },
-      { sel: [blocks + ' .cs-tag-input', skillsSection], title: 'Search for any skill',
-        text: 'In a subject’s skill box, type part of a name, like “dock”, to search every skill, not just the suggestions. Then pick the match from the list.',
-        altText: 'Each subject you tick gets a skill box here. Type part of a name, like “dock”, to search every skill, not just the suggestions, then pick the match from the list.' },
+      // hands-on: the tour waits here until a skill is added to a subject
+      // dropRoom: the lit area already holds the space the search results drop into
+      { sel: [blocks + ' .cs-subject-block'], keep: true, hands: true, dropRoom: 290,
+        need: function () { return qsa(blocks + ' .cs-chip').length > 0; },
+        title: 'Search for a skill and add it',
+        text: 'Click the skill box and type part of a name, like “sql” or “dock”. It searches every skill, not just the suggestions. Pick one from the list to add it.',
+        doneText: 'Added! Choose its level (Introduced, Practiced or Applied), then press Next.' },
       { sel: [blocks + ' .cs-subject-block', skillsSection],
         title: role === 'faculty' ? 'Add every skill you teach' : 'Add every skill you learned',
         text: role === 'faculty'
@@ -220,7 +235,7 @@
       '<svg class="uet-arrow" aria-hidden="true" focusable="false"><path class="uet-arrow-line" d=""></path><path class="uet-arrow-head" d=""></path></svg>' +
       '<div class="uet-tip" role="dialog" aria-modal="true" aria-labelledby="uet-title" aria-describedby="uet-text"></div>';
     document.body.appendChild(root);
-    ui = { root: root, hole: root.querySelector('.uet-hole'), tip: root.querySelector('.uet-tip'),
+    ui = { root: root, block: root.querySelector('.uet-block'), hole: root.querySelector('.uet-hole'), tip: root.querySelector('.uet-tip'),
            line: root.querySelector('.uet-arrow-line'), head: root.querySelector('.uet-arrow-head') };
     if (reduceMotion()) root.classList.add('uet--still');
     root.addEventListener('click', function (e) {
@@ -242,6 +257,8 @@
   }
   function onKey(e) {
     if (!ui) return;
+    // hands-on step: keys typed in the page (the skill search uses arrows, Tab and Esc) are the page's
+    if (handsOn && !ui.tip.contains(document.activeElement)) return;
     if (e.key === 'Escape') { e.preventDefault(); act('skip'); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); act('next'); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); act('back'); }
@@ -261,7 +278,7 @@
 
   function act(a) {
     if (!run) return;
-    if (a === 'next') go(run.i + 1, 1);
+    if (a === 'next') { if (waiting()) { nudge(); return; } go(run.i + 1, 1); }
     else if (a === 'back') go(run.i - 1, -1);
     else if (a === 'skip' || a === 'done') finish();
   }
@@ -298,6 +315,10 @@
     var steps = run.steps, step = steps[run.i], n = steps.length;
     var text = step.text, found = step.sel ? find(step.sel) : null;
     target = found ? found.el : null;
+    stopHands();
+    // a hands-on step only waits when its own part is there (e.g. no subjects listed yet: just explain)
+    handsOn = !!(step.hands && found && !found.alt);
+    if (handsOn && step.need()) text = step.doneText || text;
     if (found && found.alt && step.altText) text = step.altText;
     if (target && step.menu && (target.closest('#sidebar') && offScreen(target))) target = null;
     if (!target && step.menu) {
@@ -317,10 +338,21 @@
         '<span class="uet-btns">' +
           (last ? '' : '<button type="button" class="uet-skip" data-uet="skip">Skip tour</button>') +
           (run.i > 0 ? '<button type="button" class="btn btn-ghost btn-sm" data-uet="back">Back</button>' : '') +
-          '<button type="button" class="btn btn-red btn-sm" data-uet="' + (last ? 'done' : 'next') + '">' +
+          '<button type="button" class="btn btn-red btn-sm" data-uet="' + (last ? 'done' : 'next') + '"' +
+            (handsOn && !step.need() ? ' aria-disabled="true"' : '') + '>' +
             (last ? 'Done' : nextIsElsewhere ? 'Next: open it' : 'Next') + '</button>' +
-        '</span></div>';
-    if (target) {
+        '</span></div>' +
+        (handsOn ? '<p class="uet-wait" role="status"' + (step.need() ? ' hidden' : '') + '>Try it on the page to continue.</p>' : '');
+    ui.root.classList.toggle('uet--hands', handsOn);
+    if (handsOn) startHands(step);
+    if (target && handsOn && step.dropRoom) {
+      // card above, the skill box under it, and the dropdown's room under that
+      position();
+      var top0 = isPhone() ? 76 : 24, H0 = window.innerHeight;
+      var lit = litRect(target);
+      var want = Math.max(top0, Math.min(ui.tip.offsetHeight + 60, H0 - lit.height - 16));
+      window.scrollBy(0, lit.top - want);
+    } else if (target) {
       var r = target.getBoundingClientRect();
       var topRoom = isPhone() ? 76 : 24;
       if (r.top < topRoom || r.bottom > window.innerHeight - 24) {
@@ -332,7 +364,55 @@
     }
     position();
     var nextBtn = ui.tip.querySelector('[data-uet="next"], [data-uet="done"]');
-    if (nextBtn) nextBtn.focus({ preventScroll: true });
+    if (nextBtn && !handsOn) nextBtn.focus({ preventScroll: true });
+  }
+
+  /* ---------------- hands-on steps ----------------
+     The page under the spotlight can be clicked and typed in, and Next waits until the
+     step's task is done (a subject ticked, a skill added). The spotlight follows the
+     part as it grows (a new skill box, the search results). */
+  var handsOn = false, handsTimer = 0, handsDone = false;
+  function waiting() {
+    var step = run && run.steps[run.i];
+    return !!(handsOn && step && step.need && !step.need());
+  }
+  function nudge() {
+    var w = ui && ui.tip.querySelector('.uet-wait');
+    if (!w) return;
+    w.hidden = false;
+    w.classList.remove('is-nudge'); void w.offsetWidth; w.classList.add('is-nudge');
+  }
+  var padWas = null;
+  function startHands(step) {
+    handsDone = step.need();
+    if (step.dropRoom && padWas === null) {
+      // the last skill box may sit at the very end of the page: room to scroll it up
+      padWas = document.body.style.paddingBottom;
+      document.body.style.paddingBottom = (step.dropRoom + 120) + 'px';
+    }
+    handsTimer = window.setInterval(function () {
+      if (!run || !ui) return stopHands();
+      // the part grew or moved (a skill box opened, the results list dropped down)
+      var found = find(step.sel);
+      if (found && !found.alt) target = found.el;
+      // the part under the spotlight plus the open search results, so they stay lit too
+      schedule();
+      var done = step.need();
+      if (done === handsDone) return;
+      handsDone = done;
+      var btn = ui.tip.querySelector('[data-uet="next"]');
+      if (btn) { if (done) btn.removeAttribute('aria-disabled'); else btn.setAttribute('aria-disabled', 'true'); }
+      var w = ui.tip.querySelector('.uet-wait');
+      if (w) w.hidden = done;
+      var t = ui.tip.querySelector('.uet-text');
+      if (t) t.textContent = done ? (step.doneText || step.text) : step.text;
+      schedule();
+    }, 250);
+  }
+  function stopHands() {
+    if (handsTimer) window.clearInterval(handsTimer);
+    handsTimer = 0;
+    if (padWas !== null) { document.body.style.paddingBottom = padWas; padWas = null; }
   }
 
   function position() {
@@ -343,6 +423,7 @@
     tip.style.width = tipW + 'px';
     var tipH = tip.offsetHeight;
     ui.line.setAttribute('d', ''); ui.head.setAttribute('d', '');
+    ui.block.style.clipPath = '';
     if (!target || !document.body.contains(target)) {
       ui.hole.classList.add('is-none');
       setBox(ui.hole, W / 2, H / 2, 0, 0);
@@ -350,13 +431,16 @@
       return;
     }
     ui.hole.classList.remove('is-none');
-    var r = target.getBoundingClientRect(), pad = 6;
+    var r = litRect(target), pad = 6;
     var hx = Math.max(4, r.left - pad), hy = Math.max(4, r.top - pad);
     var hr = Math.min(W - 4, r.right + pad), hb = Math.min(H - 4, r.bottom + pad);
     var hw = Math.max(0, hr - hx), hh = Math.max(0, hb - hy);
     setBox(ui.hole, hx, hy, hw, hh);
-    var gap = 44, side, tx, ty;
-    if (hy + hh + gap + tipH <= H - 10) { side = 'below'; ty = hy + hh + gap; }
+    // hands-on: the lit part can be clicked, everything else stays blocked
+    if (handsOn) ui.block.style.clipPath = "path(evenodd, 'M0 0H" + W + 'V' + H + "H0Z M" + hx + ' ' + hy + 'h' + hw + 'v' + hh + 'h' + (-hw) + "Z')";
+    var gap = 44, side, tx, ty, cur = run.steps[run.i];
+    if (handsOn && cur && cur.dropRoom && hy - gap - tipH >= 10) { side = 'above'; ty = hy - gap - tipH; }
+    else if (hy + hh + gap + tipH <= H - 10) { side = 'below'; ty = hy + hh + gap; }
     else if (hy - gap - tipH >= 10) { side = 'above'; ty = hy - gap - tipH; }
     else if (!phone && hx + hw + gap + tipW <= W - 10) { side = 'right'; tx = hx + hw + gap; ty = clamp(hy + hh / 2 - tipH / 2, 10, H - tipH - 10); }
     else if (!phone && hx - gap - tipW >= 10) { side = 'left'; tx = hx - gap - tipW; ty = clamp(hy + hh / 2 - tipH / 2, 10, H - tipH - 10); }
@@ -376,6 +460,21 @@
       if (side === 'right') { sx = tx - 6; ex = hx + hw + 9; } else { sx = tx + tipW + 6; ex = hx - 9; }
     } else return;
     arrow(sx, sy, ex, ey, side);
+  }
+  function litRect(t) {
+    var r = t.getBoundingClientRect();
+    if (!handsOn) return r;
+    var box = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    var cur = run && run.steps[run.i], field = cur && cur.dropRoom && t.querySelector('.cs-tagbox');
+    if (field) box.bottom = Math.max(box.bottom, field.getBoundingClientRect().bottom + cur.dropRoom);
+    Array.prototype.forEach.call(t.querySelectorAll('.cs-skill-results:not([hidden])'), function (x) {
+      var q = x.getBoundingClientRect();
+      if (q.width < 2 || q.height < 2) return;
+      box.left = Math.min(box.left, q.left); box.top = Math.min(box.top, q.top);
+      box.right = Math.max(box.right, q.right); box.bottom = Math.max(box.bottom, q.bottom);
+    });
+    box.width = box.right - box.left; box.height = box.bottom - box.top;
+    return box;
   }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function setBox(n, x, y, w, h) { var s = n.style; s.left = x + 'px'; s.top = y + 'px'; s.width = w + 'px'; s.height = h + 'px'; }
@@ -406,7 +505,7 @@
     if (name !== 'survey') hideWelcomeCard();
     if (name !== 'admin') {
       // one-page tours: leave out parts this account's page doesn't have, so "Step 3 of 8" counts true
-      steps = steps.filter(function (s) { return !s.sel || find(s.sel) || (s.menu && menuButton()); });
+      steps = steps.filter(function (s) { return s.keep || !s.sel || find(s.sel) || (s.menu && menuButton()); });
     }
     run = { name: name, steps: steps, i: 0 };
     if (!ui) buildUI();
@@ -429,6 +528,7 @@
   function finish() {
     var name = run && run.name;
     run = null; target = null;
+    stopHands(); handsOn = false;
     try { sessionStorage.removeItem(RUN_KEY); } catch (e) { /* storage blocked */ }
     destroyUI();
     if (!name) return;

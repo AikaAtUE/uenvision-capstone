@@ -57,6 +57,12 @@
           </span>
           <span>Dashboard</span>
         </a>
+        <a class="nav-item {% if active_page == 'job_market' %}is-active{% endif %}" href="{% url 'job_market' %}" data-tip="How job postings change over time: posting volume, rising and falling skills, roles, employers, locations and pay." title="How job postings change over time: posting volume, rising and falling skills, roles, employers, locations and pay.">
+          <span class="nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 8h5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span>Job Market</span>
+        </a>
         <a class="nav-item {% if active_page == 'recommendations' %}is-active{% endif %}" href="{% url 'recommendations' %}" data-tour="nav-recs" data-tip="Training and learning resources for the in-demand skills the curriculum covers least." title="Training and learning resources for the in-demand skills the curriculum covers least.">
           <span class="nav-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
