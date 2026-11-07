@@ -1,7 +1,7 @@
 """
 The job sources the Data Extraction page can scrape, in one place.
 
-Adding a third source later takes three things:
+Adding another source takes three things (Foundit was added this way):
   1. its scraper script in this folder, saving one JSON file per job posting into an
      output folder and taking the search words from a command-line option
      (the options below are the ones Kalibrr's and Trabajo's scrapers already take),
@@ -40,5 +40,6 @@ class JobSource:
 REGISTRY = (
     JobSource("kalibrr", "Kalibrr", "kalibrr.com", "kalibrr_scraper.py", "--text"),
     JobSource("trabajo", "Trabajo", "ph.trabajo.org", "trabajo_scraper.py", "--keyword"),
+    JobSource("foundit", "Foundit", "foundit.com.ph", "foundit_scraper.py", "--query"),
 )
 BY_KEY = {s.key: s for s in REGISTRY}

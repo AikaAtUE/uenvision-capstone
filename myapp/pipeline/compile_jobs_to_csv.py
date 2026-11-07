@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Job JSON -> CSV Compiler  (Kalibrr + Trabajo)
-=============================================
+Job JSON -> CSV Compiler  (Kalibrr + Trabajo + Foundit)
+=======================================================
 
 Reads every individual job-posting JSON file saved by one of the scrapers
 and compiles them into a single CSV file, using that source's column schema.
 
     --source kalibrr   JSON files from kalibrr_scraper.py   (default)
     --source trabajo   JSON files from trabajo_scraper.py
+    --source foundit   JSON files from foundit_scraper.py
 
 Usage
 -----
@@ -37,7 +38,7 @@ import logging
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 try:
@@ -133,6 +134,43 @@ TRABAJO_FIELDNAMES = [
     "listing_snippet",
     "scraped_at",
 ] + TRABAJO_DEDUPE_COLUMNS
+
+FOUNDIT_FIELDNAMES = [
+    "job_id",
+    "job_title",
+    "job_url",
+    "apply_url",
+    "company_name",
+    "company_id",
+    "company_industry",
+    "company_logo_url",
+    "function",
+    "designations",
+    "employment_type",
+    "job_type",
+    "min_experience_years",
+    "max_experience_years",
+    "months_work_experience",
+    "city",
+    "region",
+    "country",
+    "formatted_address",
+    "salary_shown",
+    "base_salary",
+    "maximum_salary",
+    "salary_currency",
+    "salary_interval",
+    "description",
+    "skills",
+    "it_skills",
+    "created_at",
+    "posted_at",
+    "updated_at",
+    "closed_at",
+    "is_active",
+    "job_source",
+    "scraped_at",
+]
 
 # --------------------------------------------------------------------------
 # Helpers
@@ -311,6 +349,100 @@ def extract_trabajo_row(data: dict, source_path: Path) -> dict | None:
 
 
 # --------------------------------------------------------------------------
+# Source: Foundit
+# --------------------------------------------------------------------------
+
+# Foundit's dates are Unix timestamps in milliseconds; they're written in Philippine time
+# (UTC+8) as ISO text like Kalibrr's createdAt, so "2026-11-02..." gives the posting's month.
+PH_TIME = timezone(timedelta(hours=8))
+
+
+def foundit_date(ms):
+    if ms in (None, "") or isinstance(ms, bool):
+        return ""
+    try:
+        return datetime.fromtimestamp(int(ms) / 1000, tz=PH_TIME).isoformat()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return ""
+
+
+def _join(values, key=None):
+    """['a', 'b'] or [{'text': 'a'}, ...] -> 'a; b' (blanks and repeats dropped)."""
+    out = []
+    for v in values or []:
+        if key and isinstance(v, dict):
+            v = v.get(key)
+        if isinstance(v, str) and v.strip() and v.strip() not in out:
+            out.append(v.strip())
+    return "; ".join(out)
+
+
+def _foundit_salary(job, which):
+    value = get_nested(job, f"{which}.absoluteMonthlyValue") or get_nested(job, f"{which}.absoluteValue")
+    return value if isinstance(value, (int, float)) and value > 0 else None
+
+
+def extract_foundit_row(data: dict, source_path: Path) -> dict | None:
+    # Every file written by foundit_scraper.py is the jobDetail API response as-is.
+    if not isinstance(data, dict) or not data.get("jobId") or not data.get("title"):
+        log.warning("Skipping %s: not a Foundit job file (no 'jobId'/'title').", source_path.name)
+        return None
+
+    job = data
+    locations = [l for l in (job.get("locations") or []) if isinstance(l, dict)]
+    first = locations[0] if locations else {}
+    places = []
+    for loc in locations:
+        place = ", ".join(x for x in (loc.get("city"), loc.get("state"), loc.get("country")) if x)
+        if place and place not in places:
+            places.append(place)
+
+    base, top = _foundit_salary(job, "minimumSalary"), _foundit_salary(job, "maximumSalary")
+    hidden = bool(job.get("hideSalary")) or bool(job.get("jobSalaryConfidential"))
+    min_years = get_nested(job, "minimumExperience.years")
+    jd_url = job.get("jdUrl")
+
+    row = {
+        "job_id": job.get("jobId"),
+        "job_title": job.get("title"),
+        "job_url": f"https://www.foundit.com.ph{jd_url}" if jd_url else "",
+        "apply_url": job.get("applyUrl") or job.get("redirectUrl"),
+        "company_name": get_nested(job, "company.name") or job.get("companyName"),
+        "company_id": job.get("companyId") or get_nested(job, "company.companyId"),
+        "company_industry": _join(job.get("industries")),
+        "company_logo_url": job.get("companyLogoUrl") or get_nested(job, "company.logo"),
+        "function": _join(job.get("functions")),
+        "designations": _join(job.get("designations")),
+        "employment_type": _join(job.get("employmentTypes")),
+        "job_type": _join(job.get("jobTypes")),
+        "min_experience_years": min_years,
+        "max_experience_years": get_nested(job, "maximumExperience.years"),
+        "months_work_experience": min_years * 12 if isinstance(min_years, (int, float)) else None,
+        "city": first.get("city"),
+        "region": first.get("state"),
+        "country": first.get("country"),
+        "formatted_address": "; ".join(places),
+        "salary_shown": not hidden and bool(base or top),
+        "base_salary": None if hidden else base,
+        "maximum_salary": None if hidden else top,
+        "salary_currency": (job.get("currencyCode") or get_nested(job, "minimumSalary.currency"))
+                           if (base or top) and not hidden else None,
+        "salary_interval": "month" if (base or top) and not hidden else None,
+        "description": strip_html(job.get("description")),
+        "skills": _join(job.get("skills"), "text"),
+        "it_skills": _join(job.get("itSkills"), "text"),
+        "created_at": foundit_date(job.get("createdAt")),
+        "posted_at": foundit_date(job.get("postedAt")),
+        "updated_at": foundit_date(job.get("updatedAt")),
+        "closed_at": foundit_date(job.get("closedAt")),
+        "is_active": job.get("isJobActive", job.get("activeJob")),
+        "job_source": job.get("jobSource"),
+        "scraped_at": file_scraped_at(source_path),
+    }
+    return blank_none(row)
+
+
+# --------------------------------------------------------------------------
 # Source registry
 # --------------------------------------------------------------------------
 
@@ -326,6 +458,12 @@ SOURCES = {
         "extractor": extract_trabajo_row,
         "default_input": "./trabajo_jobs",
         "default_output": "./trabajo_jobs.csv",
+    },
+    "foundit": {
+        "fieldnames": FOUNDIT_FIELDNAMES,
+        "extractor": extract_foundit_row,
+        "default_input": "./foundit_jobs",
+        "default_output": "./foundit_jobs.csv",
     },
 }
 
@@ -400,7 +538,7 @@ def compile_to_csv(source: str, input_dir: Path, output_csv: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compile scraped job JSON files (Kalibrr or Trabajo) into a single CSV."
+        description="Compile scraped job JSON files (Kalibrr, Trabajo or Foundit) into a single CSV."
     )
     parser.add_argument(
         "--source", "-s", choices=sorted(SOURCES), default="kalibrr",
@@ -409,12 +547,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-dir", "-i", default=None,
         help="Folder containing the individual job JSON files "
-             "(default: ./kalibrr_jobs or ./trabajo_jobs, depending on --source).",
+             "(default: ./kalibrr_jobs, ./trabajo_jobs or ./foundit_jobs, depending on --source).",
     )
     parser.add_argument(
         "--output-csv", "-o", default=None,
         help="Path to write the compiled CSV file to "
-             "(default: ./kalibrr_jobs.csv or ./trabajo_jobs.csv, depending on --source).",
+             "(default: ./kalibrr_jobs.csv, ./trabajo_jobs.csv or ./foundit_jobs.csv, depending on --source).",
     )
     return parser.parse_args()
 

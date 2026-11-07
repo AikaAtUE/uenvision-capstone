@@ -17,7 +17,7 @@
       <div class="settings-card data-card">
         <h3 class="card-title">Settings</h3>
         <label class="checkbox"><input type="checkbox" name="flag_duplicates" id="g-dup"{% if form.flag_duplicates %} checked{% endif %}>
-          <span><strong>Flag the same job posted twice</strong><br><small class="field-hint">Same company and same job title under a different job ID, on Kalibrr or Trabajo. This alone marks a posting. When excluded, the newest copy is kept so the job still counts once.</small></span></label>
+          <span><strong>Flag the same job posted twice</strong><br><small class="field-hint">Same company and same job title under a different job ID, on Kalibrr, Trabajo or Foundit. This alone marks a posting. When excluded, the newest copy is kept so the job still counts once.</small></span></label>
 
         <fieldset class="field-group ghost-weak">
           <legend>Weak signs</legend>
@@ -27,7 +27,7 @@
             <span><strong>Company is not verified</strong> <small class="muted">(Kalibrr only)</small></span></label>
           <label class="field"><span>Description shorter than (characters)</span>
             <input type="number" name="min_description_chars" id="g-chars" value="{{ form.min_description_chars }}" min="0" max="{{ max_chars }}" step="1" required>
-            <small class="field-hint">0 turns this check off. The description is read from the compiled Kalibrr / Trabajo files.</small>
+            <small class="field-hint">0 turns this check off. The description is read from the compiled Kalibrr / Trabajo / Foundit files.</small>
           </label>
           <label class="field"><span>Weak signs needed to mark a posting</span>
             <select name="weak_signs_needed" id="g-needed">

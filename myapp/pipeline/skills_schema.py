@@ -32,7 +32,7 @@ JOB_FLAG_COLUMNS = {
 ALIASES = {
     "job_title": "job_name",
     "company_code": "company_id",
-    "created_at": "date",            # Kalibrr
+    "created_at": "date",            # Kalibrr, Foundit
     "date_posted": "date",           # Trabajo
     "employment_type": "tenure",
     "category": "function",
@@ -61,6 +61,13 @@ SOURCE_CONFIG = {
         "company_cols": ["company_name", "company_logo_url"],
         "job_cols": ["job_url", "location_raw", "city", "region", "country", "employment_type", "work_mode",
                      "salary_currency", "salary_min", "salary_max", "salary_period", "date_posted", "category"],
+    },
+    "foundit": {
+        "text_columns": ["description"],
+        "company_cols": ["company_name", "company_id", "company_industry", "company_logo_url"],
+        "job_cols": ["job_url", "function", "employment_type", "months_work_experience",
+                     "city", "region", "country", "formatted_address", "salary_shown", "base_salary",
+                     "maximum_salary", "salary_currency", "salary_interval", "created_at", "is_active"],
     },
 }
 

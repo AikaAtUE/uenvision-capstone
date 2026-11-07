@@ -101,8 +101,8 @@
   }
 
   /* ---------------- bar chart ---------------- */
-  // Each bar is split by job board; Trabajo and Kalibrr keep the same colour on every filter.
-  const SOURCE_COLORS = { trabajo: '#c8202f', kalibrr: '#16233f' };
+  // Each bar is split by job board; Trabajo, Kalibrr and Foundit keep the same colour on every filter.
+  const SOURCE_COLORS = { trabajo: '#c8202f', kalibrr: '#16233f', foundit: '#d39b1e' };
   const sourceLabel = s => (s ? cap(s) : 'Other');
   function sourceColor(s, i) { return themed(SOURCE_COLORS[s] || COLORS[(i + 2) % COLORS.length]); }
 

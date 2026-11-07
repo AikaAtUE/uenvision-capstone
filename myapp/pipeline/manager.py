@@ -202,7 +202,7 @@ def delete_table(key: str) -> str | None:
 
 
 def clear_extracted_source(source: str) -> tuple[int, str | None]:
-    """Remove one source's job postings (Kalibrr or Trabajo) from Extracted Skills, its resume file
+    """Remove one source's job postings (Kalibrr, Trabajo or Foundit) from Extracted Skills, its resume file
     and the Hard / Soft Skills CSVs built from it. Returns (rows removed, error message or None)."""
     if source not in SOURCES:
         return 0, "Unknown job source."
@@ -986,6 +986,12 @@ def _json_target_name(source: str, data) -> str | None:
             return None
         slug = _SAFE_RE.sub("-", str(job["slug"])).strip("-") or "job"
         return f"{_SAFE_RE.sub('-', str(job['id'])).strip('-')}_{slug}.json"
+    if source == "foundit":     # the jobDetail API response as-is
+        if not data.get("jobId") or not data.get("title"):
+            return None
+        slug = re.sub(r"-\d+$", "", str(data.get("jdUrl") or "").rstrip("/").rsplit("/", 1)[-1])
+        slug = _SAFE_RE.sub("-", slug).strip("-") or "job"
+        return f"{_SAFE_RE.sub('-', str(data['jobId'])).strip('-')}_{slug}.json"
     jid = data.get("job_id")
     if not jid or not data.get("title"):
         return None

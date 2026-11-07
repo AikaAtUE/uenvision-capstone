@@ -176,7 +176,7 @@ class DataExtractionPageTests(IsolatedDataMixin, TestCase):
             self.assertIsNone(pipeline.start_run(cfg))
         state = pipeline.get_run_state()
         self.assertEqual(state["kind"], "extraction")
-        self.assertEqual(state["source"], "Kalibrr + Trabajo")
+        self.assertEqual(state["source"], "Kalibrr + Trabajo + Foundit")       # every source by default
         (settings.DATA_DIR / ".state" / "run.json").unlink()
         with self.settings(API_KEYS_FILE=settings.DATA_DIR / "api_keys.txt"):
             self.assertIn("no compiled Kalibrr CSV",

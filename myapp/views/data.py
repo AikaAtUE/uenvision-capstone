@@ -60,7 +60,7 @@ def data_delete_view(request, key):
 @administrator_required
 @require_POST
 def data_clear_source_view(request, source):
-    """Extracted Skills: remove every Kalibrr (or Trabajo) job posting, keep the other source's."""
+    """Extracted Skills: remove every job posting from one source (Kalibrr, Trabajo or Foundit), keep the others'."""
     if source not in pipeline.SOURCES:
         raise Http404
     removed, error = pipeline.clear_extracted_source(source)
