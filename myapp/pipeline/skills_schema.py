@@ -145,8 +145,22 @@ def split_skills(value):
     return [" ".join(str(x).split()) for x in items if x is not None and str(x).strip()]
 
 
+def _marked_not_tech(record):
+    """True when the skill extraction said this posting is NOT a tech job (isTechJob false).
+    Blank (not answered yet) is kept, like the rest of UEnvision does."""
+    v = record.get("isTechJob", record.get("is_tech_job"))
+    if isinstance(v, bool):
+        return v is False
+    return str(v or "").strip().lower() in ("false", "0", "no")
+
+
 def write_skill_csvs(records, out_dir):
-    """records: dicts with job_name, experience_level, hard_skills, soft_skills."""
+    """records: dicts with job_name, experience_level, hard_skills, soft_skills.
+    Only tech postings are written: postings the extraction marked as not a tech job
+    (isTechJob false, e.g. an accountant the job board also returned) are left out, so
+    counting hard_skills.csv gives the same numbers as the homepage, Dashboard and Job
+    Market, which count tech postings only. extracted_skills.csv still has every posting."""
+    records = [r for r in records if not _marked_not_tech(r)]
     for col, filename in SKILL_CSVS.items():
         path = os.path.join(out_dir, filename)
         fd, tmp = tempfile.mkstemp(dir=out_dir, prefix=filename + ".", suffix=".tmp")

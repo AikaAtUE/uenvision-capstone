@@ -62,8 +62,8 @@
       </div>
       <div class="stat-card">
         <p class="stat-label">Skills to build</p>
-        <p class="stat-value">{{ to_build|length }}</p>
-        <p class="stat-note">{% if to_build %}Start with {{ to_build.0.skill }}{% else %}Nothing missing from the top skills{% endif %}</p>
+        <p class="stat-value">{{ to_build_total }}</p>
+        <p class="stat-note">{% if to_build %}Start with {{ to_build.0.skill }}{% if to_build_total > to_build|length %} (the first {{ to_build|length }} are listed below){% endif %}{% else %}Nothing missing from the top skills{% endif %}</p>
       </div>
     </div>
 

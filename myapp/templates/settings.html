@@ -117,18 +117,26 @@
       <noscript><button type="submit" class="btn btn-navy">Save</button></noscript>
     </form>
 
+    {% if user.has_usable_password %}
     <h2 class="section-title settings-section-gap">Change password</h2>
+    {% else %}
+    <h2 class="section-title settings-section-gap">Set a password</h2>
+    {% endif %}
     <form class="settings-card" id="password-form" method="post" action="{% url 'change_password' %}">
       {% csrf_token %}
+      {% if user.has_usable_password %}
       <label class="field"><span>Current password</span>
         <input type="password" name="current_password" id="pw-current" autocomplete="current-password" required></label>
+      {% else %}
+      <p class="muted">You signed up with Google, so your account has no password yet. Set one here if you also want to log in with your email and password. Continue with Google keeps working either way.</p>
+      {% endif %}
       <label class="field"><span>New password</span>
         <input type="password" name="new_password" id="pw-new" autocomplete="new-password" minlength="{{ min_password_length }}" required>
         <small class="field-hint">At least {{ min_password_length }} characters.</small></label>
       <label class="field"><span>Confirm new password</span>
         <input type="password" name="confirm_password" id="pw-confirm" autocomplete="new-password" minlength="{{ min_password_length }}" required></label>
       <p class="form-msg" id="pw-msg"></p>
-      <button type="submit" class="btn btn-navy">Update password</button>
+      <button type="submit" class="btn btn-navy">{% if user.has_usable_password %}Update password{% else %}Set password{% endif %}</button>
     </form>
 
     </div>

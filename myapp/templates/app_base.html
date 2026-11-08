@@ -168,8 +168,15 @@
       </div>
       </div>
       {% block page_content %}{% endblock %}
+      {% comment %}Messages the page itself didn't show (e.g. "Successfully signed in as ..." after
+        Continue with Google lands on the Dashboard, which has no messages spot of its own).
+        Pages that show messages themselves have already read them, so messages.used is true
+        and nothing is repeated here; before, these waited and turned up on a later page.{% endcomment %}
+      {% if messages and not messages.used %}<div class="app-flash" id="app-flash">{% include "_messages.html" %}</div>{% endif %}
       <script>(function () {
         var bars = document.getElementById('app-banners');
+        var flash = document.getElementById('app-flash');
+        if (bars && flash) bars.insertBefore(flash, bars.firstChild);
         var header = bars && document.querySelector('.content .page-header');
         if (header) header.insertAdjacentElement('afterend', bars);
       })();</script>

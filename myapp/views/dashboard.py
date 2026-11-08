@@ -125,7 +125,10 @@ def _curriculum_suggestions(user, gap, subject_value=""):
         return []
     scoped = dict(gap)
     _scope_gap_for(user, scoped)
-    rows = [r for r in scoped.get("by_subject") or [] if r["could_add"]]
+    # Practicum / research / capstone and the placeholder Professional Electives aren't
+    # subjects a professor picks on this page (_subject_choices), so they aren't suggested either.
+    rows = [r for r in scoped.get("by_subject") or []
+            if r["could_add"] and r["code"] not in curriculum_data.HIDDEN_FROM_PROFESSORS]
     if subject_value:
         rows = [r for r in rows if r["code"] == subject_value]
     return rows[:MAX_CURRICULUM_SUGGESTIONS]

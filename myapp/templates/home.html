@@ -102,7 +102,7 @@
       {% include "_data_updated.html" %}
     </section>
   </div>
-  <p class="muted pub-foot">Job postings are collected from public job boards (Kalibrr) for academic research at the University of the East – CCSS. Gemini marks which postings are tech jobs and whether they fit Computer Science or Information Technology graduates. Role groups come from job titles, so small roles are based on only a few postings.</p>
+  <p class="muted pub-foot">Job postings are collected from public job boards{% if stats.exists %} ({{ stats.source_label }}){% endif %} for academic research at the University of the East – CCSS. Gemini marks which postings are tech jobs and whether they fit Computer Science or Information Technology graduates. Role groups come from job titles, so small roles are based on only a few postings.</p>
   {% endif %}
 </main>
 {% endblock %}

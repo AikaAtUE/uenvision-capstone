@@ -1,18 +1,20 @@
 """Data > Survey Responses (administrators only): search, view and delete the
-Student / Alumni / Professor curriculum survey answers (CurriculumSurveyResponse).
+Student / Alumni / Professor curriculum survey answers (CurriculumSurveyResponse),
+and download them, or the Feedback page answers (SUS / UAT / test sheet), as CSV.
 
 Search runs in Python over a short text built from each response (name, emails,
 student number, course, subjects and skills) -- a few thousand responses at most,
 and it avoids depending on how the database stores the JSON."""
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from . import curriculum_data
-from .models import CurriculumSurveyResponse
+from .models import CurriculumSurveyResponse, SurveyResponse
 from .views import _data_ctx, administrator_required
 
 PAGE_SIZE = 25
@@ -61,8 +63,9 @@ def _search_text(row):
     return " ".join(parts).lower()
 
 
-@administrator_required
-def survey_responses_view(request):
+def _filtered(request):
+    """The responses the page's filters pick (search, respondent type, data set), newest
+    first, as _summary() rows. Shared by the page and its CSV download."""
     q = request.GET.get("q", "").strip()
     rtype = request.GET.get("type", "")
     data_set = request.GET.get("set", "real")
@@ -80,6 +83,12 @@ def survey_responses_view(request):
     if q:
         words = q.lower().split()
         rows = [r for r in rows if all(w in _search_text(r) for w in words)]
+    return rows, q, rtype, data_set
+
+
+@administrator_required
+def survey_responses_view(request):
+    rows, q, rtype, data_set = _filtered(request)
     page = Paginator(rows, PAGE_SIZE).get_page(request.GET.get("page"))
     params = request.GET.copy()
     params.pop("page", None)
@@ -87,8 +96,33 @@ def survey_responses_view(request):
         request, "responses",
         page=page, total=len(rows), q=q, rtype=rtype, data_set=data_set,
         types=CurriculumSurveyResponse.RESPONDENT_TYPES, data_sets=DATA_SETS,
+        feedback_kinds=SurveyResponse.SURVEY_TYPES,
         query_string=params.urlencode(),
     ))
+
+
+@administrator_required
+def survey_responses_csv_view(request):
+    """Download the curriculum survey answers the page's filters pick, as CSV."""
+    from . import survey_export
+    rows, _q, rtype, data_set = _filtered(request)
+    name = "-".join(["survey-responses", rtype or "all-types", data_set])
+    return survey_export.curriculum_csv([r["obj"] for r in rows], name)
+
+
+@administrator_required
+def feedback_csv_view(request, kind):
+    """Download the Feedback page answers (SUS, UAT or the functional test sheet) as CSV."""
+    from . import survey_export
+    if kind not in dict(SurveyResponse.SURVEY_TYPES):
+        raise Http404
+    data_set = request.GET.get("set", "real")
+    if data_set not in dict(DATA_SETS):
+        data_set = "real"
+    qs = SurveyResponse.objects.filter(survey_type=kind).select_related("user").order_by("created_at", "pk")
+    if data_set != "all":
+        qs = qs.filter(is_dummy=(data_set == "dummy"))
+    return survey_export.feedback_csv(kind, list(qs), f"feedback-{kind}-{data_set}")
 
 
 @administrator_required

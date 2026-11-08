@@ -12,11 +12,15 @@ the hard_skills column as written in the data set, once per posting. Nothing is 
 into other names, so a skill's count here is what counting hard_skills.csv gives.
 
 Unlike the Dashboard, this page also counts non-tech postings (isTechJob = False) in the
-volume chart, because the change in mix is part of the story. Skill shares by year use
-tech postings only, so a year with more non-tech postings doesn't look like a drop.
+volume chart, employers, cities, work setup and pay, because the change in mix is part
+of the story. Every skill number (top skills, rising / falling, entry vs senior) uses
+tech postings only, the same postings the homepage, Dashboard and hard_skills.csv count.
+
+The Dashboard's "Exclude possible ghost jobs" switch applies here too (ghost_jobs.EXCLUDE).
 """
 import statistics
 
+from . import ghost_jobs
 from . import job_roles
 from .pipeline import manager as pipeline
 from .pipeline.skills_schema import split_skills
@@ -86,6 +90,7 @@ def _rows():
             monthly = (lo + (hi or lo)) / 2
         rows.append({
             "source": get(r, "source").lower(),
+            "ghost_key": (get(r, "source"), get(r, "job_id")),
             "year": int(m.group(1)),
             "month": int(m.group(2)),
             "tech": tech_flag if tech_flag is not None else bool(role),
@@ -137,11 +142,19 @@ def compute(source=DEFAULT_SOURCE, since=DEFAULT_SINCE):
     rows = _rows()
     if rows is None:
         return {"exists": False}
-    key = (source, since)
+    exclude_ghosts = ghost_jobs.EXCLUDE.get()
+    found = (ghost_jobs.detect() or {}) if exclude_ghosts else {}
+    # The ghost job marks change when their settings or the data change, so they're part of the key.
+    key = (source, since, exclude_ghosts, ghost_jobs._stamp() if exclude_ghosts else None)
     if key in _CACHE["results"]:
         return _CACHE["results"][key]
 
     chosen = [r for r in rows if (not source or r["source"] == source) and r["year"] >= since]
+    ghosts_hidden = 0
+    if exclude_ghosts:
+        kept = [r for r in chosen if found.get(r["ghost_key"], {}).get("keep_when_excluding", True)]
+        ghosts_hidden = len(chosen) - len(kept)
+        chosen = kept
     updated = pipeline.skills_data_updated()
     result = {
         "exists": True,
@@ -150,6 +163,8 @@ def compute(source=DEFAULT_SOURCE, since=DEFAULT_SINCE):
         "since": since,
         "updated": updated.isoformat() if updated else None,
         "total": len(chosen),
+        "ghosts_excluded": exclude_ghosts,
+        "ghosts_hidden": ghosts_hidden,
     }
     if not chosen:
         result["empty"] = True
@@ -185,10 +200,11 @@ def compute(source=DEFAULT_SOURCE, since=DEFAULT_SINCE):
                            "partial": (y, q) == last_q and last[1] % 3 != 0}
                           for y, q in qkeys]
 
-    # Top skills across every posting, with each year's count.
-    counts, label = _tally(chosen)
-    by_year = {y: _tally([r for r in chosen if r["year"] == y])[0] for y in years}
-    result["top_skills"] = [{"skill": label[k], "count": counts[k], "pct": _pct(counts[k], len(chosen)),
+    # Top skills across the tech postings (as on the Dashboard and in hard_skills.csv),
+    # with each year's count.
+    counts, label = _tally(tech)
+    by_year = {y: _tally([r for r in tech if r["year"] == y])[0] for y in years}
+    result["top_skills"] = [{"skill": label[k], "count": counts[k], "pct": _pct(counts[k], len(tech)),
                              "by_year": [by_year[y].get(k, 0) for y in years]}
                             for k in _ranked(counts, label, TOP_SKILLS)]
     result["unique_skills"] = len(counts)

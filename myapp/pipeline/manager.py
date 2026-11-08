@@ -376,13 +376,25 @@ def query_table(key: str, q: str = "", page: int = 1, page_size: int = 50,
 # ---------------------------------------------------------------------------
 # Hard / soft skills CSVs and the dashboard numbers
 # ---------------------------------------------------------------------------
+# Bumped when write_skill_csvs() changes what goes into hard_skills.csv / soft_skills.csv,
+# so files built by the older code are rebuilt once even if extracted_skills.csv hasn't
+# changed. "2": non-tech postings (isTechJob false) are left out.
+SKILL_CSVS_VERSION = "2"
+
+
 def ensure_skill_csvs() -> None:
     """(Re)build hard_skills.csv / soft_skills.csv from extracted_skills.csv when missing or stale."""
     src = extracted_csv()
     if not src.is_file():
         return
     stamp = src.stat().st_mtime
-    if all(table_path(k).is_file() and table_path(k).stat().st_mtime >= stamp for k in SKILL_CSVS):
+    version_file = state_dir() / "skill_csvs.version"
+    try:
+        built_version = version_file.read_text(encoding="utf-8").strip()
+    except OSError:
+        built_version = ""
+    if (built_version == SKILL_CSVS_VERSION
+            and all(table_path(k).is_file() and table_path(k).stat().st_mtime >= stamp for k in SKILL_CSVS)):
         return
     loaded = load_table("extracted")
     if loaded is None:
@@ -390,6 +402,7 @@ def ensure_skill_csvs() -> None:
     columns, rows = loaded
     recs = [dict(zip(columns, r)) for r in rows]
     write_skill_csvs(recs, str(data_dir()))
+    _atomic_write_text(version_file, SKILL_CSVS_VERSION)
     for k in SKILL_CSVS:
         _table_cache.pop(k, None)
 

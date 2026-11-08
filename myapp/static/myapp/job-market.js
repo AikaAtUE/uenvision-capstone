@@ -112,7 +112,15 @@
     $('jm-companies-note').textContent = 'Top 10 posted ' + d.employers_share + '% of jobs';
     var top = d.top_skills[0];
     $('jm-topskill').textContent = top ? top.skill : '—';
-    $('jm-topskill-note').textContent = top ? 'In ' + num(top.count) + ' postings (' + top.pct + '%)' : '';
+    $('jm-topskill-note').textContent = top ? 'In ' + num(top.count) + ' tech postings (' + top.pct + '%)' : '';
+    var ghostNote = $('jm-ghost-note');
+    if (ghostNote) {
+      ghostNote.hidden = !d.ghosts_excluded;
+      ghostNote.textContent = d.ghosts_excluded
+        ? num(d.ghosts_hidden) + ' possible ghost job' + (d.ghosts_hidden === 1 ? '' : 's') +
+          ' excluded, as set in the Dashboard\'s Filter.'
+        : '';
+    }
 
     $('jm-quarters').innerHTML = quartersChart(d.quarters);
     var last = d.quarters[d.quarters.length - 1];

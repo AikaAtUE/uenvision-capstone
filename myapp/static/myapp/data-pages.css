@@ -122,6 +122,10 @@ code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-
 .sr-bulk{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px;}
 .sr-bulk .table-count{margin:0;}
 .sr-bulk .btn[disabled]{opacity:.45; cursor:not-allowed;}
+.sr-bulk-actions{display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end;}
+.sr-bulk-actions .btn, .sr-export .btn{text-decoration:none;}
+.sr-export-title{margin-top:28px;}
+.sr-export{display:flex; flex-wrap:wrap; gap:8px;}
 .sr-table{width:100%;}
 .sr-table td{vertical-align:top; white-space:normal;}
 .sr-table .sr-check{width:36px;}

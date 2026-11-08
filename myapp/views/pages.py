@@ -121,13 +121,16 @@ def change_password_view(request):
     new = request.POST.get("new_password", "")
     confirm = request.POST.get("confirm_password", "")
 
-    if not request.user.check_password(current):
+    # An account made with "Continue with Google" has no password yet (set_unusable_password),
+    # so Settings asks it to set one without a current password.
+    has_password = request.user.has_usable_password()
+    if has_password and not request.user.check_password(current):
         messages.error(request, "Current password is incorrect.")
     elif len(new) < MIN_PASSWORD_LENGTH:
         messages.error(request, f"New password must be at least {MIN_PASSWORD_LENGTH} characters.")
     elif new != confirm:
         messages.error(request, "New password and confirmation do not match.")
-    elif new == current:
+    elif has_password and new == current:
         messages.error(request, "New password must be different from your current password.")
     else:
         was_temporary = request.user.must_change_password
@@ -135,7 +138,8 @@ def change_password_view(request):
         request.user.must_change_password = False
         request.user.save(update_fields=["password", "must_change_password"])
         update_session_auth_hash(request, request.user)  # keep this session logged in
-        messages.success(request, "Your password has been changed.")
+        messages.success(request, "Your password has been changed." if has_password else
+                         "Your password has been set. You can now also log in with your email and password.")
         if was_temporary:
             return redirect(home_url_for(request.user))
     return redirect("settings")

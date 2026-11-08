@@ -166,6 +166,7 @@ def student_plan(user, top=10, max_to_build=6):
         to_build.append(s)
     return {"ctx": ctx, "stats": stats, "role": role, "compare": compare, "overall": overall, "have": have,
             "have_assumed": have_assumed, "readiness": readiness, "to_build": to_build[:max_to_build],
+            "to_build_total": len(to_build),   # before the cut to max_to_build, for the "Skills to build" card
             "coming_up": coming_up}
 
 

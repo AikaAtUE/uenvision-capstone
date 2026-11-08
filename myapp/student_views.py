@@ -96,15 +96,31 @@ def skill_search_view(request):
     return JsonResponse({"ok": True, "results": skills_catalog.search(q, 8)})
 
 
+MAX_NEW_SKILLS_PER_HOUR = 30
+
+
 @require_POST
 def skill_add_view(request):
+    """Adds a skill a survey respondent couldn't find to data/ontology/custom_skills.csv,
+    which the skill standardizer also reads, so only logged-in users can add one (the
+    surveys need a login anyway), at most MAX_NEW_SKILLS_PER_HOUR new skills an hour each."""
+    from django.core.cache import cache
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"ok": False, "error": "Please log in to add a new skill."}, status=403)
     try:
         payload = json.loads(request.body or b"{}")
     except ValueError:
         return JsonResponse({"ok": False, "error": "Malformed request."}, status=400)
+    rate_key = f"skill_add:{request.user.pk}"
+    if cache.get(rate_key, 0) >= MAX_NEW_SKILLS_PER_HOUR:
+        return JsonResponse({"ok": False, "error": "You've added a lot of new skills in the last hour. "
+                                                   "Please pick from the list or try again later."}, status=429)
     name, created, error = skills_catalog.add_custom_skill(str(payload.get("name") or ""))
     if error:
         return JsonResponse({"ok": False, "error": error}, status=400)
+    if created:
+        cache.set(rate_key, cache.get(rate_key, 0) + 1, 60 * 60)
     return JsonResponse({"ok": True, "name": name, "created": created})
 
 
@@ -508,6 +524,7 @@ def render_student_dashboard(request, active_page="student_dashboard", as_kind=N
         "readiness": readiness,
         "have": have,
         "to_build": to_build,
+        "to_build_total": plan["to_build_total"],
         "any_to_find": any(not s["cached_resources"] and not s["finding"] for s in to_build),
         "you_levels": [{"key": k, "label": label, "status": status, "text": text} for k, label, status, text in YOU_LEVELS],
         "my_skills": sorted(ctx["reported"].values(), key=lambda m: (-m["weight"], m["skill"].lower())),

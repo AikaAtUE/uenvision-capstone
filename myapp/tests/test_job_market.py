@@ -66,9 +66,12 @@ class JobMarketTests(TestCase):
         self.assertEqual(top["HTML"]["count"], 2)
         self.assertEqual(top["HTML"]["by_year"], [2, 0])
         self.assertEqual(top["Python"]["count"], 2)
-        # "Excel" and "Microsoft Excel" stay two skills, as in the data set
+        # "Excel" stays as written in the data set ...
         self.assertIn("Excel", top)
-        self.assertIn("Microsoft Excel", top)
+        # ... and the accountant's "Microsoft Excel" isn't counted: skills come from tech
+        # postings only, like the Dashboard and hard_skills.csv
+        self.assertNotIn("Microsoft Excel", top)
+        self.assertEqual(top["HTML"]["pct"], 50.0)   # 2 of the 4 tech postings
         self.assertNotIn("Go", top)
         self.assertNotIn("Perl", top)
 

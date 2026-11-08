@@ -44,11 +44,12 @@ Scope, deliberately kept narrow for this first pass:
   for that subject (ontology.subject_skill_map) but nobody reported it there.
 """
 import math
+import re
 
 
 from . import skill_categories
 from .models import CurriculumSurveyResponse
-from .pipeline.skill_standardizer import clean_display, norm
+from .pipeline.skill_standardizer import clean_display
 
 MAX_LISTED = 12  # how many under-taught / well-covered skills the UI shows
 MAX_SUBJECT_SKILLS = 8  # per-subject lists in the breakdown
@@ -79,8 +80,20 @@ def _standardize(raw: str):
     display = clean_display(raw)
     if not display:
         return None
-    key = norm(display) or display.lower()
+    key = count_key(display) or display.lower()
     return key, display
+
+
+_NOT_KEY_CHARS = re.compile(r"[^a-z0-9+#]+")
+
+
+def count_key(text: str) -> str:
+    """The name a skill is counted under: lowercase, "&" read as "and", every other
+    punctuation mark or space run turned into one space ("CI/CD" = "CI CD", "Node.js" =
+    "Node js"). Unlike skill_standardizer.norm() (used to look skills up in the ontology),
+    version numbers are kept, so "Industry 4.0" and "IEEE 802.11" stay their own skills
+    instead of being counted as "Industry" and "IEEE"."""
+    return _NOT_KEY_CHARS.sub(" ", str(text).lower().replace("&", " and ")).strip()
 
 
 def _tally(mention_sets):

@@ -154,6 +154,7 @@ class SkillCatalogTests(IsolatedDataMixin, TestCase):
         self.assertEqual(self.client.get(reverse("skill_search"), {"q": "js"}).json()["results"][0]["name"], "JavaScript")
 
     def test_search_and_add(self):
+        login_administrator(self.client)   # adding a new skill needs a login
         r = self.client.get(reverse("skill_search"), {"q": "dock"})
         self.assertIn("Docker", [x["name"] for x in r.json()["results"]])
         add = lambda name: self.client.post(reverse("skill_add"), data=json.dumps({"name": name}),

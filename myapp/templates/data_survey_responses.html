@@ -38,7 +38,10 @@
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       <div class="sr-bulk">
         <p class="muted table-count">{{ total }} response{{ total|pluralize }}{% if q %} matching “{{ q }}”{% endif %}</p>
-        <button type="button" class="btn btn-red btn-sm" id="sr-delete-selected" disabled>Delete selected</button>
+        <div class="sr-bulk-actions">
+          <a class="btn btn-ghost btn-sm" href="{% url 'survey_responses_csv' %}{% if query_string %}?{{ query_string }}{% endif %}" title="Every response these filters show, one row per skill">Download CSV</a>
+          <button type="button" class="btn btn-red btn-sm" id="sr-delete-selected" disabled>Delete selected</button>
+        </div>
       </div>
 
       {% if page.object_list %}
@@ -90,6 +93,14 @@
       {% if page.has_next %}<a class="btn btn-ghost btn-sm" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page.next_page_number }}">Next ›</a>{% endif %}
     </nav>
     {% endif %}
+
+    <h2 class="section-title sr-export-title">Feedback survey answers</h2>
+    <p class="muted sr-intro">Download what accounts answered on the Feedback page, one file per survey ({% for value, label in data_sets %}{% if value == data_set %}{{ label|lower }}{% endif %}{% endfor %}, as chosen in Data set above).</p>
+    <div class="sr-export">
+      {% for value, label in feedback_kinds %}
+      <a class="btn btn-ghost btn-sm" href="{% url 'feedback_responses_csv' value %}?set={{ data_set }}">{{ label }} (CSV)</a>
+      {% endfor %}
+    </div>
   </div>
 </section>
 {% endblock %}
