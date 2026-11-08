@@ -23,8 +23,10 @@
   // ---- How many searches the multiple list has ----
   const extra = document.getElementById('extra-searches');
   const count = document.getElementById('search-count');
-  const locked = count ? parseInt(count.dataset.locked, 10) || 0 : 0;
+  const chedCount = document.getElementById('ched-count');
+  const chedBoxes = Array.from(form.querySelectorAll('input[name="ched_searches"]'));
   const lockedTerms = new Set(Array.from(form.querySelectorAll('.dx-locked .dx-term')).map((el) => el.textContent.trim().toLowerCase()));
+  function ticked() { return chedBoxes.filter((c) => c.checked).length; }
   function extraTerms() {
     const seen = new Set();
     return (extra ? extra.value : '').split(/\r?\n/).map((l) => l.trim().replace(/\s+/g, ' ')).filter((l) => {
@@ -35,17 +37,27 @@
     });
   }
   function updateCount() {
+    const t = ticked();
+    chedBoxes.forEach((c) => { const li = c.closest('li'); if (li) li.classList.toggle('is-off', !c.checked); });
+    if (chedCount) chedCount.textContent = t + ' of ' + chedBoxes.length + ' ticked';
     if (!count) return;
     const n = extraTerms().length;
-    count.textContent = (locked + n) + ' searches in all: ' + locked + ' from CHED and ' + n + ' added.';
+    count.textContent = (t + n) + ' searches in all: ' + t + ' from CHED and ' + n + ' added.';
   }
   function updateMeta() {
     if (!scrapeMeta) return;
     const srcs = Array.from(form.querySelectorAll('input[name="sources"]:checked'))
       .map((c) => c.closest('label').querySelector('strong').textContent);
     scrapeMeta.textContent = (srcs.length ? srcs.join(' + ') : 'No source') + ' · ' +
-      (mode() === 'multiple' ? 'Multiple search (' + (locked + extraTerms().length) + ' searches)' : 'Single search');
+      (mode() === 'multiple' ? 'Multiple search (' + (ticked() + extraTerms().length) + ' searches)' : 'Single search');
   }
+  chedBoxes.forEach((c) => c.addEventListener('change', () => { updateCount(); updateMeta(); }));
+  form.querySelectorAll('button[data-ched]').forEach((b) => b.addEventListener('click', () => {
+    const on = b.dataset.ched === 'all';
+    if (chedBoxes.every((c) => c.checked === on)) return;
+    chedBoxes.forEach((c) => { c.checked = on; });
+    updateCount(); updateMeta(); schedule(150);
+  }));
   if (extra) extra.addEventListener('input', () => { updateCount(); updateMeta(); });
   form.querySelectorAll('input[name="sources"]').forEach((c) => c.addEventListener('change', updateMeta));
   updateCount();

@@ -189,6 +189,9 @@ def _extraction_ctx(request, form=None, ghost_form=None, auto_form=None, errors=
 
     form = form or pipeline.get_extraction_settings()
     extra = form.get("extra_searches") or []
+    skipped = form.get("skipped_searches") or []
+    off = {t.lower() for t in skipped}
+    locked = [{**s, "on": s["term"].lower() not in off} for s in search_terms.default_searches()]
     pipeline.ensure_skill_csvs()
     found = ghost_jobs.detect()
     flagged = ghost_jobs.flagged_postings()
@@ -198,8 +201,9 @@ def _extraction_ctx(request, form=None, ghost_form=None, auto_form=None, errors=
         request, "extraction",
         form=form,
         extra_text="\n".join(extra),
-        locked_searches=search_terms.default_searches(),
-        multiple_count=len(search_terms.multiple_list(extra)),
+        locked_searches=locked,
+        ched_ticked=sum(1 for s in locked if s["on"]),
+        multiple_count=len(search_terms.multiple_list(extra, skipped)),
         job_sources=[{"key": s.key, "label": s.label, "site": s.site} for s in pipeline.SOURCE_REGISTRY],
         run=pipeline.get_run_state(),
         summary=pipeline.disk_summary(),

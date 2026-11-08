@@ -47,7 +47,7 @@
               <label><input type="radio" name="search_mode" value="single"{% if form.search_mode != 'multiple' %} checked{% endif %}><span>Single search</span></label>
               <label><input type="radio" name="search_mode" value="multiple"{% if form.search_mode == 'multiple' %} checked{% endif %}><span>Multiple search</span></label>
             </div>
-            <small class="field-hint">This switch is for runs you start yourself. Automation always uses the multiple search list.</small>
+            <small class="field-hint">This switch is for runs you start yourself. Automation always uses the multiple search list (the ticked CHED jobs and the added searches).</small>
           </fieldset>
 
           <div class="dx-mode" data-mode="single"{% if form.search_mode == 'multiple' %} hidden{% endif %}>
@@ -57,18 +57,27 @@
           </div>
 
           <div class="dx-mode" data-mode="multiple"{% if form.search_mode != 'multiple' %} hidden{% endif %}>
-            <p class="dx-note">Each line is one search. These <strong>{{ locked_searches|length }}</strong> expected job roles of BSCS and BSIT graduates are set by <strong>CHED Memorandum Order No. 25, s. 2015</strong>, so they are always searched and can't be edited or removed.</p>
-            <ol class="dx-locked" aria-label="Searches that are always run">
+            <p class="dx-note">Each line is one search. These <strong>{{ locked_searches|length }}</strong> expected job roles of BSCS and BSIT graduates are set by <strong>CHED Memorandum Order No. 25, s. 2015</strong>, so they can't be edited or removed. Untick the ones you don't want searched this time.</p>
+            <input type="hidden" name="ched_list" value="1">
+            <div class="dx-locked-bar">
+              <span class="dx-locked-count" id="ched-count">{{ ched_ticked }} of {{ locked_searches|length }} ticked</span>
+              <span class="dx-locked-btns">
+                <button type="button" class="dx-linkbtn" data-ched="all">Tick all</button>
+                <button type="button" class="dx-linkbtn" data-ched="none">Untick all</button>
+              </span>
+            </div>
+            <ol class="dx-locked" aria-label="CHED expected jobs to search">
               {% for s in locked_searches %}
-              <li><svg class="dx-lock" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2h.5A1.5 1.5 0 0 1 13.5 8.5v5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 4 7zm1.5 0h4V5a2 2 0 0 0-4 0z" fill="currentColor"/></svg>
-                <span class="dx-term">{{ s.term }}</span>
+              <li{% if not s.on %} class="is-off"{% endif %}><label class="dx-ched">
+                <input type="checkbox" name="ched_searches" value="{{ s.term }}"{% if s.on %} checked{% endif %}>
+                <span class="dx-term">{{ s.term }}</span></label>
                 <span class="dx-tags">{% for t in s.tags %}<span class="dx-tag">{{ t }}</span>{% endfor %}</span></li>
               {% endfor %}
             </ol>
             <label class="field"><span>Add more searches <em class="opt">(one per line)</em></span>
               <textarea name="extra_searches" id="extra-searches" rows="5" spellcheck="false" placeholder="DevOps Engineer&#10;Cloud Engineer">{{ extra_text }}</textarea>
             </label>
-            <small class="field-hint" id="search-count" data-locked="{{ locked_searches|length }}">{{ multiple_count }} searches in all: {{ locked_searches|length }} from CHED and {{ form.extra_searches|length }} added.</small>
+            <small class="field-hint" id="search-count" data-locked="{{ locked_searches|length }}">{{ multiple_count }} searches in all: {{ ched_ticked }} from CHED and {{ form.extra_searches|length }} added.</small>
           </div>
 
           <div class="field-row">
@@ -178,7 +187,7 @@
         <div class="dx-body">
           <label class="dx-switch"><input type="checkbox" name="auto_enabled" id="auto-enabled" role="switch"{% if auto_form.enabled %} checked{% endif %}>
             <span class="dx-switch-track" aria-hidden="true"></span><span><strong>Run the whole data extraction automatically</strong></span></label>
-          <p class="dx-note">An automatic run follows the settings above: the ticked job sources, the <strong>multiple search list</strong> ({{ multiple_count }} searches), and every step from scraping to ghost job detection. A run that is already going is never interrupted; the automatic one starts after it ends.</p>
+          <p class="dx-note">An automatic run follows the settings above: the ticked job sources, the <strong>multiple search list</strong> ({{ multiple_count }} searches: the ticked CHED jobs and the added ones), and every step from scraping to ghost job detection. A run that is already going is never interrupted; the automatic one starts after it ends.</p>
 
           <fieldset class="field-group dx-auto-fields">
             <legend>How often</legend>

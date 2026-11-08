@@ -543,6 +543,7 @@ DEFAULT_SCRAPE_SETTINGS = {
     "search_mode": "single",
     "keyword": "computer science",
     "extra_searches": [],
+    "skipped_searches": [],      # CHED roles unticked in the multiple search list
     "delay_min": 1.5,
     "delay_max": 4.0,
     "max_jobs": "",
@@ -589,6 +590,9 @@ def get_scrape_settings() -> dict:
         cfg["search_mode"] = "single"
     if not isinstance(cfg.get("extra_searches"), list):
         cfg["extra_searches"] = []
+    if not isinstance(cfg.get("skipped_searches"), list):
+        cfg["skipped_searches"] = []
+    cfg["skipped_searches"] = search_terms.parse_skipped(search_terms.ticked_terms(cfg["skipped_searches"]))
     return cfg
 
 
@@ -607,9 +611,9 @@ def get_extraction_settings() -> dict:
 
 def searches_for(cfg: dict, mode: str | None = None) -> list[str]:
     """The searches a run scrapes: the one keyword, or the multiple list
-    (the locked CHED roles plus the extra searches)."""
+    (the ticked CHED roles plus the extra searches)."""
     if (mode or cfg.get("search_mode")) == "multiple":
-        return search_terms.multiple_list(cfg.get("extra_searches"))
+        return search_terms.multiple_list(cfg.get("extra_searches"), cfg.get("skipped_searches"))
     kw = " ".join(str(cfg.get("keyword") or "").split())
     return [kw] if kw else []
 
@@ -631,6 +635,12 @@ def parse_extraction_form(post, for_run: bool = True) -> tuple[dict, str | None]
     cfg["search_mode"] = post.get("search_mode", "single")
     cfg["keyword"] = " ".join(post.get("keyword", "").split())
     cfg["extra_searches"], extra_error = search_terms.parse_extra(post.get("extra_searches", ""))
+    # The CHED tick boxes. "ched_list" marks a form that has them, so a form without them
+    # (an older page, a test) leaves every role ticked instead of unticking them all.
+    if post.get("ched_list"):
+        cfg["skipped_searches"] = search_terms.parse_skipped(_getlist(post, "ched_searches"))
+    else:
+        cfg["skipped_searches"] = []
     cfg["max_jobs"] = post.get("max_jobs", "").strip()
     cfg["model"] = post.get("model", "").strip()
     for step in ("do_scrape", "do_compile", "do_extract", "standardize", "do_ghost"):
@@ -676,6 +686,8 @@ def check_run_choices(cfg: dict, mode: str | None = None) -> str | None:
     if not cfg["sources"] and any(cfg.get(k) for k in ("do_scrape", "do_compile", "do_extract")):
         return "Tick at least one job source (" + " and/or ".join(SOURCE_LABELS.values()) + ")."
     if cfg.get("do_scrape") and not searches_for(cfg, mode):
+        if (mode or cfg.get("search_mode")) == "multiple":
+            return "Tick at least one CHED expected job (or add a search) in the multiple search list."
         return "Enter a search keyword."
     return None
 

@@ -3,8 +3,10 @@ The searches the scraper runs in "Multiple search" mode (and on every automatic 
 
 The expected job roles of graduates set by CHED Memorandum Order No. 25, s. 2015
 (PSG for BSCS, BSIS and BSIT) are always in the list: they can't be edited or removed
-on the Data Extraction page, only added to. Administrators' extra searches are stored
-separately (data/.state/scrape_settings.json -> extra_searches) and come after them.
+on the Data Extraction page, only added to. Each one has a tick box, though, so a run can
+leave some of them out: the unticked ones are stored in data/.state/scrape_settings.json
+-> skipped_searches (so a role is searched unless someone unticked it). Administrators'
+extra searches are stored separately (-> extra_searches) and come after them.
 """
 
 # (program, "primary" | "secondary", roles), as listed in CMO No. 25, s. 2015
@@ -83,10 +85,23 @@ def parse_extra(text) -> tuple[list[str], str | None]:
     return out, None
 
 
-def multiple_list(extra) -> list[str]:
-    """Every search of a multiple-search run: the locked CHED roles first, then the extras."""
-    out = default_terms()
-    have = {t.lower() for t in out}
+def parse_skipped(ticked) -> list[str]:
+    """The tick boxes of the CHED roles: the roles that were NOT ticked, in memorandum order
+    (spelled as in the memorandum, whatever the form sent)."""
+    on = {clean(t).lower() for t in ticked or []}
+    return [t for t in default_terms() if t.lower() not in on]
+
+
+def ticked_terms(skipped=None) -> list[str]:
+    """The CHED roles a multiple-search run searches: every one that wasn't unticked."""
+    off = {clean(t).lower() for t in skipped or []}
+    return [t for t in default_terms() if t.lower() not in off]
+
+
+def multiple_list(extra, skipped=None) -> list[str]:
+    """Every search of a multiple-search run: the ticked CHED roles first, then the extras."""
+    out = ticked_terms(skipped)
+    have = {t.lower() for t in default_terms()}       # an extra never brings back an unticked role
     for term in (clean(x) for x in extra or []):
         if term and term.lower() not in have:
             have.add(term.lower())

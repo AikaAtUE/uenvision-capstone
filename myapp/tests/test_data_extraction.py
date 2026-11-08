@@ -58,6 +58,16 @@ class SearchListTests(TestCase):
         self.assertIsNotNone(search_terms.parse_extra("x" * 101)[1])
 
 
+    def test_unticked_ched_roles_are_left_out(self):
+        skipped = search_terms.parse_skipped(["software engineer", "  Data   Analyst ", "Not a CHED role"])
+        self.assertNotIn("Software Engineer", skipped)
+        self.assertNotIn("Data Analyst", skipped)
+        self.assertEqual(len(skipped), len(CHED) - 2)
+        self.assertEqual(search_terms.multiple_list(["Cloud Engineer", "Network Engineer"], skipped),
+                         ["Software Engineer", "Data Analyst", "Cloud Engineer"])   # an extra can't bring one back
+        self.assertEqual(search_terms.multiple_list([], []), CHED)
+
+
 class DataExtractionPageTests(IsolatedDataMixin, TestCase):
     def setUp(self):
         super().setUp()
@@ -140,6 +150,29 @@ class DataExtractionPageTests(IsolatedDataMixin, TestCase):
         # the scrape + compile steps of each source come before anything that has no lane
         first_plain = next(i for i, s in enumerate(steps) if not s.get("lane"))
         self.assertTrue(all(s.get("lane") for s in steps[:first_plain]))
+
+    def test_ched_tick_boxes_pick_the_searches(self):
+        picked = ["Software Engineer", "Network Engineer"]
+        with mock.patch.object(pipeline, "start_run", return_value=None) as start:
+            self.client.post(reverse("data_extraction"), form(
+                action="run", search_mode="multiple", ched_list="1", ched_searches=picked,
+                extra_searches="DevOps Engineer"))
+        self.assertEqual(start.call_args.args[0]["searches"], picked + ["DevOps Engineer"])
+        cfg = pipeline.get_extraction_settings()
+        self.assertEqual(len(cfg["skipped_searches"]), len(CHED) - 2)
+        page = self.client.get(reverse("data_extraction"))
+        self.assertContains(page, "3 searches in all: 2 from CHED and 1 added.")
+        self.assertContains(page, "2 of 18 ticked")
+        self.assertContains(page, 'value="Software Engineer" checked')
+        self.assertContains(page, 'value="Data Analyst">')
+        # Untick all and no extra searches: nothing to search
+        with mock.patch.object(pipeline, "start_run") as start:
+            self.client.post(reverse("data_extraction"), form(action="run", search_mode="multiple", ched_list="1"))
+        start.assert_not_called()
+        self.assertContains(self.client.get(reverse("data_extraction")), "Tick at least one CHED expected job")
+        # A form without the tick boxes keeps every role
+        self.client.post(reverse("data_extraction"), form(action="save", search_mode="multiple"))
+        self.assertEqual(pipeline.searches_for(pipeline.get_extraction_settings()), CHED)
 
     def test_single_search_runs_the_one_keyword(self):
         with mock.patch.object(pipeline, "start_run", return_value=None) as start:
@@ -282,6 +315,16 @@ class AutomationTests(IsolatedDataMixin, TestCase):
         self.assertEqual(nxt, self.at(10, 2))
         # the server was off for a week: one catch-up run, then back on the 3-day rhythm
         self.assertEqual(automation.following_run(cfg, self.at(7, 2), self.at(14, 9)), self.at(16, 2))
+
+    def test_automation_follows_the_ched_tick_boxes(self):
+        from .. import automation
+        skipped = search_terms.parse_skipped(["Systems Analyst"])
+        pipeline.save_extraction_settings({**pipeline.get_extraction_settings(), "skipped_searches": skipped,
+                                           "extra_searches": ["Cloud Engineer"], "sources": ["trabajo"]})
+        self.assertEqual(automation.run_settings()["searches"], ["Systems Analyst", "Cloud Engineer"])
+        pipeline.save_extraction_settings({**pipeline.get_extraction_settings(), "skipped_searches": list(CHED),
+                                           "extra_searches": []})
+        self.assertIn("Tick at least one CHED", pipeline.check_run_choices(automation.run_settings(), mode="multiple"))
 
     def test_days_of_the_week(self):
         from .. import automation
