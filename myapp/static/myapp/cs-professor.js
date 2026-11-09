@@ -315,6 +315,8 @@
         setFormError('professor-error', 'Please select at least one subject you currently teach or taught last semester.');
         return;
       }
+      var skillsError = CS.missingSkillsError(blocksWrap);
+      if (skillsError) { setFormError('professor-error', skillsError); return; }
 
       var subjects = subjectKeys.map(function (key) {
         var p = pickers[key];

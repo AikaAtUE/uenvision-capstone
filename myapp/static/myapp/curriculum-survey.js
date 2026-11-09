@@ -599,6 +599,21 @@
     };
   }
 
+  /* Every selected subject needs at least one skill before submitting. Marks the empty
+     skill boxes, scrolls to the first one and returns an error message, or '' when all
+     subjects have a skill. */
+  function missingSkillsError(wrap) {
+    var empty = qsa('.cs-subject-block', wrap).filter(function (b) { return !qs('.cs-chip', b); });
+    qsa('.cs-tagbox.is-missing', wrap).forEach(function (t) { t.classList.remove('is-missing'); });
+    if (!empty.length) return '';
+    empty.forEach(function (b) { var t = qs('.cs-tagbox', b); if (t) t.classList.add('is-missing'); });
+    try { empty[0].scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { empty[0].scrollIntoView(); }
+    var codes = empty.map(function (b) { return b.getAttribute('data-code'); });
+    return 'Please add at least one skill to every subject you selected (' +
+      codes.slice(0, 3).join(', ') + (codes.length > 3 ? ', …' : '') +
+      '). If a subject doesn’t belong, remove it.';
+  }
+
   /* Every chosen skill needs a level before submitting. Marks the empty ones and
      returns an error message, or '' when all are set. */
   function missingLevelError(form) {
@@ -890,6 +905,7 @@
     addSkills: addSkills,
     buildSkillPicker: buildSkillPicker,
     missingLevelError: missingLevelError,
+    missingSkillsError: missingSkillsError,
     PROFICIENCY_LEVELS: PROFICIENCY_LEVELS,
     IPA_LEVELS: IPA_LEVELS,
     LEARNER_IPA_LEVELS: LEARNER_IPA_LEVELS,

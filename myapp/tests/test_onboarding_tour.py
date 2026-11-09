@@ -39,7 +39,6 @@ class TourConfigTests(TestCase):
         self.assertIn("onboarding-tour.js", html)
         self.assertIn("onboarding-tour.css", html)
         self.assertIn('data-page="dashboard"', html)
-        self.assertEqual(cfg["urls"], {})
         self.assertNotIn(reverse("accounts"), html)
 
     def test_logged_out_pages_have_no_tour(self):
@@ -47,12 +46,18 @@ class TourConfigTests(TestCase):
         self.assertIsNone(tour_config(html))
         self.assertNotIn("onboarding-tour.js", html)
 
-    def test_administrators_get_the_admin_page_urls(self):
+    def test_administrators_are_flagged(self):
         admin = make("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR)
         self.client.force_login(admin)
         cfg = tour_config(self.client.get(reverse("dashboard")).content.decode())
         self.assertTrue(cfg["admin"])
-        self.assertEqual(cfg["urls"], {"extraction": reverse("data_extraction"), "accounts": reverse("accounts")})
+
+    def test_old_combined_admin_tour_counts_as_both(self):
+        # accounts that saw the old Data Extraction + Accounts tour don't get either part again
+        admin = make("old@ue.edu.ph", CustomUser.Role.ADMINISTRATOR, tours_seen=["results", "admin"])
+        self.client.force_login(admin)
+        cfg = tour_config(self.client.get(reverse("dashboard")).content.decode())
+        self.assertEqual(cfg["seen"], ["results", "extraction", "accounts"])
 
 
 class TourSeenTests(TestCase):
@@ -71,8 +76,18 @@ class TourSeenTests(TestCase):
         cfg = tour_config(self.client.get(reverse("help")).content.decode())
         self.assertEqual(cfg["seen"], ["results", "survey"])
 
+    def test_admin_page_tours_are_saved_separately(self):
+        self.client.force_login(make("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR))
+        self.client.post(reverse("tour_seen"), {"tour": "extraction"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        cfg = tour_config(self.client.get(reverse("help")).content.decode())
+        self.assertEqual(cfg["seen"], ["extraction"])
+        self.client.post(reverse("tour_seen"), {"tour": "accounts"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        cfg = tour_config(self.client.get(reverse("help")).content.decode())
+        self.assertEqual(cfg["seen"], ["extraction", "accounts"])
+
     def test_unknown_tour_and_get_are_refused(self):
         self.assertEqual(self.client.post(reverse("tour_seen"), {"tour": "nope"}).status_code, 400)
+        self.assertEqual(self.client.post(reverse("tour_seen"), {"tour": "admin"}).status_code, 400)
         self.assertEqual(self.client.get(reverse("tour_seen")).status_code, 405)
         self.user.refresh_from_db()
         self.assertEqual(self.user.tours_seen, [])
@@ -98,11 +113,11 @@ class TourSeenTests(TestCase):
 class PromotionTests(TestCase):
     def setUp(self):
         self.admin = make("boss@ue.edu.ph", CustomUser.Role.ADMINISTRATOR)
-        self.fac = make("zed@ue.edu.ph", CustomUser.Role.FACULTY, tours_seen=["survey", "results", "admin"])
+        self.fac = make("zed@ue.edu.ph", CustomUser.Role.FACULTY, tours_seen=["survey", "results", "extraction", "accounts"])
         self.client.force_login(self.admin)
         self.fields = {"last_name": "User", "first_name": "T", "email": "zed@ue.edu.ph"}
 
-    def test_promotion_to_administrator_makes_the_admin_tour_unseen(self):
+    def test_promotion_to_administrator_makes_both_admin_tours_unseen(self):
         self.client.post(reverse("account_edit", args=[self.fac.pk]), {**self.fields, "account_type": "administrator"})
         self.fac.refresh_from_db()
         self.assertEqual(self.fac.role, "administrator")
@@ -111,14 +126,21 @@ class PromotionTests(TestCase):
     def test_other_edits_keep_the_tours(self):
         self.client.post(reverse("account_edit", args=[self.fac.pk]), {**self.fields, "first_name": "Zed", "account_type": "faculty"})
         self.fac.refresh_from_db()
-        self.assertEqual(self.fac.tours_seen, ["survey", "results", "admin"])
+        self.assertEqual(self.fac.tours_seen, ["survey", "results", "extraction", "accounts"])
+
+    def test_promotion_also_clears_the_old_combined_tour(self):
+        old = make("old@ue.edu.ph", CustomUser.Role.FACULTY, tours_seen=["survey", "admin"])
+        self.client.post(reverse("account_edit", args=[old.pk]),
+                         {"last_name": "User", "first_name": "T", "email": "old@ue.edu.ph", "account_type": "administrator"})
+        old.refresh_from_db()
+        self.assertEqual(old.tours_seen, ["survey"])
 
     def test_an_administrator_staying_one_keeps_it(self):
-        other = make("adm2@ue.edu.ph", CustomUser.Role.ADMINISTRATOR, tours_seen=["admin"])
+        other = make("adm2@ue.edu.ph", CustomUser.Role.ADMINISTRATOR, tours_seen=["extraction", "accounts"])
         self.client.post(reverse("account_edit", args=[other.pk]),
                          {"last_name": "User", "first_name": "T", "email": "adm2@ue.edu.ph", "account_type": "administrator"})
         other.refresh_from_db()
-        self.assertEqual(other.tours_seen, ["admin"])
+        self.assertEqual(other.tours_seen, ["extraction", "accounts"])
 
 
 class ReplayLinkTests(TestCase):
@@ -127,14 +149,17 @@ class ReplayLinkTests(TestCase):
         html = self.client.get(reverse("help")).content.decode()
         self.assertIn(reverse("alumni_survey") + "?tour=survey", html)
         self.assertIn(reverse("student_dashboard") + "?tour=results", html)
-        self.assertNotIn("?tour=admin", html)
+        self.assertNotIn("?tour=extraction", html)
+        self.assertNotIn("?tour=accounts", html)
 
-    def test_administrator_also_gets_the_admin_tour(self):
+    def test_administrator_also_gets_the_two_admin_tours(self):
         self.client.force_login(make("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR))
         html = self.client.get(reverse("help")).content.decode()
         self.assertIn(reverse("professor_survey") + "?tour=survey", html)
         self.assertIn(reverse("dashboard") + "?tour=results", html)
-        self.assertIn(reverse("dashboard") + "?tour=admin", html)
+        self.assertIn(reverse("data_extraction") + "?tour=extraction", html)
+        self.assertIn(reverse("accounts") + "?tour=accounts", html)
+        self.assertNotIn("?tour=admin", html)
 
 
 class TourTargetTests(IsolatedDataMixin, TestCase):
@@ -176,6 +201,13 @@ class TourTargetTests(IsolatedDataMixin, TestCase):
         html = self.client.get(reverse("alumni_survey")).content.decode()
         self.assertIn('id="alumni-select-all-years"', html)
         self.assertIn("#alumni-earlier-subjects .cs-subject-grid", html)
+
+    def test_admin_tours_stay_on_their_own_page(self):
+        js = (STATIC / "onboarding-tour.js").read_text(encoding="utf-8")
+        self.assertIn("function extractionSteps()", js)
+        self.assertIn("function accountsSteps()", js)
+        self.assertNotIn("adminSteps", js)
+        self.assertNotIn("window.location.href", js)   # no tour moves to another page
 
     def test_admin_pages(self):
         admin = make("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR)

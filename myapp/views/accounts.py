@@ -269,9 +269,9 @@ def account_edit_view(request, pk):
         if moved:
             notes.append(f"Professor Survey answer{'' if moved == 1 else 's'} moved to the {target.get_role_display()} Survey.")
     if target.is_administrator and old_role not in (CustomUser.Role.ADMINISTRATOR, CustomUser.Role.DEVELOPER):
-        # promoted to administrator: the next page they open starts the Data Extraction and
-        # Accounts tour (onboarding-tour.js), even if they saw it in an earlier admin stint
-        target.tours_seen = [t for t in (target.tours_seen or []) if t != "admin"]
+        # promoted to administrator: Data Extraction and Accounts each start their own tour
+        # (onboarding-tour.js) the first time they open them, even after an earlier admin stint
+        target.tours_seen = [t for t in target.seen_tours() if t not in target.ADMIN_TOURS]
         data["tours_seen"] = target.tours_seen
     if target.role_label != old_label:
         notes.insert(0, f"Role changed from {old_label} to {target.role_label}.")

@@ -80,6 +80,13 @@ def _parse_curriculum_submission(request, needs_personal_info=True):
         skills = subj.get("skills")
         if skills is not None and (not isinstance(skills, list) or len(skills) > MAX_SKILLS_PER_SUBJECT):
             return None, "Malformed skills entry."
+    # every selected subject needs at least one skill (the page checks this too)
+    no_skills = [str(s.get("code") or s.get("name") or "a subject") for s in subjects
+                 if not any(isinstance(k, dict) and str(k.get("name") or "").strip() for k in (s.get("skills") or []))]
+    if no_skills:
+        return None, ("Please add at least one skill to every subject you selected ("
+                      + ", ".join(no_skills[:3]) + (", …" if len(no_skills) > 3 else "")
+                      + "). If a subject doesn’t belong, remove it.")
     return payload, None
 
 

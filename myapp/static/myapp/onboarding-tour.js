@@ -1,12 +1,13 @@
 /* UEnvision — onboarding tours (spotlight walkthrough).
    The page is dimmed, one part stays lit, and a short card with an arrow explains it.
-   Three tours, each shown once per account (saved on the account through cfg.saveUrl):
+   Four tours, each shown once per account (saved on the account through cfg.saveUrl):
      * "survey"  — on the student / alumni / professor survey, before the first answer
                    (only while survey-first.js says the survey is still required).
      * "results" — on My skill gap (students, alumni) or the Dashboard (faculty, administrators).
-     * "admin"   — administrators: Data Extraction, then Accounts. It moves between the pages
-                   itself (its place is kept in sessionStorage). Promoting someone to
-                   administrator makes it unseen again (views.accounts.account_edit_view).
+     * "extraction" — administrators, the first time they open Data Extraction.
+     * "accounts"   — administrators, the first time they open Accounts.
+                   Each runs on its own page only. Promoting someone to administrator makes
+                   both unseen again (views.accounts.account_edit_view).
    How to use replays any tour with ?tour=<name>. A step whose part of the page isn't there
    (hidden for this account, or not drawn yet) is skipped, so the steps follow the real page.
    On phones the menu is hidden, so menu steps point at the ☰ button instead.
@@ -20,7 +21,6 @@
   var me = document.currentScript;
   var PAGE = (me && me.getAttribute('data-page')) || '';
   var CSRF = (me && me.getAttribute('data-csrf')) || '';
-  var RUN_KEY = 'ue_tour_run';
   var seen = (cfg.seen || []).slice();
 
   /* ---------------- helpers ---------------- */
@@ -108,14 +108,21 @@
           text: 'Choose your last term at UE. Its subjects appear below, and Select all subjects from every year ticks your whole curriculum.' }
       : { sel: ['.cs-subject-tools', '.cs-section:has(#professor-current-subjects)'], title: 'Ways to find your subjects',
           text: 'Find a subject searches by code or name, and + Add a subject that isn’t listed is for electives.' });
+    // the whole picker is lit: the subject search plus every semester's list (not just this
+    // semester's), so earlier semesters can be ticked here too and aren't skipped
+    var pickerSel = role === 'alumni' ? '.cs-section:has(#alumni-subjects)' : '#' + p + '-subject-picker';
     steps.push(
       // hands-on: the tour waits here until a subject is ticked
-      { sel: [gridSel + ' .cs-subject-grid', gridSel], keep: true, hands: true, need: ticked,
-        title: role === 'faculty' ? 'Now tick a subject you teach' : 'Now tick a subject',
+      { sel: [pickerSel, gridSel + ' .cs-subject-grid', gridSel], keep: true, hands: true, need: ticked,
+        title: role === 'faculty' ? 'Now tick the subjects you teach' : 'Now tick your subjects',
         text: role === 'faculty'
-          ? 'Click a subject you teach this semester. A skill box for it opens below. You can tick the rest after the tour.'
-          : 'Click a subject you took. A skill box for it opens below. You can tick the rest after the tour.',
-        doneText: 'Nice! Tick any others now if you like, then press Next.' },
+          ? 'Tick every subject you teach this semester and every one you taught last semester. Scroll down for the earlier semesters, or type a code or name in Find a subject. A skill box opens below for each one.'
+          : role === 'alumni'
+          ? 'Tick the subjects you took. Scroll down for the earlier years too. A skill box opens below for each one.'
+          : 'Tick the subjects you took this semester and in earlier semesters. Scroll down for the earlier ones, or type a code or name in Find a subject. A skill box opens below for each one.',
+        doneText: role === 'faculty'
+          ? 'Nice! Now tick the rest you teach, including last semester’s, then press Next.'
+          : 'Nice! Now tick the rest you took, including earlier semesters, then press Next.' },
       { sel: [skillsSection], title: 'What is a technical skill?',
         text: 'A tool, language or method you can actually use' + (role === 'faculty' ? ' and teach' : '') + ' in IT work, like Python, SQL, Git, Figma or setting up a network. Teamwork and communication are soft skills, so leave those out here.' },
       // hands-on: the tour waits here until a skill is added to a subject
@@ -183,35 +190,38 @@
     ];
   }
 
-  function adminSteps() {
+  function extractionSteps() {
     return [
-      { title: 'You’re now an administrator',
-        text: 'You can now run data extraction and manage accounts. Here is a 2-minute tour of both.' },
-      { sel: ['[data-tour="nav-data"]'], menu: 'Data', title: 'Data extraction is under Data',
-        text: 'Open Data, then the Data Extraction tab. Next takes you there.' },
-      { page: 'extraction', sel: ['.data-tabs'], title: 'Tabs only administrators see',
+      { title: 'Data Extraction',
+        text: 'This is where new job postings come in and their skills are pulled out. Here is a 1-minute tour of the page.' },
+      { sel: ['.data-tabs'], title: 'Tabs only administrators see',
         text: 'Import Data, Data Extraction, Survey Responses and Recommendations are for administrators only.' },
-      { page: 'extraction', sel: ['#scrape > summary', '#scrape'], title: 'Scrape job postings',
+      { sel: ['#scrape > summary', '#scrape'], title: 'Scrape job postings',
         text: 'Pick the job sites and what to search: one keyword, or the CHED list of IT and CS job roles. The pause settings keep the sites from being overloaded.' },
-      { page: 'extraction', sel: ['#skills > summary', '#skills'], title: 'Extract the skills',
+      { sel: ['#skills > summary', '#skills'], title: 'Extract the skills',
         text: 'Gemini reads each posting and pulls out its skills. Add your Gemini API keys here, one per line.' },
-      { page: 'extraction', sel: ['#ghost > summary', '#ghost'], title: 'Mark ghost jobs',
+      { sel: ['#ghost > summary', '#ghost'], title: 'Mark ghost jobs',
         text: 'Postings that look fake or duplicated are only marked. Nothing is deleted.' },
-      { page: 'extraction', sel: ['#run'], title: 'Run it',
+      { sel: ['#run'], title: 'Run it',
         text: 'Tick the steps you want, then press Run now. Settings on this page save by themselves.' },
-      { page: 'extraction', sel: ['#automation > summary', '#automation'], title: 'Or run it on a schedule',
+      { sel: ['#automation > summary', '#automation'], title: 'Or run it on a schedule',
         text: 'Turn on Automation to run every step by itself, every few days or on set weekdays.' },
-      { page: 'extraction', sel: ['[data-tour="nav-console"]'], menu: 'Console', title: 'Watch a run',
-        text: 'The Console shows the progress and log of every run as it happens.' },
-      { page: 'accounts', sel: ['[data-tour="nav-accounts"]'], menu: 'Accounts', title: 'Manage accounts',
-        text: 'Everything about user accounts is on this page.' },
-      { page: 'accounts', sel: ['#add-account-btn'], title: 'Add an account',
+      { sel: ['[data-tour="nav-console"]'], menu: 'Console', title: 'Watch a run',
+        text: 'The Console shows the progress and log of every run as it happens.' }
+    ];
+  }
+
+  function accountsSteps() {
+    return [
+      { title: 'Accounts',
+        text: 'Everything about user accounts is on this page. Here is a 1-minute tour.' },
+      { sel: ['#add-account-btn'], title: 'Add an account',
         text: 'Create an account for a student, alumnus, faculty member or administrator.' },
-      { page: 'accounts', sel: ['.acct-toolbar'], title: 'Find an account',
+      { sel: ['.acct-toolbar'], title: 'Find an account',
         text: 'Search by name or email. Filter narrows the list by role, approval or test accounts.' },
-      { page: 'accounts', sel: ['.acct-pending-note', '#accounts-table'], title: 'Approve new faculty',
+      { sel: ['.acct-pending-note', '#accounts-table'], title: 'Approve new faculty',
         text: 'Faculty who sign up show Not approved yet. Approve real faculty, or use Move to Student for a student who picked the wrong role.' },
-      { page: 'accounts', sel: ['#accounts-table .row-actions'], title: 'Edit, reset or remove',
+      { sel: ['#accounts-table .row-actions'], title: 'Edit, reset or remove',
         text: 'Change someone’s name or role, send a new temporary password, or remove the account.' }
     ];
   }
@@ -219,7 +229,8 @@
   function stepsFor(name) {
     if (name === 'survey') return surveyRole ? surveySteps(surveyRole) : null;
     if (name === 'results') return resultsKind ? resultsSteps(resultsKind) : null;
-    if (name === 'admin') return cfg.admin && inApp ? adminSteps() : null;
+    if (name === 'extraction') return cfg.admin && adminPage === 'extraction' ? extractionSteps() : null;
+    if (name === 'accounts') return cfg.admin && adminPage === 'accounts' ? accountsSteps() : null;
     return null;
   }
 
@@ -290,20 +301,11 @@
     // skip steps whose part of the page isn't there (hidden for this account or not drawn yet)
     while (i >= 0 && i < steps.length) {
       var s = steps[i];
-      if (s.page && s.page !== adminPage) break;          // on another page: go there
       if (!s.sel || find(s.sel) || (s.menu && menuButton())) break;
       i += dir;
     }
     if (i < 0) return;                                    // nothing before this one
     if (i >= steps.length) { finish(); return; }
-    var step = steps[i];
-    if (step.page && step.page !== adminPage) {
-      var url = cfg.urls && cfg.urls[step.page];
-      if (!url) { finish(); return; }
-      try { sessionStorage.setItem(RUN_KEY, JSON.stringify({ name: run.name, i: i })); } catch (e) { finish(); return; }
-      window.location.href = url;
-      return;
-    }
     run.i = i;
     render();
   }
@@ -329,7 +331,6 @@
       text = 'Open the menu (☰) and tap ' + step.menu + '. ' + text;
     }
     var last = run.i === n - 1;
-    var nextIsElsewhere = !last && steps[run.i + 1].page && steps[run.i + 1].page !== adminPage;
     var dots = '';
     for (var k = 0; k < n; k++) dots += '<i' + (k === run.i ? ' class="is-on"' : '') + '></i>';
     ui.tip.innerHTML =
@@ -342,7 +343,7 @@
           (run.i > 0 ? '<button type="button" class="btn btn-ghost btn-sm" data-uet="back">Back</button>' : '') +
           '<button type="button" class="btn btn-red btn-sm" data-uet="' + (last ? 'done' : 'next') + '"' +
             (handsOn && !step.need() ? ' aria-disabled="true"' : '') + '>' +
-            (last ? 'Done' : nextIsElsewhere ? 'Next: open it' : 'Next') + '</button>' +
+            (last ? 'Done' : 'Next') + '</button>' +
         '</span></div>' +
         (handsOn ? '<p class="uet-wait" role="status"' + (step.need() ? ' hidden' : '') + '>Try it on the page to continue.</p>' : '');
     ui.root.classList.toggle('uet--hands', handsOn);
@@ -436,11 +437,14 @@
     var r = litRect(target), pad = 6;
     var hx = Math.max(4, r.left - pad), hy = Math.max(4, r.top - pad);
     var hr = Math.min(W - 4, r.right + pad), hb = Math.min(H - 4, r.bottom + pad);
+    var gap = 44, side, tx, ty, cur = run.steps[run.i];
+    // hands-on part taller than the screen (every semester's subject list): keep the card
+    // in a strip at the bottom, off the subjects, and let the list scroll through the lit area
+    if (handsOn && cur && !cur.dropRoom && hb > H - tipH - gap - 12 && hy < H - tipH - gap - 160) hb = H - tipH - gap - 12;
     var hw = Math.max(0, hr - hx), hh = Math.max(0, hb - hy);
     setBox(ui.hole, hx, hy, hw, hh);
     // hands-on: the lit part can be clicked, everything else stays blocked
     if (handsOn) ui.block.style.clipPath = "path(evenodd, 'M0 0H" + W + 'V' + H + "H0Z M" + hx + ' ' + hy + 'h' + hw + 'v' + hh + 'h' + (-hw) + "Z')";
-    var gap = 44, side, tx, ty, cur = run.steps[run.i];
     if (handsOn && cur && cur.dropRoom && hy - gap - tipH >= 10) { side = 'above'; ty = hy - gap - tipH; }
     else if (hy + hh + gap + tipH <= H - 10) { side = 'below'; ty = hy + hh + gap; }
     else if (hy - gap - tipH >= 10) { side = 'above'; ty = hy - gap - tipH; }
@@ -505,10 +509,8 @@
     var steps = stepsFor(name);
     if (!steps) return false;
     if (name !== 'survey') hideWelcomeCard();
-    if (name !== 'admin') {
-      // one-page tours: leave out parts this account's page doesn't have, so "Step 3 of 8" counts true
-      steps = steps.filter(function (s) { return s.keep || !s.sel || find(s.sel) || (s.menu && menuButton()); });
-    }
+    // leave out parts this account's page doesn't have, so "Step 3 of 8" counts true
+    steps = steps.filter(function (s) { return s.keep || !s.sel || find(s.sel) || (s.menu && menuButton()); });
     run = { name: name, steps: steps, i: 0 };
     if (!ui) buildUI();
     document.documentElement.classList.add('uet-open');
@@ -531,12 +533,10 @@
     var name = run && run.name;
     run = null; target = null;
     stopHands(); handsOn = false;
-    try { sessionStorage.removeItem(RUN_KEY); } catch (e) { /* storage blocked */ }
+    try { sessionStorage.removeItem('ue_tour_run'); } catch (e) { /* left over from the old two-page tour */ }
     destroyUI();
     if (!name) return;
     markSeen(name);
-    // a new administrator who just finished the Dashboard tour goes straight on to theirs
-    if (name === 'results' && cfg.admin && seen.indexOf('admin') === -1) setTimeout(function () { start('admin'); }, 250);
   }
 
   window.UETour = { start: start };
@@ -549,18 +549,12 @@
       params.delete('tour');
       var rest = params.toString();
       try { window.history.replaceState(null, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash); } catch (e) {}
-      try { sessionStorage.removeItem(RUN_KEY); } catch (e) {}
       if (stepsFor(asked)) return { name: asked, i: 0 };
-    }
-    var saved = null;
-    try { saved = JSON.parse(sessionStorage.getItem(RUN_KEY) || 'null'); } catch (e) { saved = null; }
-    if (saved && saved.name) {
-      try { sessionStorage.removeItem(RUN_KEY); } catch (e) {}
-      if (stepsFor(saved.name)) return { name: saved.name, i: saved.i || 0 };
     }
     if (surveyRole && document.getElementById('survey-first') && seen.indexOf('survey') === -1) return { name: 'survey', i: 0 };
     if (resultsKind && seen.indexOf('results') === -1) return { name: 'results', i: 0 };
-    if (cfg.admin && inApp && !surveyRole && seen.indexOf('admin') === -1) return { name: 'admin', i: 0 };
+    // administrators: each admin page has its own tour, the first time they open that page
+    if (cfg.admin && inApp && adminPage && seen.indexOf(adminPage) === -1) return { name: adminPage, i: 0 };
     return null;
   }
 

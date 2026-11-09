@@ -32,6 +32,8 @@
 .cs-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .cs-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 .cs-panel form > .field, .cs-panel form > .cs-row-2, .cs-panel form > .cs-row-3, .cs-panel form > .cs-section { margin-bottom: 16px; }
+/* the subject search and every semester's list sit in one box, so the onboarding tour can light them all */
+.cs-subject-picker > .cs-section { margin-bottom: 16px; }
 
 .cs-section { border-top: 1px solid var(--line); padding-top: 16px; }
 .cs-section:empty { display: none; }
@@ -109,6 +111,8 @@
 .cs-chip-level {
   font: inherit; font-size: .78rem; padding: 2px 4px; border: 1px solid #cfd5e2; border-radius: 6px; background: var(--surface); cursor: pointer;
 }
+/* a selected subject with no skill yet, flagged on submit; clears once a skill is added */
+.cs-tagbox.is-missing:not(:has(.cs-chip)) { border-color: #c8202f; box-shadow: 0 0 0 2px rgba(200,32,47,.18); }
 .cs-chip-level.is-missing { border-color: #c8202f; box-shadow: 0 0 0 2px rgba(200,32,47,.18); }
 .cs-chip-remove {
   width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: var(--muted);

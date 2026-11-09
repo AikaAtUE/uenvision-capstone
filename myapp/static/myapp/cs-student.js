@@ -302,6 +302,8 @@
         setFormError('student-error', 'Please select at least one previous-semester subject.');
         return;
       }
+      var skillsError = CS.missingSkillsError(blocksWrap);
+      if (skillsError) { setFormError('student-error', skillsError); return; }
 
       var subjects = Object.keys(pickers).map(function (code) {
         var p = pickers[code];

@@ -84,11 +84,22 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     THEMES = ("light", "dark", "system")
     theme = models.CharField(max_length=10, default="light", blank=True)
     # Onboarding tours (onboarding-tour.js) this account has finished or skipped:
-    # "survey" (how to answer the survey), "results" (My skill gap / Dashboard) and
-    # "admin" (Data Extraction and Accounts). Promoting someone to administrator takes
-    # "admin" out again so they get that tour (views.accounts.account_edit_view).
-    TOURS = ("survey", "results", "admin")
+    # "survey" (how to answer the survey), "results" (My skill gap / Dashboard),
+    # "extraction" (Data Extraction page) and "accounts" (Accounts page). Promoting someone to
+    # administrator takes the two admin tours out again (views.accounts.account_edit_view).
+    TOURS = ("survey", "results", "extraction", "accounts")
+    ADMIN_TOURS = ("extraction", "accounts")
     tours_seen = models.JSONField(default=list, blank=True)
+
+    def seen_tours(self):
+        """tours_seen, known tours only. "admin" was the old combined Data Extraction and
+        Accounts tour: an account that saw it has seen both of the tours it became."""
+        seen = []
+        for t in self.tours_seen or []:
+            for name in (self.ADMIN_TOURS if t == "admin" else (t,)):
+                if name in self.TOURS and name not in seen:
+                    seen.append(name)
+        return seen
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

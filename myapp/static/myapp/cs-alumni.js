@@ -320,6 +320,8 @@
         setFormError('alumni-error', 'Please select at least one subject from your last semester.');
         return;
       }
+      var skillsError = CS.missingSkillsError(blocksWrap);
+      if (skillsError) { setFormError('alumni-error', skillsError); return; }
       var employedChoice = (employedRadios.filter(function (r) { return r.checked; })[0] || {}).value;
       if (!employedChoice) {
         setFormError('alumni-error', 'Please answer whether you are currently employed.');

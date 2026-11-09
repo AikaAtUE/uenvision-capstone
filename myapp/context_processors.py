@@ -62,22 +62,15 @@ def skills_data_updated(request):
 
 def onboarding_tour(request):
     """{"tour_config": {...}} for onboarding-tour.js (base.html): which tours this account has
-    already seen, and the URLs the tour needs (saving "seen", and the pages the administrator
-    tour moves to). Logged-in users only."""
+    already seen, and where to save "seen". Logged-in users only."""
     from django.urls import reverse
 
     user = getattr(request, "user", None)
     if user is None or not user.is_authenticated:
         return {}
-    seen = [t for t in (user.tours_seen or []) if t in user.TOURS]
     return {"tour_config": {
-        "seen": seen,
+        "seen": user.seen_tours(),
         "learner": user.is_learner,
         "admin": user.is_administrator,
         "saveUrl": reverse("tour_seen"),
-        # admin page links only for administrators, so other users' pages never name them
-        "urls": {
-            "extraction": reverse("data_extraction"),
-            "accounts": reverse("accounts"),
-        } if user.is_administrator else {},
     }}

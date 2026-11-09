@@ -28,7 +28,8 @@ def help_view(request):
     tours = [("survey", "How to answer the survey", survey_url),
              ("results", "How to read your results" if user.is_learner else "How to use the Dashboard", results_url)]
     if user.is_administrator:
-        tours.append(("admin", "Data Extraction and Accounts (administrators)", reverse("dashboard")))
+        tours.append(("extraction", "Data Extraction (administrators)", reverse("data_extraction")))
+        tours.append(("accounts", "Accounts (administrators)", reverse("accounts")))
     return render(request, "help.html", {"active_page": "help", "show_all": user.is_developer,
                                          "idle_minutes": idle_minutes,
                                          "tours": [{"name": n, "label": l, "url": f"{u}?tour={n}"} for n, l, u in tours]})
@@ -42,7 +43,7 @@ def tour_seen_view(request):
     name = request.POST.get("tour", "")
     if name not in request.user.TOURS:
         return JsonResponse({"ok": False, "error": "Unknown tour."}, status=400)
-    seen = [t for t in (request.user.tours_seen or []) if t in request.user.TOURS]
+    seen = request.user.seen_tours()
     if name not in seen:
         seen.append(name)
         request.user.tours_seen = seen

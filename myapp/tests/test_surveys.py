@@ -801,7 +801,7 @@ class HigherYearSubjectTests(TestCase):
         payload = {"consent": True, "has_previous": False,
                    "personal_info": {"name": "S", "ue_email": "s@ue.edu.ph", "course": "BSIT", "student_number": "1",
                                      "year_level": 1, "section": "A"},
-                   "subjects": [{"code": y1["current"]["subjects"][0]["code"], "term": "current", "skills": []},
+                   "subjects": [{"code": y1["current"]["subjects"][0]["code"], "term": "current", "skills": [{"name": "Python", "level": "introduced"}]},
                                 {"code": later["code"], "term": "later", "skills": [{"name": "Python", "level": "introduced"}]}]}
         login_administrator(self.client)
         r = self.client.post(reverse("student_survey_submit"), content_type="application/json", data=json.dumps(payload))
@@ -835,7 +835,7 @@ class LearnerElectiveTests(TestCase):
         return {"consent": True, "has_previous": False,
                 "personal_info": {"name": "S", "ue_email": "s@ue.edu.ph", "course": "BSIT", "student_number": "1",
                                   "year_level": 1, "section": "A"},
-                "subjects": [{"code": y1["current"]["subjects"][0]["code"], "term": "current", "skills": []}] + extra}
+                "subjects": [{"code": y1["current"]["subjects"][0]["code"], "term": "current", "skills": [{"name": "Python", "level": "introduced"}]}] + extra}
 
     def test_elective_placeholders_are_not_offered(self):
         from .. import curriculum_data
@@ -861,7 +861,7 @@ class LearnerElectiveTests(TestCase):
 
     def test_added_subject_must_not_reuse_a_listed_code(self):
         r = self.client.post(reverse("student_survey_submit"), content_type="application/json", data=json.dumps(
-            self.student_payload([{"code": "CIT EL02", "name": "Elective", "custom": True, "skills": []}])))
+            self.student_payload([{"code": "CIT EL02", "name": "Elective", "custom": True, "skills": [{"name": "Python", "level": "introduced"}]}])))
         self.assertEqual(r.status_code, 400)
 
     def test_alumni_can_add_a_subject_and_the_page_offers_it(self):
@@ -872,8 +872,8 @@ class LearnerElectiveTests(TestCase):
         payload = {"consent": True,
                    "personal_info": {"name": "A", "ue_email": "a@ue.edu.ph", "course": "BSIT", "student_number": "1",
                                      "year_graduated": "2025"},
-                   "subjects": [{"code": last["code"], "skills": []},
-                                {"code": "CIT 4199", "name": "Game Development", "custom": True, "skills": []}],
+                   "subjects": [{"code": last["code"], "skills": [{"name": "Python", "level": "introduced"}]},
+                                {"code": "CIT 4199", "name": "Game Development", "custom": True, "skills": [{"name": "Unity", "level": "introduced"}]}],
                    "employment": {"status": "unemployed"}}
         r = self.client.post(reverse("alumni_survey_submit"), content_type="application/json", data=json.dumps(payload))
         self.assertEqual(r.status_code, 200, r.content)
