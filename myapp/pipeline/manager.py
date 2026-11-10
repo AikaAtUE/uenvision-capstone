@@ -83,6 +83,23 @@ def extracted_csv() -> Path:
     return data_dir() / "extracted_skills.csv"
 
 
+def datasets_dir() -> Path:
+    """Public job datasets brought in with Import Data (data/datasets/<name>.csv)."""
+    return data_dir() / "datasets"
+
+
+def dataset_csv(name: str) -> Path:
+    return datasets_dir() / f"{name}.csv"
+
+
+def list_datasets() -> list[str]:
+    """Names of the imported public datasets (also their source label in Extracted Skills)."""
+    d = datasets_dir()
+    if not d.is_dir():
+        return []
+    return sorted(p.stem for p in d.glob("*.csv") if DATASET_NAME_RE.match(p.stem))
+
+
 def skills_data_updated():
     """When the skills data the charts read was last written (the last Extract Skills run or
     Import Data that wrote extracted_skills.csv), as an aware datetime, or None if there is none.
@@ -164,6 +181,8 @@ def ensure_dirs() -> None:
 
 
 def table_path(key: str) -> Path:
+    if key.startswith("dataset:"):
+        return dataset_csv(key.split(":", 1)[1])
     return data_dir() / TABLES[key][1]
 
 
@@ -291,6 +310,7 @@ def disk_summary() -> dict:
             "json_count": count_json(s),
             "compiled": _file_info(compiled_csv(s)),
         }
+    out["datasets"] = {name: _file_info(dataset_csv(name)) for name in list_datasets()}
     return out
 
 
@@ -786,6 +806,18 @@ def build_steps(cfg: dict) -> list[dict]:
             steps.append({"name": f"extract_{src}", "label": f"Extract skills — {SOURCE_LABELS[src]}",
                           "continue_on_fail": True, "argv": argv})
 
+    if cfg.get("do_extract"):
+        # Imported public datasets (Import Data): already one row per job in a fixed layout.
+        for name in cfg.get("datasets") or []:
+            argv = [py, "-u", str(PIPELINE_DIR / "extract_skills_gemini.py"), str(dataset_csv(name)),
+                    f"--keys={api_keys_path()}", "--output=extracted_skills",
+                    f"--output-dir={data_dir()}", f"--json-dir={state_dir()}",
+                    f"--model={cfg['model']}", f"--batch-size={cfg['batch_size']}",
+                    f"--source-label={name}", "--text-columns=description",
+                    "--company-cols=company_name", "--job-cols=" + ",".join(DATASET_JOB_COLS)]
+            steps.append({"name": f"extract_dataset_{name}", "label": f"Extract skills — {name} dataset",
+                          "continue_on_fail": True, "argv": argv})
+
     if cfg.get("do_standardize"):
         # After extraction: map the hard skills onto the ontology (exact -> fuzzy candidates -> Gemini).
         steps.append({"name": "standardize", "label": "Standardize hard skills", "continue_on_fail": True, "argv": [
@@ -875,6 +907,7 @@ def start_run(cfg: dict, kind: str = "extraction", wait: bool = False) -> str | 
     if not steps:
         return "Nothing to run: tick at least one step and one job source."
     sources = [s for s in cfg.get("sources") or [] if s in SOURCES]
+    datasets = list(cfg.get("datasets") or [])
 
     if cfg.get("do_extract"):
         if count_api_keys() == 0:
@@ -910,7 +943,8 @@ def start_run(cfg: dict, kind: str = "extraction", wait: bool = False) -> str | 
                    "It keeps going in the background, so you can leave this page.", "INFO")
     state = {
         "status": "running", "kind": kind,
-        "source": (" + ".join(SOURCE_LABELS[x] for x in sources) if sources else "Skills data")
+        "source": (" + ".join([SOURCE_LABELS[x] for x in sources] + [f"{x} dataset" for x in datasets])
+                   or "Skills data")
                   + (" (automatic run)" if kind == "automation" else ""),
         "started_at": _now(), "heartbeat": _now(),
         "finished_at": None, "current": None, "pid": None, "error": None,
@@ -1009,7 +1043,107 @@ IMPORT_TYPES = {
     **{f"json_{s.key}": (f"{s.label} job JSONs", "json", s.key) for s in SOURCE_REGISTRY},
     **{f"csv_{s.key}": (f"Compiled {s.label} CSV", "csv", s.key) for s in SOURCE_REGISTRY},
     "csv_extracted": ("Extracted skills CSV", "csv", "extracted"),
+    "csv_dataset": ("Public job dataset CSV", "dataset", None),
 }
+
+# ---------------------------------------------------------------------------
+# Public job datasets (e.g. a Hugging Face CSV): any CSV with one job posting per row.
+# Its columns are matched to the layout below by name, so data/datasets/<name>.csv can go
+# through the same skill extraction, standardizing and ghost job check as a scraped source.
+# ---------------------------------------------------------------------------
+DATASET_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{1,39}$")
+DATASET_COLUMNS = {     # our column -> the names it may have in a dataset, in order of preference
+    "job_id": ("job_id", "record_id", "id", "posting_id", "source_job_id"),
+    "job_title": ("job_title", "title", "job_name", "position", "role"),
+    "description": ("description", "job_description", "jd", "details", "text"),
+    "company_name": ("company_name", "company", "employer", "organization"),
+    "created_at": ("created_at", "posting_date", "date_posted", "posted_at", "date", "post_date"),
+    "function": ("function", "source_job_category", "category", "job_category", "industry"),
+}
+DATASET_REQUIRED = ("job_title", "description")
+DATASET_JOB_COLS = ("function", "created_at")
+
+
+def dataset_column_map(columns) -> dict:
+    """{our column: the dataset's column} for every one that was found (case-insensitive)."""
+    lower = {c.strip().lower(): c for c in columns}
+    out = {}
+    for ours, names in DATASET_COLUMNS.items():
+        for n in names:
+            if n in lower and lower[n] not in out.values():
+                out[ours] = lower[n]
+                break
+    return out
+
+
+def check_dataset_name(name: str) -> str | None:
+    if name in SOURCES or name in ("extracted", "custom_skills", "hard_skills", "soft_skills"):
+        return f"“{name}” is already used by UEnvision. Pick another name for the dataset."
+    if not DATASET_NAME_RE.match(name):
+        return ("The dataset name must be 2 to 40 lowercase letters, numbers, - or _, starting with a letter "
+                "(for example djinni or hf-it-jobs).")
+    return None
+
+
+def import_dataset(name: str, upload, merge: bool) -> dict:
+    """Save a public job dataset CSV as data/datasets/<name>.csv (one row per job, our column names).
+    Returns counts and which of its columns were used."""
+    ensure_dirs()
+    error = check_dataset_name(name)
+    if error:
+        raise ValueError(error)
+    columns, new_rows = _read_csv_upload(upload)
+    if not columns:
+        raise ValueError("That CSV has no header row.")
+    cmap = dataset_column_map(columns)
+    missing = [c for c in DATASET_REQUIRED if c not in cmap]
+    if missing:
+        raise ValueError("Couldn't find a column for " + " and ".join(
+            f"{c} (tried {', '.join(DATASET_COLUMNS[c])})" for c in missing) + ".")
+    if not new_rows:
+        raise ValueError("That CSV has no data rows.")
+
+    path = dataset_csv(name)
+    existing = []
+    if merge and path.is_file():
+        with open(path, "r", encoding="utf-8-sig", newline="") as f:
+            existing = list(csv.DictReader(f))
+    seen = {r.get("job_id", "") for r in existing}
+    added = skipped = 0
+    for n, r in enumerate(new_rows, start=1):
+        row = {ours: (r.get(theirs) or "").strip() for ours, theirs in cmap.items()}
+        raw_id = row.get("job_id") or f"row-{n}"
+        # Prefixed, so a dataset's ids never clash with Kalibrr's / Foundit's numeric ids in Extracted Skills.
+        row["job_id"] = raw_id if raw_id.lower().startswith(name + "-") else f"{name}-{raw_id}"
+        if not row.get("job_title") or not row.get("description") or row["job_id"] in seen:
+            skipped += 1
+            continue
+        seen.add(row["job_id"])
+        existing.append(row)
+        added += 1
+
+    buf = io.StringIO(newline="")
+    w = csv.DictWriter(buf, fieldnames=list(DATASET_COLUMNS), extrasaction="ignore", lineterminator="\r\n")
+    w.writeheader()
+    w.writerows(existing)
+    _atomic_write_text(path, buf.getvalue(), encoding="utf-8-sig")
+    _table_cache.pop(f"dataset:{name}", None)
+    return {"added": added, "skipped": skipped, "total": len(existing),
+            "columns": {ours: theirs for ours, theirs in cmap.items()}}
+
+
+def start_dataset_run(name: str, do_extract: bool, do_standardize: bool, do_ghost: bool) -> str | None:
+    """Run the ticked steps (skill extraction, standardizing, ghost job check) for one imported
+    dataset, with the model and rows per prompt saved under Data Extraction > Skill Extraction."""
+    if not dataset_csv(name).is_file():
+        return f"There's no imported dataset called {name}."
+    saved = get_extract_settings()
+    cfg = {"sources": [], "datasets": [name] if do_extract else [],
+           "do_scrape": False, "do_compile": False, "searches": [],
+           "do_extract": do_extract, "do_standardize": do_standardize, "standardize": do_standardize,
+           "do_ghost": do_ghost, "model": saved["model"], "batch_size": saved["batch_size"],
+           "delay_min": None, "delay_max": None}
+    return start_run(cfg, kind="import")
 
 _SAFE_RE = re.compile(r"[^A-Za-z0-9_-]+")
 _TRABAJO_ID_RE = re.compile(r"^\d+-[A-Za-z0-9]{8,64}$")

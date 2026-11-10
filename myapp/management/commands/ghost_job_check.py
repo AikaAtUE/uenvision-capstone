@@ -30,3 +30,10 @@ class Command(BaseCommand):
                           f"{cfg['weak_signs_needed']} weak sign(s) needed.")
         self.stdout.write(f"{len(flagged)} posting(s) marked as possible ghost jobs; "
                           f"{excluded} of them are left out when \"Exclude possible ghost jobs\" is on.")
+        by_source = {}
+        for (source, _job_id), info in found.items():
+            counts = by_source.setdefault(source or "(no source)", [0, 0])
+            counts[0] += 1
+            counts[1] += bool(info["flagged"])
+        for source, (total, marked) in sorted(by_source.items()):
+            self.stdout.write(f"  {source}: {marked} of {total} posting(s) marked")

@@ -9,6 +9,10 @@
       <tr><td><code>data/compiled_{{ key }}.csv</code></td>
         <td>{% if s.compiled.exists %}{{ s.compiled.size|filesizeformat }} · updated <time datetime="{{ s.compiled.modified }}" class="js-time">{{ s.compiled.modified }}</time>{% else %}<span class="muted">not created yet</span>{% endif %}</td></tr>
     {% endfor %}
+    {% for name, f in summary.datasets.items %}
+      <tr><td><code>data/datasets/{{ name }}.csv</code></td>
+        <td>{{ f.size|filesizeformat }} · updated <time datetime="{{ f.modified }}" class="js-time">{{ f.modified }}</time></td></tr>
+    {% endfor %}
       <tr><td><code>data/extracted_skills.csv</code></td>
         <td>{% if summary.extracted.exists %}{{ summary.extracted.size|filesizeformat }} · updated <time datetime="{{ summary.extracted.modified }}" class="js-time">{{ summary.extracted.modified }}</time>{% else %}<span class="muted">not created yet</span>{% endif %}</td></tr>
     </tbody>

@@ -116,6 +116,8 @@ def data_import_view(request):
             return redirect("data_import")
         label, fmt, target = pipeline.IMPORT_TYPES[kind]
 
+        if fmt == "dataset":
+            return _import_dataset(request, files)
         if fmt == "json":
             res = pipeline.import_json_files(target, files, overwrite=request.POST.get("mode") == "replace")
             for err in res["errors"]:
@@ -152,7 +154,39 @@ def data_import_view(request):
         return redirect("data_import")
 
     return render(request, "data_import.html", _data_ctx(
-        request, "import", summary=pipeline.disk_summary(), import_types=pipeline.IMPORT_TYPES))
+        request, "import", summary=pipeline.disk_summary(), import_types=pipeline.IMPORT_TYPES,
+        datasets=pipeline.list_datasets(), key_count=pipeline.count_api_keys(),
+        extract_settings=pipeline.get_extract_settings()))
+
+
+def _import_dataset(request, files):
+    """Import Data > Public job dataset CSV: save it, then start the ticked steps (if any)."""
+    if len(files) > 1:
+        messages.error(request, "Import one CSV at a time.")
+        return redirect("data_import")
+    name = request.POST.get("dataset_name", "").strip().lower()
+    steps = {k: request.POST.get(k) == "on" for k in ("ds_extract", "ds_standardize", "ds_ghost")}
+    if pipeline.is_running() and any(steps.values()):
+        messages.error(request, "A scrape or extraction run is going. Wait for it to finish (or stop it), "
+                                "or untick the steps to only import the file.")
+        return redirect("data_import")
+    try:
+        res = pipeline.import_dataset(name, files[0], merge=request.POST.get("mode") != "replace")
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect("data_import")
+    used = ", ".join(f"{theirs} → {ours}" for ours, theirs in res["columns"].items())
+    messages.success(
+        request,
+        f"{name} dataset: {res['added']} job(s) added, {res['skipped']} skipped (already there, or no title "
+        f"or description); {res['total']} job(s) now in data/datasets/{name}.csv. Columns used: {used}.")
+    if not any(steps.values()):
+        return redirect("data_import")
+    error = pipeline.start_dataset_run(name, steps["ds_extract"], steps["ds_standardize"], steps["ds_ghost"])
+    if error:
+        messages.error(request, error)
+        return redirect("data_import")
+    return redirect("console")
 
 
 @administrator_required
