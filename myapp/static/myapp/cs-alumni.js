@@ -25,6 +25,7 @@
       LEARNER_LEVELS = CS.LEARNER_IPA_LEVELS,
       domId = CS.domId,
       termTagsHtml = CS.termTagsHtml,
+      wireSubjectFilter = CS.wireSubjectFilter,
       addSelectAll = CS.addSelectAll,
       blockCloseHtml = CS.blockCloseHtml,
       insertLevelGuide = CS.insertLevelGuide,
@@ -39,14 +40,35 @@
     if (!form) return;
 
     var programSel = qs('#alumni-program', form);
-    var termSel = qs('#alumni-term', form);
-    var subjectsWrap = qs('#alumni-subjects', form);
-    var earlierWrap = qs('#alumni-earlier-subjects', form);
+    var subjectsWrap = qs('#alumni-subjects', form);   // one list per year level
     var blocksWrap = qs('#alumni-subject-blocks', form);
     insertLevelGuide(blocksWrap, LEARNER_LEVELS, 'What the levels mean (choose how far you got with each skill in the subject):');
     var overallWrap = qs('#alumni-overall-skills', form);
     var pickers = {};
     var overallPicker = null;
+    // Laid out like the faculty survey: one open list per year level (1st to 4th Year, every
+    // semester and summer of that year together), with Find a subject, Select all and a count.
+    var tools = qs('#alumni-subject-tools', form);
+    var hint = qs('#alumni-hint', form);
+    var filterInput = qs('#alumni-subject-filter', form);
+    var pickedCount = qs('#alumni-picked-count', form);
+    var applyFilter = filterInput ? wireSubjectFilter(form, filterInput) : function () {};
+    function updatePickedCount() {
+      // each folded year says how many of its subjects are ticked, so nothing hides when closed
+      qsa('.cs-year', subjectsWrap).forEach(function (fold) {
+        var n = qsa('.cs-subject-pick:checked', fold).length;
+        var tag = qs('.cs-year-picked', fold);
+        if (tag) tag.textContent = n ? n + ' selected' : '';
+      });
+      if (!pickedCount) return;
+      var n = Object.keys(pickers).length;
+      pickedCount.textContent = n ? n + ' subject' + (n === 1 ? '' : 's') + ' selected' : 'No subjects selected yet';
+    }
+    function showTools(show) {
+      if (tools) tools.hidden = !show;
+      if (hint) hint.hidden = show;
+      updatePickedCount();
+    }
 
     function subjectCheckHtml(subj, termKey) {
       return '<label class="cs-subject-check">' +
@@ -64,28 +86,27 @@
       return ((BOOT.subjectsByProgramTerm || {})[program] || {})[termKey] || [];
     }
 
-    // Until a course is picked the list has nothing to offer, so it says so (it used to
-    // open as an empty dropdown, which looked broken).
-    function renderTermOptions() {
-      var program = programSel.value;
-      var terms = termsOf(program);
-      termSel.innerHTML = terms.length ? terms.map(function (t) {
-        return '<option value="' + t.key + '">' + escapeHtml(t.label) + '</option>';
-      }).join('') : '<option value="">Choose your course first</option>';
-      termSel.disabled = !terms.length;
-      if (terms.length) termSel.value = terms[terms.length - 1].key; // default: the final term
-      renderSubjects();
-      renderOverallSkills();
-    }
-
     function gridHtml(program, termKey) {
       return '<div class="cs-subject-grid">' + subjectsOf(program, termKey).map(function (subj) {
         return subjectCheckHtml(subj, termKey);
       }).join('') + '</div>';
     }
 
+    // The latest term with a ticked subject: saved as their last semester at UE.
+    function lastTermKey() {
+      var keys = termsOf(programSel.value).map(function (t) { return t.key; });
+      var best = -1;
+      qsa('.cs-subject-pick:checked', form).forEach(function (box) {
+        best = Math.max(best, keys.indexOf(box.getAttribute('data-term-key')));
+      });
+      return best >= 0 ? keys[best] : '';
+    }
+
+    var YEAR_NAMES = { 1: '1st Year', 2: '2nd Year', 3: '3rd Year', 4: '4th Year' };
+    function yearName(y) { return YEAR_NAMES[y] || ('Year ' + y); }
+
     function renderSubjects() {
-      // Subjects they added themselves don't depend on the course / last semester, so they stay.
+      // Subjects they added themselves don't depend on the course, so they stay.
       var added = Object.keys(pickers).filter(function (c) { return pickers[c].custom; }).map(function (c) {
         return { code: c, name: pickers[c].name, skills: pickers[c].api.collect() };
       });
@@ -93,25 +114,34 @@
       pickers = {};
       added.forEach(function (s) { addCustomBlock(s.code, s.name, s.skills); });
       var program = programSel.value;
-      var termKey = termSel.value;
-      if (!program || !termKey) { subjectsWrap.innerHTML = ''; earlierWrap.innerHTML = ''; return; }
-      subjectsWrap.innerHTML =
-        '<h3>Subjects from your last semester <span class="muted">(' + escapeHtml(termLabelOf(program, termKey)) + ')</span></h3>' +
-        '<p class="muted">Select every subject you took in that term. At least one is required.</p>' +
-        gridHtml(program, termKey);
-      // Every term before the last one: optional, like the student survey's earlier semesters.
       var terms = termsOf(program);
-      var idx = terms.map(function (t) { return t.key; }).indexOf(termKey);
-      var earlier = idx > 0 ? terms.slice(0, idx) : [];
-      earlierWrap.innerHTML = earlier.length ?
-        '<details class="cs-earlier"><summary>+ Also report subjects from your previous semesters (optional)</summary>' +
-        '<p class="muted">Not required. Add the earlier subjects where you learned skills you still use.</p>' +
-        earlier.slice().reverse().map(function (t) {
-          return '<h4>' + escapeHtml(t.label) + '</h4>' + gridHtml(program, t.key);
-        }).join('') +
-        '</details>' : '';
+      subjectsWrap.innerHTML = '';
+      if (!program || !terms.length) { showTools(false); return; }
+      showTools(true);
+      var years = [];
+      var byYear = {};
+      terms.forEach(function (t) {
+        if (!byYear[t.year]) { byYear[t.year] = []; years.push(t.year); }
+        byYear[t.year].push(t);
+      });
+      // Newest year first (4th Year on top, open); the other years are folded until opened.
+      // Find a subject and Select all open a fold when they reach into it.
+      subjectsWrap.innerHTML = years.slice().reverse().map(function (y, i) {
+        var subjects = '';
+        byYear[y].forEach(function (t) {
+          subjectsOf(program, t.key).forEach(function (subj) { subjects += subjectCheckHtml(subj, t.key); });
+        });
+        var count = (subjects.match(/class="cs-subject-pick"/g) || []).length;
+        return '<details class="cs-section cs-year" data-year="' + y + '"' + (i === 0 ? ' open' : '') + '>' +
+          '<summary><span class="cs-year-title">' + escapeHtml(yearName(y)) + ' subjects</span>' +
+          ' <span class="muted cs-year-meta">' + count + ' subject' + (count === 1 ? '' : 's') + ' · ' +
+          escapeHtml(byYear[y].map(function (t) { return t.label.replace(/^\d\w+ Year – /, ''); }).join(' · ')) + '</span>' +
+          '<span class="cs-year-picked" aria-live="polite"></span></summary>' +
+          '<div class="cs-subject-grid">' + subjects + '</div>' +
+        '</details>';
+      }).join('');
       addSelectAll(subjectsWrap);
-      addSelectAll(earlierWrap);
+      applyFilter();
     }
 
     function addSubjectBlock(code, name, program, termLabel, termKey, bucket) {
@@ -149,6 +179,7 @@
       var btn = e.target.closest('.cs-remove-added');
       if (!btn) return;
       removeSubjectBlock(btn.closest('.cs-subject-block').getAttribute('data-code'));
+      updatePickedCount();
       form.dispatchEvent(new Event('change'));
     });
     var otherWrap = qs('#alumni-other-subject', form);
@@ -159,6 +190,7 @@
         isTaken: function (code) { return !!pickers[code]; },
         onAdd: function (subj) {
           var block = addCustomBlock(subj.code, subj.name, []);
+          updatePickedCount();
           form.dispatchEvent(new Event('change'));
           if (block) { block.scrollIntoView({ block: 'nearest' }); var inp = qs('.cs-tag-input', block); if (inp) inp.focus(); }
         }
@@ -171,7 +203,7 @@
       delete pickers[code];
     }
 
-    [subjectsWrap, earlierWrap].forEach(function (wrap) {
+    [subjectsWrap].forEach(function (wrap) {
       wrap.addEventListener('change', function (e) {
         if (!e.target.classList.contains('cs-subject-pick')) return;
         var program = programSel.value;
@@ -179,11 +211,13 @@
         var subj = subjectsOf(program, termKey).filter(function (s) { return s.code === e.target.value; })[0];
         if (!subj) return;
         if (e.target.checked) {
+          var term = termsOf(program).filter(function (t) { return t.key === termKey; })[0] || {};
           addSubjectBlock(subj.code, subj.name, program, termLabelOf(program, termKey), termKey,
-                          wrap === subjectsWrap ? 'last' : 'earlier');
+                          term.year ? 'year' + term.year : 'earlier');
         } else {
           removeSubjectBlock(subj.code);
         }
+        updatePickedCount();
       });
     });
 
@@ -206,8 +240,7 @@
       overallPicker = buildSkillPicker(qs('#alumni-overall-picker', overallWrap), names.slice(0, 24), LEARNER_LEVELS, 'alumni-overall');
     }
 
-    programSel.addEventListener('change', renderTermOptions);
-    termSel.addEventListener('change', function () { renderSubjects(); });
+    programSel.addEventListener('change', function () { renderSubjects(); renderOverallSkills(); });
 
     /* ---- employment branch ---- */
     var employedRadios = qsa('input[name="alumni-employed"]', form);
@@ -266,7 +299,24 @@
         set: function (list) { values = (list || []).map(String); render(); }
       };
     }
-    var skillsToLearnTags = tagInput('alumni-skills-to-learn-input', 'alumni-skills-to-learn-list');
+    // "Which technical skills do you feel you still need to learn?": a skill box like the others,
+    // suggesting the skills job postings ask for most for their course (BOOT.learnSuggestions);
+    // anything else is found by typing. No level is asked.
+    var learnWrap = qs('#alumni-skills-to-learn-picker', form);
+    var learnPicker = null;
+    function buildLearnPicker(names) {
+      if (!learnWrap) return;
+      var suggested = (BOOT.learnSuggestions || {})[programSel.value] || [];
+      learnPicker = buildSkillPicker(learnWrap, suggested, [{ value: 'learn', label: 'To learn' }], 'alumni-learn',
+        (names || []).map(function (n) { return { name: n, level: 'learn' }; }));
+    }
+    var skillsToLearnTags = {
+      get: function () { return learnPicker ? learnPicker.collect().map(function (s) { return s.name; }) : []; },
+      set: function (list) { buildLearnPicker((list || []).map(String)); }
+    };
+    buildLearnPicker([]);
+    // a new course brings its own suggestions; skills already added stay
+    programSel.addEventListener('change', function () { buildLearnPicker(skillsToLearnTags.get()); });
     var upskillTags = tagInput('alumni-upskilling-input', 'alumni-upskilling-list');
 
     // "Clear all answers": drop the subjects they added, redraw the subject lists, the overall
@@ -276,11 +326,12 @@
       Object.keys(pickers).forEach(removeSubjectBlock);
       pickers = {};
       programSel.dispatchEvent(new Event('change'));
+      updatePickedCount();
       skillsToLearnTags.set([]);
       upskillTags.set([]);
       qsa('input[name="alumni-employed"], input[name="alumni-first-job"], input[name="alumni-upskilling"]', form)
         .forEach(function (r) { r.checked = false; });
-      ['alumni-role', 'alumni-jobs-applied', 'alumni-rejection-reason', 'alumni-skills-to-learn-input', 'alumni-upskilling-input']
+      ['alumni-role', 'alumni-jobs-applied', 'alumni-rejection-reason', 'alumni-upskilling-input']
         .forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
       employedBranch.hidden = true;
       unemployedBranch.hidden = true;
@@ -315,9 +366,9 @@
         setFormError('alumni-error', 'Please tick “I have read the Data Privacy Notice” just above the Submit button.');
         return;
       }
-      var subjectChecks = qsa('.cs-subject-pick:checked', subjectsWrap);
-      if (!subjectChecks.length) {
-        setFormError('alumni-error', 'Please select at least one subject from your last semester.');
+      var termKey = lastTermKey();
+      if (!termKey) {
+        setFormError('alumni-error', 'Please select at least one subject you took at UE.');
         return;
       }
       var skillsError = CS.missingSkillsError(blocksWrap);
@@ -362,7 +413,7 @@
         consent: true,
         personal_info: Object.assign({ name: name, ue_email: email, course: course, student_number: studentNumber, year_graduated: yearGraduated }, aboutNames()),
         target_role: BOOT.targetRole || '',
-        last_semester: { program: course, term_key: termSel.value, term_label: (((BOOT.termsByProgram || {})[course] || []).filter(function (t) { return t.key === termSel.value; })[0] || {}).label },
+        last_semester: { program: course, term_key: termKey, term_label: termLabelOf(course, termKey) },
         subjects: subjects,
         overall_skills: overallPicker ? overallPicker.collect() : [],
         employment: employment
@@ -397,7 +448,7 @@
     var RADIOS = ['alumni-employed', 'alumni-first-job', 'alumni-upskilling'];
     var draft = surveyDraft(form, function () {
       return {
-        fields: readFields(FIELDS.concat(['alumni-term'], MORE_FIELDS)),
+        fields: readFields(FIELDS.concat(MORE_FIELDS)),
         radios: readRadios(form, RADIOS),
         subjects: Object.keys(pickers).map(function (code) {
           return { code: code, termKey: pickers[code].termKey, skills: pickers[code].api.collect(), custom: !!pickers[code].custom, name: pickers[code].name };
@@ -408,8 +459,7 @@
         upskilling: upskillTags.get()
       };
     }, function (d) {
-      writeFields(d.fields, FIELDS);              // the course lists its terms + overall skills
-      writeFields(d.fields, ['alumni-term']);     // the last semester lists its subjects
+      writeFields(d.fields, FIELDS);              // the course lists its subjects + overall skills
       (d.subjects || []).forEach(function (s) {
         if (s.custom) { addCustomBlock(s.code, s.name || '', s.skills); return; }
         var box = qsa('.cs-subject-pick', form).filter(function (c) {
@@ -423,6 +473,7 @@
       writeRadios(form, d.radios, RADIOS);
       writeFields(d.fields, MORE_FIELDS);
       addSkills(window.__alumniAppliedPicker, d.applied);
+      updatePickedCount();
       skillsToLearnTags.set(d.toLearn);
       upskillTags.set(d.upskilling);
     });

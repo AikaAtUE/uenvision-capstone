@@ -38,7 +38,8 @@
 .cs-section { border-top: 1px solid var(--line); padding-top: 16px; }
 .cs-section:empty { display: none; }
 .cs-hint { margin: 4px 0 16px; padding: 12px 14px; border-radius: 8px; background: #f3f5f9; color: #4b5263; font-size: .9rem; }
-.cs-panel:has(#student-current-subjects:not(:empty)) #student-hint { display: none; }
+.cs-panel:has(#student-current-subjects:not(:empty)) #student-hint,
+.cs-panel:has(#alumni-subjects:not(:empty)) #alumni-hint { display: none; }
 /* until a subject is picked, say what will appear here instead of showing nothing */
 [id$="-subject-blocks"]:empty::before {
   content: "Pick a subject above and a skill box for it will appear here.";
@@ -50,7 +51,18 @@
 .cs-subject-filter-wrap { flex: 1 1 280px; }
 .cs-subject-filter-wrap input { width: 100%; }
 .cs-picked-count { font-size: .86rem; font-weight: 600; color: var(--navy-text); padding-bottom: 12px; }
-#professor-survey-form .cs-subject-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+#professor-survey-form .cs-subject-grid,
+#alumni-survey-form .cs-subject-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+#alumni-subjects > .cs-section { margin-bottom: 16px; }
+/* alumni: one fold per year level, 4th Year first and open */
+.cs-year > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 4px 0 8px; list-style: none; }
+.cs-year > summary::-webkit-details-marker { display: none; }
+.cs-year > summary::before { content: "▸"; color: var(--navy-text); width: 1em; transition: transform .15s; }
+.cs-year[open] > summary::before { transform: rotate(90deg); }
+.cs-year-title { font-family: inherit; font-size: 1.12rem; font-weight: 700; color: var(--navy-text); }
+.cs-year-meta { font-size: .86rem; }
+.cs-year-picked { margin-left: auto; font-size: .82rem; font-weight: 600; color: var(--navy-text); }
+.cs-year-picked:empty { display: none; }
 .cs-subject-check.is-filtered-out { display: none; }
 .cs-subject-check:has(input:checked) { border-color: var(--navy, #1b2a4a); background: #eef1f7; }
 .cs-no-match { color: var(--muted); font-size: .88rem; font-style: italic; }

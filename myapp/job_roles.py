@@ -178,10 +178,25 @@ def fits_program(p, program):
     return not program or p.get(program) is not False
 
 
+def source_filter(source=""):
+    """-> the set of source keys (lowercase) a result counts.
+    source "" (the default) = the scraped job boards in pipeline/sources.py (Kalibrr, Trabajo,
+    Foundit). Imported public datasets (Import Data, e.g. Djinni, which is Ukrainian job
+    postings) are never in the default: only the Job Market page can tick them in.
+    source can also be one key or a list of keys."""
+    if not source:
+        return set(pipeline.SOURCES) | {""}   # "" = rows saved before there was a source column
+    if isinstance(source, str):
+        source = [source]
+    return {str(s).strip().lower() for s in source if str(s).strip()}
+
+
 def it_postings(source="", level="", program="", exclude_ghosts=None):
     """The postings every result counts: tech jobs only (non-tech postings that the job
-    boards also return, such as accountants or pharmacists, are left out), optionally
-    narrowed to one source / experience level ("Not specified" = blank) / program
+    boards also return, such as accountants or pharmacists, are left out), from the
+    scraped job boards only (imported datasets such as Djinni are left out, see
+    source_filter), optionally narrowed to some sources (one key or a list) / experience
+    level ("Not specified" = blank) / program
     ("BSCS" = COMPUTER SCIENCE is true, "BSIT" = INFORMATION TECHNOLOGY is true).
     exclude_ghosts: leave out possible ghost jobs (ghost_jobs.py), keeping the newest copy
     of a job posted twice. None (the default) = whatever the viewer's "Exclude possible
@@ -191,8 +206,9 @@ def it_postings(source="", level="", program="", exclude_ghosts=None):
     all_postings = postings()
     if all_postings is None:
         return None
+    sources = source_filter(source)
     chosen = [p for p in all_postings if is_counted(p) and fits_program(p, program)
-              and (not source or p["source"] == source)
+              and p["source"].lower() in sources
               and (not level or (p["level"] or "Not specified") == level)]
     if exclude_ghosts is None:
         exclude_ghosts = ghost_jobs.EXCLUDE.get()

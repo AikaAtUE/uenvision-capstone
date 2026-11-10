@@ -20,7 +20,7 @@
     <ol>
       {% if prefill %}<li>Check the details from your registration under <strong>About you</strong>. Press <strong>Change</strong> if something is wrong.</li>{% else %}<li>Read the Data Privacy Notice and tick the box to agree.</li>
       <li>Fill in your name, email, course and the year you graduated. Your student number is optional.</li>{% endif %}
-      <li>Pick your course first, then your last semester at UE, and tick the subjects you took in it (<strong>Select all</strong> ticks the whole semester). You may also add subjects from your previous semesters; those are optional. For a Professional Elective, use <strong>+ Add a subject that isn’t listed</strong>.</li>
+      <li>Your subjects appear after you pick your course. They are grouped by year level, with 4th Year on top; press a year to open or close its list. Tick every subject you took, or use <strong>Select all</strong> to tick a whole year at once. <strong>Find a subject</strong> searches by code or name. For a Professional Elective, use <strong>+ Add a subject that isn’t listed</strong>.</li>
       <li>For each subject, pick the skills you learned and how far you got with each one: Introduced, Practiced or Applied (the same levels faculty use; each level is explained above the skill boxes). Press <strong>×</strong> on a subject's box to remove it.</li>
       <li>Pick the skills you learned overall at UE, then answer the questions about your current job or job search.</li>
       <li>Press <strong>Submit survey</strong>. You then go straight to your dashboard to see your own skill gap results.</li>
@@ -99,15 +99,18 @@
     </div>
     {% endif %}
 
-    <div class="cs-section">
-      <h3>Your last semester at UE</h3>
-      <p class="muted">Which term was your last one? (Most students: 4th Year – 2nd Semester.)</p>
-      <label class="field"><span>Last semester</span><select id="alumni-term" disabled><option value="">Choose your course first</option></select></label>
-      <div class="cs-select-all-row cs-select-all-row--page"><button type="button" class="btn btn-ghost btn-sm cs-select-all cs-select-all--page" id="alumni-select-all-years" data-select-all="#alumni-subjects .cs-subject-grid, #alumni-earlier-subjects .cs-subject-grid" data-label="Select all subjects from every year" data-clear-label="Clear all subjects from every year" disabled>Select all subjects from every year</button></div>
-      <div id="alumni-subjects"></div>
-      <div id="alumni-earlier-subjects"></div>
+    <p class="cs-hint" id="alumni-hint">Choose your course above to see your subjects.</p>
+    <div class="cs-subject-picker" id="alumni-subject-picker">
+    <div class="cs-subject-tools" id="alumni-subject-tools" hidden>
+      <label class="field cs-subject-filter-wrap"><span>Find a subject</span>
+        <input type="search" id="alumni-subject-filter" placeholder="Type a code or name, e.g. CCP or Database" autocomplete="off">
+      </label>
+      <button type="button" class="btn btn-ghost btn-sm cs-select-all cs-select-all--page" id="alumni-select-all-years" data-select-all="#alumni-subjects .cs-subject-grid" data-label="Select all subjects from every year" data-clear-label="Clear all subjects from every year">Select all subjects from every year</button>
+      <span class="cs-picked-count" id="alumni-picked-count" aria-live="polite">No subjects selected yet</span>
     </div>
-
+    {# one .cs-section per year level, like the faculty survey's lists #}
+    <div id="alumni-subjects"></div>
+    </div>
     <div class="cs-section">
       <h3>Subjects not in the list</h3>
       <p class="muted">Took a Professional Elective or another subject that isn't listed above? Add it here with its own subject code and title.</p>
@@ -143,9 +146,9 @@
           <div class="cs-skill-picker" id="alumni-skills-applied-picker"></div>
         </div>
         <div class="field">
-          <span>Which technical skills do you feel you still need to learn? (press Enter to add)</span>
-          <input type="text" id="alumni-skills-to-learn-input" placeholder="Type a skill, then press Enter">
-          <div id="alumni-skills-to-learn-list"></div>
+          <span>Which technical skills do you feel you still need to learn?</span>
+          <small class="field-hint">Suggestions are the skills IT and CS job postings ask for most. Type to search for any other skill.</small>
+          <div class="cs-skill-picker" id="alumni-skills-to-learn-picker"></div>
         </div>
       </div>
 

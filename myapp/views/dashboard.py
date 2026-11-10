@@ -52,7 +52,12 @@ def dashboard_skills_view(request):
         # right away to this response (GhostJobsMiddleware applies it on later pages).
         request.session[ghost_jobs.SESSION_KEY] = ghost == "exclude"
         ghost_jobs.EXCLUDE.set(ghost == "exclude")
-    source = request.GET.get("source", "")
+    # The ticked job sources, comma-separated ("" = all of them). Only the scraped job boards
+    # can be picked: imported datasets such as Djinni never count on the Dashboard.
+    picked = [s for s in request.GET.get("source", "").lower().split(",") if s.strip()]
+    if any(s not in pipeline.SOURCES for s in picked):
+        return JsonResponse({"ok": False, "error": "Unknown source."}, status=400)
+    source = picked if picked and set(picked) != set(pipeline.SOURCES) else ""
     level = request.GET.get("level", "")
     program = request.GET.get("program", "")
     if program and program not in curriculum_data.PROGRAMS:

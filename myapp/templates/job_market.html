@@ -9,12 +9,13 @@
     <div class="jm-toolbar">
       <p class="muted">How job postings change over time. <span id="jm-updated"></span></p>
       <form class="jm-filters" id="jm-filters" method="get">
-        <label>Source
-          <select name="source" id="jm-source">
-            <option value="all"{% if source == 'all' %} selected{% endif %}>All sources</option>
-            {% for key, label in sources %}<option value="{{ key }}"{% if source == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
-          </select>
-        </label>
+        <fieldset class="jm-sources" id="jm-sources">
+          <legend>Sources</legend>
+          <div class="jm-source-list">
+            {% for s in sources %}<label class="checkbox jm-source{% if s.dataset %} jm-source--dataset{% endif %}"><input type="checkbox" name="source" value="{{ s.key }}"{% if s.key in picked %} checked{% endif %}><span>{{ s.label }}{% if s.dataset %} <small>imported dataset</small>{% endif %}</span></label>{% endfor %}
+          </div>
+          {% if has_datasets %}<small class="jm-source-hint">Imported datasets (such as Djinni, Ukrainian job postings) are not ticked by default. Tick one for a global market view. The Dashboard never counts them.</small>{% endif %}
+        </fieldset>
         <label>From
           <select name="since" id="jm-since">
             {% for y in years %}<option value="{{ y }}"{% if since == y %} selected{% endif %}>{{ y }}</option>{% endfor %}

@@ -1,3 +1,4 @@
+from pathlib import Path
 import json
 
 from django.test import TestCase, override_settings
@@ -773,11 +774,19 @@ class SurveyInstructionsTests(IsolatedDataMixin, TestCase):
         self.client.force_login(prof)
         self.assertContains(self.client.get(reverse("professor_survey")), "mailto:inquiries@uenvision.tech")
 
-    def test_alumni_last_semester_list_waits_for_the_course(self):
+    def test_alumni_subjects_use_the_student_picker_not_a_dropdown(self):
         login_administrator(self.client)
-        r = self.client.get(reverse("alumni_survey"))
-        self.assertContains(r, '<select id="alumni-term" disabled><option value="">Choose your course first</option></select>', html=False)
-        self.assertContains(r, 'id="alumni-earlier-subjects"')
+        html = self.client.get(reverse("alumni_survey")).content.decode()
+        self.assertNotIn('id="alumni-term"', html)                     # no "last semester" dropdown
+        self.assertIn("Choose your course above to see your subjects.", html)
+        box = html.split('id="alumni-subject-picker"', 1)[1].split('<h3>Subjects not in the list</h3>', 1)[0]
+        for part in ('id="alumni-subject-filter"', 'id="alumni-picked-count"', 'id="alumni-subjects"',
+                     'id="alumni-select-all-years"'):
+            self.assertIn(part, box)
+        # listed by year level like the faculty survey, not by semester
+        js = (Path(__file__).resolve().parents[1] / "static" / "myapp" / "cs-alumni.js").read_text(encoding="utf-8")
+        self.assertIn("byYear[t.year]", js)
+        self.assertNotIn("alumni-previous-subjects", html + js)
 
 
 class HigherYearSubjectTests(TestCase):

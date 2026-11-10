@@ -392,6 +392,28 @@ def student_survey_view(request):
     })
 
 
+def _learn_suggestions(role="", top=24):
+    """Suggestions for the alumni question "Which technical skills do you feel you still need
+    to learn?": the skills IT/CS job postings ask for most, per course (their target role's
+    first, if they picked one). Names as job_roles.skill_stats gives them; only the order of
+    suggestions, never a count shown anywhere. -> {"BSIT": [...], "BSCS": [...]}"""
+    from .. import job_roles
+
+    out = {}
+    for program in curriculum_data.PROGRAMS:
+        try:
+            stats = job_roles.skill_stats(role, top, program)
+        except Exception:   # no dataset yet: the box still searches every skill
+            stats = {}
+        names = []
+        for group in ((stats.get("role") or {}).get("skills") or [], (stats.get("overall") or {}).get("skills") or []):
+            for s in group:
+                if s["skill"] not in names:
+                    names.append(s["skill"])
+        out[program] = names[:top]
+    return out
+
+
 def alumni_survey_view(request):
     gate = _learner_survey_gate(request, "alumni")
     if gate:
@@ -412,6 +434,7 @@ def alumni_survey_view(request):
         "skills": skill_suggestions.ranked_subject_skill_map(),   # ordering only (skill_suggestions.py)
         "keywordSkills": skill_suggestions.keyword_table(),
         "termTags": curriculum_data.subject_term_tags(),
+        "learnSuggestions": _learn_suggestions(_target_role(request)),
         "submitUrl": reverse("alumni_survey_submit"),
         "skillSearchUrl": reverse("skill_search"),
         "skillAddUrl": reverse("skill_add"),

@@ -200,7 +200,7 @@ class TourTargetTests(IsolatedDataMixin, TestCase):
         self.assertNotIn("#student-later-subjects .cs-subject-grid", html)   # higher years stay optional
         html = self.client.get(reverse("alumni_survey")).content.decode()
         self.assertIn('id="alumni-select-all-years"', html)
-        self.assertIn("#alumni-earlier-subjects .cs-subject-grid", html)
+        self.assertIn('data-select-all="#alumni-subjects .cs-subject-grid"', html)
 
     def test_admin_tours_stay_on_their_own_page(self):
         js = (STATIC / "onboarding-tour.js").read_text(encoding="utf-8")

@@ -7,7 +7,26 @@
   if (!panel) return;
 
   const $ = id => document.getElementById(id);
-  const ctl = { kind: $('ctl-kind'), top: $('ctl-top'), source: $('ctl-source'), level: $('ctl-level'), months: $('ctl-months'), program: $('ctl-program') };
+  // Job sources are tick boxes. sourceCtl gives them a .value like the other controls:
+  // '' = every source ticked (the default), otherwise the ticked keys joined with commas.
+  // Imported datasets (Djinni) are never offered here: the server leaves them out of the Dashboard.
+  const sourceWrap = $('ctl-source');
+  const sourceBoxes = () => Array.from(sourceWrap.querySelectorAll('input[type=checkbox]'));
+  const sourceCtl = {
+    get value() {
+      const all = sourceBoxes(), on = all.filter(b => b.checked).map(b => b.value);
+      return on.length === all.length ? '' : on.join(',');
+    },
+    set value(v) {
+      const want = v ? v.split(',') : null;
+      sourceBoxes().forEach(b => { b.checked = !want || want.includes(b.value); });
+    },
+    label() {
+      const v = this.value;
+      return v ? v.split(',').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' + ') : 'All sources';
+    },
+  };
+  const ctl = { kind: $('ctl-kind'), top: $('ctl-top'), source: sourceCtl, level: $('ctl-level'), months: $('ctl-months'), program: $('ctl-program') };
   // "Exclude possible ghost jobs" (a checkbox, so it's kept apart from the select / number controls).
   const ghostBox = $('ctl-ghost');
   const ghostOn = () => !!(ghostBox && ghostBox.checked);
@@ -39,7 +58,7 @@
   /* ---------------- "According to" source lines ---------------- */
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
   function sourceName(d) {
-    const picked = ctl.source.value ? [ctl.source.value] : (d.sources || []);
+    const picked = ctl.source.value ? ctl.source.value.split(',') : (d.sources || []);
     return picked.length ? picked.map(cap).join(', ') : 'online job boards';
   }
   const PROGRAM_NAMES = { BSCS: 'Computer Science', BSIT: 'Information Technology' };
@@ -435,8 +454,17 @@
       items.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
       sel.value = items.includes(keep) ? keep : '';
     };
-    fill(ctl.source, d.sources.map(s => s), 'All sources');
-    Array.from(ctl.source.options).forEach(o => { if (o.value) o.textContent = o.value.charAt(0).toUpperCase() + o.value.slice(1); });
+    const keep = applied.source;
+    clear(sourceWrap);
+    d.sources.forEach(s => {
+      const lab = document.createElement('label'); lab.className = 'checkbox source-check';
+      const box = document.createElement('input'); box.type = 'checkbox'; box.value = s; box.checked = true;
+      // At least one source stays ticked.
+      box.addEventListener('change', () => { if (!sourceBoxes().some(b => b.checked)) box.checked = true; });
+      const span = document.createElement('span'); span.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+      lab.append(box, span); sourceWrap.appendChild(lab);
+    });
+    sourceCtl.value = keep;
     fill(ctl.level, d.levels, 'All levels');
     filtersBuilt = true;
     setSummary();
@@ -502,7 +530,7 @@
   let applied = Object.assign({}, DEFAULTS);
   let appliedGhost = ghostOn();     // starts from what the server remembered for this login
 
-  const label = (c) => c.tagName === 'SELECT' ? (c.options[c.selectedIndex] || {}).textContent || '' : c.value;
+  const label = (c) => c.label ? c.label() : c.tagName === 'SELECT' ? (c.options[c.selectedIndex] || {}).textContent || '' : c.value;
   function setSummary() {
     const parts = [label(ctl.kind), 'top ' + applied.top, label(ctl.program), label(ctl.source), label(ctl.level)];
     const sum = $('filter-summary'); clear(sum);

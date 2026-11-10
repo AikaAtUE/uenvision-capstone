@@ -239,6 +239,39 @@ class TechJobColumnsTests(IsolatedDataMixin, TestCase):
         only = pipeline.skills_dashboard("hard", 10, source="trabajo")
         self.assertEqual(only["bar_sources"], ["trabajo"])
 
+    def test_dashboard_source_tick_boxes_and_no_djinni(self):
+        """The Dashboard's sources are tick boxes ("kalibrr,trabajo"); an imported dataset such as
+        Djinni (Ukrainian postings) is never counted on it, nor on the other result pages."""
+        import csv
+        from django.conf import settings
+        from .. import job_roles
+        from ..pipeline import manager as pipeline
+        path = settings.DATA_DIR / "extracted_skills.csv"
+        with open(path, encoding="utf-8-sig", newline="") as f:
+            rows = list(csv.reader(f))
+        rows[2][2] = "trabajo"                                    # network admin from Trabajo
+        rows.append(["djinni-1", "Rust Developer", "djinni", "", "2026-01-05", "Rust", "Teamwork",
+                     "Mid", "True", "True", "True"])
+        with open(path, "w", encoding="utf-8-sig", newline="") as f:
+            csv.writer(f).writerows(rows)
+        self.assertEqual(len(job_roles.it_postings()), 5)       # Djinni left out by default
+        self.assertEqual(len(job_roles.it_postings(["kalibrr", "trabajo"])), 5)
+        self.assertEqual(len(job_roles.it_postings(["trabajo"])), 1)
+        dash = pipeline.skills_dashboard("hard", 30)
+        self.assertEqual(dash["sources"], ["kalibrr", "trabajo"])
+        self.assertNotIn("Rust", [b["skill"] for b in dash["bars"]])
+
+        admin = CustomUser.objects.create_user(email="adm@ue.edu.ph", password="secret123", first_name="A",
+                                               last_name="D", role=CustomUser.Role.ADMINISTRATOR)
+        self.client.force_login(admin)
+        url = reverse("dashboard_skills")
+        self.assertEqual(self.client.get(url).json()["stats"]["postings"], 5)
+        both = self.client.get(url, {"source": "kalibrr,trabajo"}).json()
+        self.assertEqual(both["stats"]["postings"], 5)
+        self.assertEqual(self.client.get(url, {"source": "trabajo"}).json()["stats"]["postings"], 1)
+        self.assertEqual(self.client.get(url, {"source": "kalibrr"}).json()["gap"]["postings_considered"], 4)
+        self.assertEqual(self.client.get(url, {"source": "kalibrr,djinni"}).status_code, 400)
+
 
     def test_all_skills_counts_hard_and_soft_once_per_posting(self):
         from ..pipeline import manager as pipeline

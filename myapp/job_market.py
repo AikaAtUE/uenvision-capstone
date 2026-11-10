@@ -17,6 +17,11 @@ of the story. Every skill number (top skills, rising / falling, entry vs senior)
 tech postings only, the same postings the homepage, Dashboard and hard_skills.csv count.
 
 The Dashboard's "Exclude possible ghost jobs" switch applies here too (ghost_jobs.EXCLUDE).
+
+Sources are tick boxes. The scraped job boards (Kalibrr, Trabajo, Foundit) are ticked by
+default. Imported public datasets (Import Data, e.g. Djinni, Ukrainian job postings) can be
+ticked in for a global view, but are never ticked by default. The Dashboard and the other
+pages never count them (job_roles.source_filter).
 """
 import statistics
 
@@ -25,7 +30,7 @@ from . import job_roles
 from .pipeline import manager as pipeline
 from .pipeline.skills_schema import split_skills
 
-DEFAULT_SOURCE = "kalibrr"
+DEFAULT_SOURCES = tuple(pipeline.SOURCES)    # Kalibrr, Trabajo, Foundit; datasets are opt-in
 DEFAULT_SINCE = 2024
 TOP_SKILLS = 15
 SHIFT_SKILLS = 8          # rising and falling skills shown each
@@ -107,15 +112,35 @@ def _rows():
     return rows
 
 
+def source_label(key):
+    return pipeline.SOURCE_LABELS.get(key) or key.replace("-", " ").replace("_", " ").title()
+
+
 def sources_available():
-    """-> [(key, label)] for the sources that have postings, in the registry's order."""
+    """-> [{"key", "label", "dataset", "default"}] for the sources that have postings: the
+    scraped job boards in the registry's order (ticked by default), then any imported
+    datasets such as Djinni (not ticked by default)."""
     rows = _rows() or []
-    present = {r["source"] for r in rows}
-    return [(k, pipeline.SOURCE_LABELS.get(k, k.capitalize())) for k in pipeline.SOURCES if k in present]
+    present = {r["source"] for r in rows if r["source"]}
+    out = [{"key": k, "label": source_label(k), "dataset": False, "default": True}
+           for k in pipeline.SOURCES if k in present]
+    out += [{"key": k, "label": source_label(k), "dataset": True, "default": False}
+            for k in sorted(present - set(pipeline.SOURCES))]
+    return out
+
+
+def default_sources():
+    """The sources ticked when the page opens: every scraped job board that has postings."""
+    return [s["key"] for s in sources_available() if s["default"]] or list(DEFAULT_SOURCES)
 
 
 def years_available():
     return sorted({r["year"] for r in (_rows() or [])})
+
+
+def _join(names):
+    """["Kalibrr", "Trabajo", "Foundit"] -> "Kalibrr, Trabajo and Foundit"."""
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
 
 
 def _tally(postings):
@@ -136,8 +161,9 @@ def _pct(part, whole):
     return round(part / whole * 100, 1) if whole else 0.0
 
 
-def compute(source=DEFAULT_SOURCE, since=DEFAULT_SINCE):
-    """Everything the Job Market page draws, for one source ("" = all) from `since`
+def compute(source=None, since=DEFAULT_SINCE):
+    """Everything the Job Market page draws, for the ticked sources (`source`: a list of keys,
+    or one key; None / "" = the scraped job boards, without imported datasets) from `since`
     (a year) to the newest posting. -> dict with "exists": False when there's no data."""
     rows = _rows()
     if rows is None:
@@ -145,11 +171,21 @@ def compute(source=DEFAULT_SOURCE, since=DEFAULT_SINCE):
     exclude_ghosts = ghost_jobs.EXCLUDE.get()
     found = (ghost_jobs.detect() or {}) if exclude_ghosts else {}
     # The ghost job marks change when their settings or the data change, so they're part of the key.
-    key = (source, since, exclude_ghosts, ghost_jobs._stamp() if exclude_ghosts else None)
+    if isinstance(source, str):
+        source = [source]
+    picked = sorted({str(s).strip().lower() for s in (source or []) if str(s).strip()})
+    if not picked:
+        picked = sorted(default_sources())
+    allowed = set(picked)
+    if set(default_sources()) <= allowed:
+        allowed.add("")     # rows saved before there was a source column count with the job boards
+    key = (tuple(picked), since, exclude_ghosts, ghost_jobs._stamp() if exclude_ghosts else None)
     if key in _CACHE["results"]:
         return _CACHE["results"][key]
 
-    chosen = [r for r in rows if (not source or r["source"] == source) and r["year"] >= since]
+    chosen = [r for r in rows if r["source"] in allowed and r["year"] >= since]
+    order = [s["key"] for s in sources_available()]
+    picked.sort(key=lambda k: (order.index(k) if k in order else len(order), k))
     ghosts_hidden = 0
     if exclude_ghosts:
         kept = [r for r in chosen if found.get(r["ghost_key"], {}).get("keep_when_excluding", True)]
@@ -158,8 +194,8 @@ def compute(source=DEFAULT_SOURCE, since=DEFAULT_SINCE):
     updated = pipeline.skills_data_updated()
     result = {
         "exists": True,
-        "source": source,
-        "source_label": pipeline.SOURCE_LABELS.get(source, "All sources") if source else "All sources",
+        "sources": picked,
+        "source_label": _join([source_label(k) for k in picked]),
         "since": since,
         "updated": updated.isoformat() if updated else None,
         "total": len(chosen),

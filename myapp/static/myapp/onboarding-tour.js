@@ -104,13 +104,13 @@
       ? { sel: ['#student-subject-tools', '#student-hint'], title: 'Ways to pick your subjects',
           text: 'Select all ticks this and last semester at once, or every subject from this and previous years. Find a subject searches by code or name.' }
       : role === 'alumni'
-      ? { sel: ['#alumni-term'], title: 'Pick your last semester',
-          text: 'Choose your last term at UE. Its subjects appear below, and Select all subjects from every year ticks your whole curriculum.' }
+      ? { sel: ['#alumni-subject-tools', '#alumni-hint'], title: 'Ways to pick your subjects',
+          text: 'Your subjects are grouped by year level, 4th Year on top. Press a year to open it. Select all ticks a whole year, or every subject from every year. Find a subject searches by code or name.' }
       : { sel: ['.cs-subject-tools', '.cs-section:has(#professor-current-subjects)'], title: 'Ways to find your subjects',
           text: 'Find a subject searches by code or name, and + Add a subject that isn’t listed is for electives.' });
     // the whole picker is lit: the subject search plus every semester's list (not just this
     // semester's), so earlier semesters can be ticked here too and aren't skipped
-    var pickerSel = role === 'alumni' ? '.cs-section:has(#alumni-subjects)' : '#' + p + '-subject-picker';
+    var pickerSel = '#' + p + '-subject-picker';
     steps.push(
       // hands-on: the tour waits here until a subject is ticked
       { sel: [pickerSel, gridSel + ' .cs-subject-grid', gridSel], keep: true, hands: true, need: ticked,
@@ -118,7 +118,7 @@
         text: role === 'faculty'
           ? 'Tick every subject you teach this semester and every one you taught last semester. Scroll down for the earlier semesters, or type a code or name in Find a subject. A skill box opens below for each one.'
           : role === 'alumni'
-          ? 'Tick the subjects you took. Scroll down for the earlier years too. A skill box opens below for each one.'
+          ? 'Tick the subjects you took. Open each year level below for its subjects, or type a code or name in Find a subject. A skill box opens below for each one.'
           : 'Tick the subjects you took this semester and in earlier semesters. Scroll down for the earlier ones, or type a code or name in Find a subject. A skill box opens below for each one.',
         doneText: role === 'faculty'
           ? 'Nice! Now tick the rest you teach, including last semester’s, then press Next.'

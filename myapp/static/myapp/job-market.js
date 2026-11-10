@@ -6,7 +6,12 @@
   if (!root) return;
   var REFRESH_MS = 5 * 60 * 1000;
   var url = root.dataset.url;
-  var sourceSel = document.getElementById('jm-source');
+  // Source tick boxes: the job boards are ticked by default, imported datasets (Djinni) are opt-in.
+  var sourceBoxes = Array.prototype.slice.call(document.querySelectorAll('#jm-sources input[type=checkbox]'));
+  function sourceQuery() {
+    return sourceBoxes.filter(function (b) { return b.checked; })
+      .map(function (b) { return 'source=' + encodeURIComponent(b.value); }).join('&');
+  }
   var sinceSel = document.getElementById('jm-since');
   var lastFetch = 0;
   var busy = false;
@@ -168,7 +173,8 @@
     if (busy) return;
     busy = true;
     lastFetch = Date.now();
-    var q = '?source=' + encodeURIComponent(sourceSel.value) + '&since=' + encodeURIComponent(sinceSel.value);
+    var sq = sourceQuery();
+    var q = '?' + (sq ? sq + '&' : '') + 'since=' + encodeURIComponent(sinceSel.value);
     fetch(url + q, {headers: {'Accept': 'application/json'}, credentials: 'same-origin'})
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -180,11 +186,18 @@
   }
 
   function onFilter() {
-    var q = '?source=' + encodeURIComponent(sourceSel.value) + '&since=' + encodeURIComponent(sinceSel.value);
+    var sq = sourceQuery();
+    var q = '?' + (sq ? sq + '&' : '') + 'since=' + encodeURIComponent(sinceSel.value);
     if (window.history && history.replaceState) history.replaceState(null, '', location.pathname + q);
     load();
   }
-  sourceSel.addEventListener('change', onFilter);
+  sourceBoxes.forEach(function (box) {
+    box.addEventListener('change', function () {
+      // At least one source stays ticked.
+      if (!sourceBoxes.some(function (b) { return b.checked; })) { box.checked = true; return; }
+      onFilter();
+    });
+  });
   sinceSel.addEventListener('change', onFilter);
   $('jm-filters').addEventListener('submit', function (e) { e.preventDefault(); onFilter(); });
 

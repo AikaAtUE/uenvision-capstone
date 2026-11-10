@@ -77,3 +77,13 @@
   .jm-shift-row{grid-template-columns:84px 1fr 1fr;}
   .jm-shift-val{grid-column:2 / -1; font-size:.74rem;}
 }
+
+/* Source tick boxes (job_market.html). */
+.jm-sources{border:0; margin:0; padding:0; min-width:0; max-width:520px;}
+.jm-sources legend{font-size:.78rem; font-weight:600; color:var(--muted); padding:0; margin-bottom:2px;}
+.jm-source-list{display:flex; flex-wrap:wrap; gap:0 16px;}
+.jm-source{color:var(--ink);}
+.jm-source small{color:var(--muted); font-size:.74rem;}
+.jm-source-hint{display:block; font-size:.74rem; color:var(--muted); margin-top:2px;}
+.jm-filters .jm-source{flex-direction:row; align-items:center; gap:7px; flex:none; font-size:.86rem; font-weight:500; color:var(--ink); padding:4px 0;}
+.jm-filters .jm-source input{width:auto;}
