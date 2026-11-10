@@ -123,6 +123,10 @@ class KalibrrScraperTests(SimpleTestCase):
         self.assertEqual(data["pageProps"]["job"]["slug"], "qa-specialist-renamed")
         events = (report / "kalibrr_events.csv").read_text()
         self.assertIn("posting was not found", events)
+        # the log lists the API URL that failed, not the job's page
+        self.assertIn("https://www.kalibrr.com/_next/data/NEW/en/c/acme/jobs/270007/qa-tester.json"
+                      "?code=acme&param=270007&param=qa-tester", events)
+        self.assertNotIn("https://www.kalibrr.com/c/acme/jobs/270007/qa-tester,", events)
 
     def test_a_search_outage_is_waited_out(self):
         site = FakeKalibrr(search_fail=ks.MAX_RETRIES + 1)   # every retry fails, then the cooldown try works

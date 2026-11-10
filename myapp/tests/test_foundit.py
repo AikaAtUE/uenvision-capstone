@@ -177,7 +177,7 @@ class FounditScraperTests(TmpDirMixin, TestCase):
         self.assertEqual([r["status"] for r in rows], ["saved", "failed"])
         self.assertEqual(rows[1]["job_id"], "2")
         self.assertIn("no job for this ID", rows[1]["reason"])
-        self.assertTrue(rows[1]["url"].startswith("https://www.foundit.com.ph/job/"))
+        self.assertEqual(rows[1]["url"], "https://www.foundit.com.ph/home/api/jobDetail?jobId=2")   # the API URL
 
     def test_runs_as_a_script(self):
         out = subprocess.run([sys.executable, str(Path(foundit_scraper.__file__)), "--help"],

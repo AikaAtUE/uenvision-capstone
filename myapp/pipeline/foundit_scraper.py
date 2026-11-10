@@ -254,11 +254,16 @@ def fetch_search_page(
     return get_json_with_retries(session, search_url(query, start, limit, countries))
 
 
+def job_detail_url(job_id) -> str:
+    """The API URL of a job's details (the one the failed saves log lists)."""
+    return f"{JOB_DETAIL_URL}?{urlencode({'jobId': job_id})}"
+
+
 def fetch_job_detail(session: requests.Session, job_id) -> dict | None:
     """The full job post. None when the request failed or foundit has no job with that ID
     (it answers HTTP 200 with an empty {} for those)."""
     global LAST_ERROR
-    data = get_json_with_retries(session, f"{JOB_DETAIL_URL}?{urlencode({'jobId': job_id})}")
+    data = get_json_with_retries(session, job_detail_url(job_id))
     if data is None:
         return None
     if not isinstance(data, dict) or not data.get("jobId"):
@@ -385,8 +390,9 @@ def scrape(
                 random_delay(delay_min, delay_max)
                 if detail is None:
                     failed += 1
+                    # the failed saves log lists the API URL that was asked for, not the job's page
                     record.failed("Couldn't fetch the job details: " + (LAST_ERROR or "no response"),
-                                  job_id, title, company, page_url)
+                                  job_id, title, company, job_detail_url(job_id))
                     continue
             else:
                 detail = job_from_search(job)
@@ -397,7 +403,8 @@ def scrape(
             except (OSError, TypeError, ValueError) as exc:
                 log.error("Couldn't write %s: %s", out_path, exc)
                 failed += 1
-                record.failed(f"Couldn't write the JSON file: {exc}", job_id, title, company, page_url)
+                record.failed(f"Couldn't write the JSON file: {exc}", job_id, title, company,
+                              job_detail_url(job_id) if fetch_details else page_url)
                 try:
                     out_path.unlink()       # a half-written file would be skipped as "already have" next time
                 except OSError:

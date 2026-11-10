@@ -113,7 +113,8 @@ class KalibrrRecordsFailuresTests(TmpDirMixin, TestCase):
         self.assertEqual(rows[0]["job_id"], "2")
         self.assertEqual(rows[0]["title"], "QA Tester")
         self.assertEqual(rows[0]["company"], "Acme")
-        self.assertEqual(rows[0]["url"], "https://www.kalibrr.com/c/acme/jobs/2/qa")
+        self.assertEqual(rows[0]["url"], "https://www.kalibrr.com/_next/data/build/en/c/acme/jobs/2/qa.json"
+                                         "?code=acme&param=2&param=qa")      # the API URL, not the job's page
         self.assertIn("HTTP 500", rows[0]["reason"])
         self.assertEqual(rows[0]["search"], "Software Engineer")
         self.assertIn("no slug", rows[1]["reason"])
