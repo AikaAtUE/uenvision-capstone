@@ -93,7 +93,7 @@ def _rows():
             "ghost_key": (get(r, "source"), get(r, "job_id")),
             "year": int(m.group(1)),
             "month": int(m.group(2)),
-            "tech": tech_flag if tech_flag is not None else bool(role),
+            "tech": job_roles._counted(tech_flag, role),   # the one rule for which postings count
             "role": role,
             "company": get(r, "company_name"),
             "city": get(r, "city"),

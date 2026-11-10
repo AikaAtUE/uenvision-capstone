@@ -263,3 +263,78 @@ class HomeFooterTests(DataFilesMixin, TestCase):
     def test_footer_lists_sources(self):
         r = self.client.get(reverse("home"))
         self.assertContains(r, "public job boards (Kalibrr)")
+
+
+# ---------------------------------------------------------------------------
+# Nov 10, 2026: two more places where the numbers could be wrong
+# ---------------------------------------------------------------------------
+OLD_COLUMNS = ["job_id", "job_name", "source", "company_name", "function", "date", "hard_skills", "soft_skills",
+               "experience_level"]          # extracted before isTechJob existed: no such column
+OLD_ROWS = [
+    ["1", "Data Engineer", "kalibrr", "DataCo", "IT and Software", "2025-02-01T00:00:00+00:00", "Python; SQL", "", "Mid"],
+    ["2", "Web Developer", "kalibrr", "WebCo", "IT and Software", "2025-03-01T00:00:00+00:00", "SQL", "", "Junior"],
+    # no isTechJob answer and not an IT title: the pages leave these out, so the files must too
+    ["3", "Accountant", "kalibrr", "Books Inc", "Accounting and Finance", "2025-04-01T00:00:00+00:00", "SQL; Microsoft Excel", "", "Mid"],
+    ["4", "Marketing Lead", "kalibrr", "AdCo", "IT and Software", "2025-04-01T00:00:00+00:00", "Python; SEO", "", "Mid"],
+]
+
+
+class UnansweredTechFlagTests(DataFilesMixin, TestCase):
+    """Postings whose isTechJob was never answered: hard_skills.csv and the pages use one
+    rule (job_roles.record_is_counted), so counting the file gives what the Dashboard shows."""
+
+    def setUp(self):
+        super().setUp()
+        with open(Path(self._tmp) / "extracted_skills.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(OLD_COLUMNS)
+            w.writerows(OLD_ROWS)
+        self._clear()
+
+    def test_file_has_the_postings_the_pages_count(self):
+        pipeline.ensure_skill_csvs()
+        self.assertEqual({r["job_name"] for r in self.hard_skills_csv()}, {"Data Engineer", "Web Developer"})
+        self.assertEqual(len(job_roles.it_postings()), 2)
+
+    def test_counts_match_hard_skills_csv(self):
+        pipeline.ensure_skill_csvs()
+        from collections import Counter
+        from_csv = Counter(r["skill"] for r in self.hard_skills_csv())
+        bars = {b["skill"]: b["count"] for b in pipeline.skills_dashboard(top=30)["bars"]}
+        self.assertEqual(bars, dict(from_csv))
+        self.assertEqual(bars, {"SQL": 2, "Python": 1})
+
+    def test_one_rule_for_rows_and_postings(self):
+        records = [dict(zip(OLD_COLUMNS, r)) for r in OLD_ROWS] + [dict(zip(COLUMNS, r)) for r in ROWS]
+        self.assertEqual([job_roles.record_is_counted(r) for r in records],
+                         [True, True, False, False, True, True, True, False])
+        self.assertTrue(job_roles.record_is_counted({"job_name": "Nurse", "is_tech_job": True}))
+        self.assertFalse(job_roles.record_is_counted({"job_name": "Software Developer", "is_tech_job": False}))
+
+
+class StaffTryOutSurveyTests(TestCase):
+    """A professor or administrator trying the Student / Alumni Survey out is not a student:
+    the answers go to the dummy data set and never count in the real results."""
+
+    def test_is_dummy_for_staff_but_not_for_learners(self):
+        from django.contrib.auth.models import AnonymousUser
+        from django.test import RequestFactory
+
+        from ..models import CustomUser
+        from ..views.surveys import _is_dummy
+
+        def as_user(role, email, **extra):
+            request = RequestFactory().post("/")
+            request.user = CustomUser.objects.create_user(email=email, password="secret123", first_name="A",
+                                                          last_name="B", role=role, **extra)
+            return bool(_is_dummy(request))
+
+        self.assertTrue(as_user(CustomUser.Role.FACULTY, "prof@ue.edu.ph"))
+        self.assertTrue(as_user(CustomUser.Role.ADMINISTRATOR, "admin@ue.edu.ph"))
+        self.assertTrue(as_user(CustomUser.Role.DEVELOPER, "dev@ue.edu.ph"))
+        self.assertFalse(as_user(CustomUser.Role.STUDENT, "stud@ue.edu.ph"))
+        self.assertFalse(as_user(CustomUser.Role.ALUMNI, "alum@ue.edu.ph"))
+        self.assertTrue(as_user(CustomUser.Role.STUDENT, "test@ue.edu.ph", is_dummy=True))
+        request = RequestFactory().post("/")
+        request.user = AnonymousUser()
+        self.assertFalse(_is_dummy(request))

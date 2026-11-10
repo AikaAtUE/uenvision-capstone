@@ -154,13 +154,20 @@ def _marked_not_tech(record):
     return str(v or "").strip().lower() in ("false", "0", "no")
 
 
-def write_skill_csvs(records, out_dir):
+def write_skill_csvs(records, out_dir, is_counted=None):
     """records: dicts with job_name, experience_level, hard_skills, soft_skills.
     Only tech postings are written: postings the extraction marked as not a tech job
     (isTechJob false, e.g. an accountant the job board also returned) are left out, so
     counting hard_skills.csv gives the same numbers as the homepage, Dashboard and Job
-    Market, which count tech postings only. extracted_skills.csv still has every posting."""
-    records = [r for r in records if not _marked_not_tech(r)]
+    Market, which count tech postings only. extracted_skills.csv still has every posting.
+    is_counted: the site's own rule for which postings count (job_roles.record_is_counted).
+    The site passes it so the file and the pages can never disagree, including for older
+    postings whose isTechJob was never answered. Left out (the extraction script run on
+    its own, where every posting has an answer): only postings marked not-tech are dropped."""
+    if is_counted is None:
+        records = [r for r in records if not _marked_not_tech(r)]
+    else:
+        records = [r for r in records if is_counted(r)]
     for col, filename in SKILL_CSVS.items():
         path = os.path.join(out_dir, filename)
         fd, tmp = tempfile.mkstemp(dir=out_dir, prefix=filename + ".", suffix=".tmp")

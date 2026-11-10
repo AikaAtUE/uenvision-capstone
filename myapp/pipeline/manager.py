@@ -231,7 +231,7 @@ def clear_extracted_source(source: str) -> tuple[int, str | None]:
         state = json.loads(state_file.read_text(encoding="utf-8"))
         state = [r for r in state if str(r.get("source") or "").strip().lower() != source]
         _atomic_write_text(state_file, json.dumps(state, indent=2, ensure_ascii=False))
-    write_skill_csvs([dict(zip(columns, r)) for r in keep], str(data_dir()))
+    _write_skill_csvs([dict(zip(columns, r)) for r in keep])
     for k in list(_table_cache):
         _table_cache.pop(k, None)
     return removed, None
@@ -378,8 +378,16 @@ def query_table(key: str, q: str = "", page: int = 1, page_size: int = 50,
 # ---------------------------------------------------------------------------
 # Bumped when write_skill_csvs() changes what goes into hard_skills.csv / soft_skills.csv,
 # so files built by the older code are rebuilt once even if extracted_skills.csv hasn't
-# changed. "2": non-tech postings (isTechJob false) are left out.
-SKILL_CSVS_VERSION = "2"
+# changed. "2": non-tech postings (isTechJob false) are left out. "3": postings whose
+# isTechJob was never answered follow the same rule as the pages (job_roles.record_is_counted).
+SKILL_CSVS_VERSION = "3"
+
+
+def _write_skill_csvs(records) -> None:
+    """hard_skills.csv / soft_skills.csv with exactly the postings the pages count."""
+    from .. import job_roles   # imported here: job_roles imports this module
+
+    write_skill_csvs(records, str(data_dir()), is_counted=job_roles.record_is_counted)
 
 
 def ensure_skill_csvs() -> None:
@@ -401,7 +409,7 @@ def ensure_skill_csvs() -> None:
         return
     columns, rows = loaded
     recs = [dict(zip(columns, r)) for r in rows]
-    write_skill_csvs(recs, str(data_dir()))
+    _write_skill_csvs(recs)
     _atomic_write_text(version_file, SKILL_CSVS_VERSION)
     for k in SKILL_CSVS:
         _table_cache.pop(k, None)

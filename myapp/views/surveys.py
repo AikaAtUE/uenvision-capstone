@@ -96,8 +96,12 @@ def _save_curriculum_survey(respondent_type, payload, user=None, dummy=False):
 
 
 def _is_dummy(request):
-    """Answers sent while logged in as a dummy (test) account or a developer go to the dummy data set."""
-    return request.user.is_authenticated and request.user.answers_are_dummy
+    """Answers sent while logged in as a dummy (test) account or a developer go to the dummy data set.
+    So does a Student / Alumni Survey sent by anyone who isn't a student or alumnus (a
+    professor or administrator trying the survey out): it is not a real student's answer,
+    so it must not count in the real results."""
+    user = request.user
+    return user.is_authenticated and (user.answers_are_dummy or not user.is_learner)
 
 
 def _learner_survey_saved(request, response):

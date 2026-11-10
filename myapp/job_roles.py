@@ -151,9 +151,26 @@ def postings():
     return out
 
 
+def _counted(tech, role):
+    """THE rule for which postings count, everywhere: Gemini said it's a tech job
+    (isTechJob). Not answered yet: the old title rules (the title gives a role)."""
+    return tech if tech is not None else bool(role)
+
+
 def is_counted(p):
-    """Gemini said it's a tech job (isTechJob). Not answered yet: the old title rules."""
-    return p["tech"] if p["tech"] is not None else bool(p["role"])
+    """p: a posting from postings()."""
+    return _counted(p["tech"], p["role"])
+
+
+def record_is_counted(record):
+    """The same rule for a raw extracted_skills row (a dict by column name; the extraction's
+    resume records say is_tech_job). hard_skills.csv / soft_skills.csv are written with this,
+    so counting those files gives what the pages show."""
+    v = record.get("isTechJob", record.get("is_tech_job"))
+    tech = v if isinstance(v, bool) else _flag(v)
+    role = role_for(record.get("job_name") or record.get("job_title"),
+                    str(record.get("function") or "").strip(), is_tech=bool(tech))
+    return _counted(tech, role)
 
 
 def fits_program(p, program):
