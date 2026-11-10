@@ -842,10 +842,7 @@ a.btn { text-decoration: none; }
 :root[data-theme="dark"] .stat-card{background:#22355f;}
 :root[data-theme="dark"] .toast{background:#2f4a82;}
 :root[data-theme="dark"] .toast.is-error{background:var(--red);}
-/* the logo's navy wordmark needs a light backing to stay readable on dark backgrounds */
-:root[data-theme="dark"] img.sidebar-logo--full, :root[data-theme="dark"] img.auth-logo,
-:root[data-theme="dark"] img.about-logo, :root[data-theme="dark"] img.pub-logo{background:#f2f3f5; padding:6px 10px; border-radius:10px;}
-:root[data-theme="dark"] img.sidebar-logo--mark{background:#f2f3f5; padding:3px; border-radius:8px;}
+/* (the logo has its own version for dark backgrounds: see .ue-logo at the end of this file) */
 
 /* ============ Likert scale with a label under every point (SUS / UAT) ============ */
 .likert-scale { align-items: stretch; }
@@ -1066,3 +1063,19 @@ th .th-sort.is-sorted .th-sort-arrow{opacity:1;}
 .fb-edit-case-head{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;}
 .fb-edit-case-tools{display:flex; gap:12px;}
 :root[data-theme="dark"] .fb-form-editor{background:#1a2440; border-color:#3a4a72;}
+
+/* ============ Logo: the light / dark versions, and the icon ============
+   _logo.html puts both versions on the page; only the one for the current theme shows.
+   The icon (uenvision-mark.svg) sits on its own white rounded tile, so it reads on the grey
+   sidebar, the red top bar and dark backgrounds alike. */
+img.ue-logo.ue-logo--dark{display:none;}
+:root[data-theme="dark"] img.ue-logo.ue-logo--light{display:none;}
+:root[data-theme="dark"] img.ue-logo.ue-logo--dark{display:block;}
+:root[data-theme="dark"] img.pub-logo.ue-logo--dark{height:38px;}   /* its tile makes the artwork taller */
+img.auth-logo{width:230px; max-width:78%;}
+img.auth-logo--sm{width:170px;}
+img.about-logo{width:220px; max-width:70%;}
+img.sidebar-logo--mark, .sidebar.is-collapsed img.sidebar-logo--mark{width:40px; border-radius:6px; box-shadow:0 0 0 1px rgba(22,35,63,.10);}
+.mobile-bar-home{overflow:hidden;}
+img.mobile-bar-logo, .app-shell:has(> .sidebar.is-collapsed) img.mobile-bar-logo{width:40px;}
+:root[data-theme="dark"] .mobile-bar-home{background:#fff;}

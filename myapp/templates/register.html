@@ -38,7 +38,7 @@
         <p>UEnvision is collecting this information for academic research purposes only, under the Data Privacy Act of 2012 (RA 10173).</p>
         <ul>
           <li><strong>Purpose:</strong> to compare the technical skills taught in the BSIT/BSCS curricula against current IT/CS job market demand{% if kind == "alumni" %}, including how well they carried over into your career{% endif %}.</li>
-          <li><strong>What is collected:</strong> your name, email, course, student number, {% if kind == "alumni" %}year graduated, your subjects/skills, and your employment situation as you describe it{% else %}year level, section, the subjects you've taken, and the skills and levels you report for each{% endif %}.</li>
+          <li><strong>What is collected:</strong> your name, email, course, student number{% if kind == "alumni" %} (optional){% endif %}, {% if kind == "alumni" %}year graduated, your subjects/skills, and your employment situation as you describe it{% else %}year level, section, the subjects you've taken, and the skills and levels you report for each{% endif %}.</li>
           <li><strong>Confidentiality:</strong> your responses are used only in aggregate for this research and are not shared outside the research team and its adviser.</li>
           <li><strong>Voluntary participation:</strong> you may decline to answer or stop at any time without consequence.</li>
           <li><strong>Questions or concerns:</strong> email the UEnvision research team at <a class="link-inline" href="mailto:inquiries@uenvision.tech">inquiries@uenvision.tech</a>.</li>
@@ -52,7 +52,7 @@
         <label class="field"><span>Last name</span><input type="text" name="last_name" value="{{ form.last_name|default:'' }}" autocomplete="family-name" maxlength="100" required></label>
       </div>
       <div class="cs-row-2">
-        <label class="field"><span>Student number</span><input type="text" name="student_number" value="{{ form.student_number|default:'' }}" maxlength="30" required></label>
+        <label class="field"><span>Student number{% if kind == "alumni" %} <span class="muted">(optional)</span>{% endif %}</span><input type="text" name="student_number" value="{{ form.student_number|default:'' }}" maxlength="30"{% if kind != "alumni" %} required{% endif %}></label>
         <label class="field"><span>Course</span>
           <select name="course" required>
             <option value="">Select…</option>

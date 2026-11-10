@@ -114,12 +114,12 @@ def backfill(id_from: int, id_to: int, output_dir: Path, delay_min: float, delay
     except (OSError, ValueError):
         pass
 
+    # Every probe needs the build id, so look it up now (or reuse the one the last run saved).
+    build = ks.BuildId(session, output_dir / ks.BUILD_ID_FILE, build_id)
+    build_id = build.get()
     if not build_id:
-        build_id = ks.discover_build_id(session)
-        if not build_id:
-            log.error("Aborting: no build_id available (pass --build-id to override).")
-            sys.exit(1)
-        ks.random_delay(delay_min, delay_max)
+        log.error("Aborting: no build_id available (pass --build-id to override).")
+        sys.exit(1)
 
     have = existing_ids(output_dir)
     n = {"checked": 0, "saved": 0, "existing": 0, "not_tech": 0, "too_old": 0, "missing": 0, "failed": 0}
@@ -143,11 +143,11 @@ def backfill(id_from: int, id_to: int, output_dir: Path, delay_min: float, delay
             n["missing" if found == "missing" else "failed"] += 1
             misses += 1
             if misses >= MISSES_BEFORE_NEW_BUILD:
-                new = ks.discover_build_id(session)
+                changed = build.refresh(force=True)
                 ks.random_delay(delay_min, delay_max)
-                if new and new != build_id:
+                if changed:
                     log.info("Kalibrr redeployed (new build id); checking the last %d IDs again.", misses)
-                    build_id = new
+                    build_id = build.value
                     job_id += misses        # the loop steps back down through them
                 misses = 0
             if job_id % 50 == 0:

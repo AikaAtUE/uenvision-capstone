@@ -70,6 +70,11 @@
             var k = el.getAttribute('data-about');
             if (k in about) el.textContent = about[k];
           });
+          // optional details (an alumni's student number) leave the line when they are blank
+          Array.prototype.forEach.call(document.querySelectorAll('[data-about-optional]'), function (el) {
+            var k = el.getAttribute('data-about-optional');
+            if (k in about) el.hidden = !about[k];
+          });
           Array.prototype.forEach.call(document.querySelectorAll('[data-about-name]'), function (el) { el.value = about.name || el.value; });
           if (status) status.textContent = 'Saved to your account.';
         })

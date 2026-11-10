@@ -173,7 +173,8 @@ def clean_learner_info(kind, post):
 
     info = {"student_number": " ".join(str(post.get("student_number") or "").split()),
             "course": str(post.get("course") or "")}
-    if not info["student_number"]:
+    # Alumni may leave it blank: many no longer remember or have their student number.
+    if kind == "student" and not info["student_number"]:
         return info, "Please enter your student number."
     if len(info["student_number"]) > MAX_STUDENT_NUMBER_LENGTH:
         return info, "That student number is too long."
@@ -199,7 +200,10 @@ def clean_learner_info(kind, post):
 
 def student_number_taken(number, exclude_pk=None, dummy=False):
     """Another account already registered this student number (one account per student).
-    Dummy (test) accounts are only compared with each other, so they never block a real student."""
+    Dummy (test) accounts are only compared with each other, so they never block a real student.
+    A blank number (alumni may leave it out) is never "taken"."""
+    if not number:
+        return False
     others = CustomUser.objects.filter(learner_info__student_number=number, is_dummy=dummy)
     if exclude_pk is not None:
         others = others.exclude(pk=exclude_pk)

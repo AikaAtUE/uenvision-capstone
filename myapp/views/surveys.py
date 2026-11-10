@@ -342,8 +342,9 @@ def _prefill(user):
     info = dict(user.learner_info or {})
     year = str(info.get("year_level") or "")
     suffix = {"1": "st", "2": "nd", "3": "rd"}.get(year, "th")
-    needed = ("student_number", "course") + (("year_graduated",) if user.role == user.Role.ALUMNI
-                                             else ("year_level", "section"))
+    # alumni may leave their student number out
+    needed = (("course", "year_graduated") if user.role == user.Role.ALUMNI
+              else ("student_number", "course", "year_level", "section"))
     return {**info, "name": user.get_full_name(), "email": user.email,
             "first_name": user.first_name, "middle_name": user.middle_name, "last_name": user.last_name,
             "year_label": f"{year}{suffix} Year" if year else "",

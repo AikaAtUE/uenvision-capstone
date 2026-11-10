@@ -1,2 +1,5 @@
-{% load static %}{# Full UEnvision logo (mark + wordmark) — replaces the old inline SVG. #}
-<img class="{{ logo_class|default:"auth-logo" }}" src="{% static 'myapp/img/uenvision-logo.png' %}" alt="UEnvision">
+{% load static %}{% comment %}The UEnvision logo (icon + name). logo_variant="horizontal" is the one-line logo for
+   narrow bars; the default is the stacked one. Each has a version for dark backgrounds: both are on the
+   page and the theme shows one of them (styles.css, .ue-logo).{% endcomment %}
+{% if logo_variant == "horizontal" %}<img class="{{ logo_class|default:"auth-logo" }} ue-logo ue-logo--light" src="{% static 'myapp/img/logo/uenvision-horizontal.svg' %}" alt="UEnvision"><img class="{{ logo_class|default:"auth-logo" }} ue-logo ue-logo--dark" src="{% static 'myapp/img/logo/uenvision-horizontal-dark.svg' %}" alt="UEnvision">
+{% else %}<img class="{{ logo_class|default:"auth-logo" }} ue-logo ue-logo--light" src="{% static 'myapp/img/logo/uenvision-vertical.svg' %}" alt="UEnvision"><img class="{{ logo_class|default:"auth-logo" }} ue-logo ue-logo--dark" src="{% static 'myapp/img/logo/uenvision-vertical-dark.svg' %}" alt="UEnvision">{% endif %}

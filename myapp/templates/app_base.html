@@ -9,7 +9,7 @@
          collapses / expands the sidebar (on phones: closes the menu). script.js keeps id="collapse-btn".{% endcomment %}
       <div class="sidebar-top">
         <a class="sidebar-home" href="{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" aria-label="UEnvision home" title="Home">
-          <img class="sidebar-logo sidebar-logo--mark" src="{% static 'myapp/img/uenvision-mark.png' %}" alt="UEnvision">
+          <img class="sidebar-logo sidebar-logo--mark" src="{% static 'myapp/img/logo/uenvision-mark.svg' %}" alt="UEnvision">
         </a>
         <button type="button" class="sidebar-toggle" id="collapse-btn" aria-controls="sidebar" aria-expanded="true" aria-label="Close menu" title="Close menu">
           <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -142,7 +142,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
         <a class="mobile-bar-home" href="{% if user.is_learner %}{% url 'student_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}" aria-label="UEnvision home">
-          <img class="mobile-bar-logo" src="{% static 'myapp/img/uenvision-mark.png' %}" alt="">
+          <img class="mobile-bar-logo" src="{% static 'myapp/img/logo/uenvision-mark.svg' %}" alt="">
         </a>
         <span class="mobile-bar-title"></span>
       </div>

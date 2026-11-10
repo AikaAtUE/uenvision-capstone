@@ -15,7 +15,9 @@
 {# ?v= forces the browser to re-download after every change (remove once you deploy) #}
 <link rel="stylesheet" href="{% static 'myapp/styles.css' %}?v={% now 'U' %}">
 {% if tour_config %}<link rel="stylesheet" href="{% static 'myapp/onboarding-tour.css' %}?v={% now 'U' %}">{% endif %}
-<link rel="icon" type="image/png" href="{% static 'myapp/img/uenvision-mark.png' %}">
+<link rel="icon" type="image/svg+xml" href="{% static 'myapp/img/logo/uenvision-mark.svg' %}">
+<link rel="alternate icon" type="image/png" href="{% static 'myapp/img/logo/uenvision-icon-192.png' %}">
+<link rel="apple-touch-icon" href="{% static 'myapp/img/logo/uenvision-icon-192.png' %}">
 {% block extra_head %}{% endblock %}
 </head>
 <!--

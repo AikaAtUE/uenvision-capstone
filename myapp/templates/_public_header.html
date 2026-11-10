@@ -1,6 +1,6 @@
 {% load static %}
 <header class="pub-header{% if user.is_authenticated and survey_first %} pub-header--locked{% endif %}">
-  <a href="{% url 'home' %}" class="pub-brand">{% include "_logo.html" with logo_class="pub-logo" %}</a>
+  <a href="{% url 'home' %}" class="pub-brand">{% include "_logo.html" with logo_class="pub-logo" logo_variant="horizontal" %}</a>
   <nav class="pub-nav">
     {% if user.is_authenticated %}
       {# Hidden until their initial survey is answered: it would only open the "answer the survey first" pop-up. #}

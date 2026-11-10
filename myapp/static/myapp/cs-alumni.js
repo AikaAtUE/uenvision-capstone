@@ -307,8 +307,8 @@
         setFormError('alumni-error', 'Please enter a valid email address.');
         return;
       }
-      if (!name || !email || !course || !studentNumber || !yearGraduated) {
-        setFormError('alumni-error', 'Please fill in every personal info field.');
+      if (!name || !email || !course || !yearGraduated) {   // the student number is optional for alumni
+        setFormError('alumni-error', 'Please fill in your name, email, course and the year you graduated.');
         return;
       }
       if (!consent) {

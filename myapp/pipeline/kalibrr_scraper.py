@@ -23,10 +23,16 @@ How it works
 6. A random delay is inserted between *every* HTTP request to avoid hammering
    the server / looking like a bot.
 
-The Next.js `build_id` embedded in Kalibrr's data URLs changes whenever
-Kalibrr redeploys their frontend. Rather than hardcoding it, this script
-scrapes the current build_id from the Kalibrr homepage automatically. You
-can also pass --build-id to skip that step / pin a known-good value.
+Only step 3 (the job details) needs a build id: the search API in step 1 doesn't.
+The Next.js `build_id` in Kalibrr's data URLs changes whenever Kalibrr redeploys
+their frontend, so it isn't hardcoded (see BuildId below):
+  * it is looked up only when the first job detail is needed, from the HTML of
+    that job's own page, then Kalibrr's homepage (any one of them is enough);
+  * the last one found is kept in {output_dir}/.kalibrr_build_id, so the next run
+    still works when Kalibrr's homepage is down;
+  * when a job detail comes back 404/403, the build id is looked up again and the
+    job is fetched once more if it changed (Kalibrr redeployed mid-run).
+You can also pass --build-id to start from a known-good value.
 
 Usage
 -----
@@ -62,6 +68,12 @@ except ImportError:                    # imported as myapp.pipeline.<scraper> (t
 
 SEARCH_URL = "https://www.kalibrr.com/kjs/job_board/search"
 HOME_URL = "https://www.kalibrr.com/"
+# Pages tried, after the job's own page, when looking up the build id. Any Next.js
+# page of Kalibrr's carries it, so one of them being down (the homepage often
+# answers 500) doesn't stop the run.
+BUILD_ID_PAGES = (HOME_URL, "https://www.kalibrr.com/home", "https://www.kalibrr.com/job-board/1")
+BUILD_ID_FILE = ".kalibrr_build_id"      # kept in the output folder (git ignores it)
+REFRESH_GAP = 300   # seconds: look the build id up again at most this often unless it changed
 JOB_DETAIL_TEMPLATE = (
     "https://www.kalibrr.com/_next/data/{build_id}/en/c/{company_code}/"
     "jobs/{job_id}/{slug}.json?code={company_code}&param={job_id}&param={slug}"
@@ -80,8 +92,9 @@ USER_AGENTS = [
     "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0",
 ]
 
-MAX_RETRIES = 3
-RETRY_BACKOFF_BASE = 2.0  # seconds; grows exponentially per retry
+MAX_RETRIES = 5
+RETRY_BACKOFF_BASE = 2.0  # seconds; doubles per retry (2, 4, 8, 16) so a short Kalibrr outage is waited out
+SEARCH_COOLDOWN = 60      # seconds to wait before asking for a failed search page one last time
 
 logging.basicConfig(
     level=logging.INFO,
@@ -90,8 +103,10 @@ logging.basicConfig(
 )
 log = logging.getLogger("kalibrr_scraper")
 
-# Why the last get_json_with_retries() call returned None (for the failed saves log).
+# Why the last get_json_with_retries() call returned None (for the failed saves log),
+# and its HTTP status (None when there was no HTTP answer).
 LAST_ERROR = ""
+LAST_STATUS = None
 JOB_PAGE_TEMPLATE = "https://www.kalibrr.com/c/{company_code}/jobs/{job_id}/{slug}"
 
 
@@ -124,16 +139,23 @@ def random_delay(min_s: float, max_s: float) -> None:
 
 def get_json_with_retries(session: requests.Session, url: str) -> dict | None:
     """GET a URL and parse JSON, retrying with exponential backoff."""
-    global LAST_ERROR
+    global LAST_ERROR, LAST_STATUS
     LAST_ERROR = ""
+    LAST_STATUS = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             resp = session.get(url, headers=random_headers(), timeout=20)
+            LAST_STATUS = resp.status_code
             if resp.status_code == 200:
                 return resp.json()
             if resp.status_code == 404:
                 log.warning("404 Not Found: %s", url)
                 LAST_ERROR = "HTTP 404 Not Found (the posting may have been taken down)"
+                return None
+            if resp.status_code == 403:
+                # Asking again doesn't change a 403; the caller may look the build id up again instead.
+                log.warning("403 Forbidden: %s", url)
+                LAST_ERROR = "HTTP 403 Forbidden (Kalibrr refused this posting)"
                 return None
             LAST_ERROR = f"HTTP {resp.status_code} after {MAX_RETRIES} attempts"
             log.warning(
@@ -154,7 +176,7 @@ def get_json_with_retries(session: requests.Session, url: str) -> dict | None:
             )
 
         if attempt < MAX_RETRIES:
-            backoff = RETRY_BACKOFF_BASE * attempt
+            backoff = RETRY_BACKOFF_BASE * 2 ** (attempt - 1)
             time.sleep(backoff)
 
     log.error("Giving up on %s after %d attempts", url, MAX_RETRIES)
@@ -165,39 +187,99 @@ def get_json_with_retries(session: requests.Session, url: str) -> dict | None:
 # Next.js build_id discovery
 # --------------------------------------------------------------------------
 
-def discover_build_id(session: requests.Session) -> str | None:
+_BUILD_ID_RES = (
+    ("__NEXT_DATA__", re.compile(r'"buildId"\s*:\s*"([^"]+)"')),
+    ("static manifest path", re.compile(r"/_next/static/([A-Za-z0-9_-]+)/_buildManifest\.js")),
+)
+
+
+def discover_build_id(session: requests.Session, page_urls=None) -> str | None:
     """
     Kalibrr's job-detail data URLs are namespaced under a Next.js build id
     (e.g. /_next/data/{build_id}/...). This id changes on every Kalibrr
-    deploy, so we scrape it live from the homepage's __NEXT_DATA__ /
-    buildManifest reference instead of hardcoding it.
+    deploy, so we read it live from a Kalibrr page's __NEXT_DATA__ /
+    buildManifest reference instead of hardcoding it. `page_urls` are tried
+    first (a job's own page), then BUILD_ID_PAGES; the first page that has it wins.
     """
     log.info("Discovering current Kalibrr Next.js build_id ...")
-    try:
-        resp = session.get(HOME_URL, headers=random_headers(), timeout=20)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
-        log.error("Could not fetch homepage to discover build_id: %s", exc)
-        return None
+    tried = []
+    for url in [*(page_urls or ()), *BUILD_ID_PAGES]:
+        if not url or url in tried:
+            continue
+        tried.append(url)
+        try:
+            resp = session.get(url, headers={**random_headers(), "Accept": "text/html,*/*"}, timeout=20)
+        except requests.RequestException as exc:
+            log.warning("Couldn't open %s to look up the build_id: %s", url, exc)
+            continue
+        # A 404 page is a Next.js page too, so it still carries the build id.
+        html = resp.text if resp.status_code in (200, 404) else ""
+        if not html:
+            log.warning("Couldn't open %s to look up the build_id: HTTP %s", url, resp.status_code)
+            continue
+        for where, pattern in _BUILD_ID_RES:
+            match = pattern.search(html)
+            if match:
+                log.info("Discovered build_id (from %s of %s): %s", where, url, match.group(1))
+                return match.group(1)
+        log.warning("No build_id in the HTML of %s", url)
 
-    html = resp.text
-
-    # Most reliable: the __NEXT_DATA__ script tag contains {"buildId":"..."}
-    match = re.search(r'"buildId"\s*:\s*"([^"]+)"', html)
-    if match:
-        build_id = match.group(1)
-        log.info("Discovered build_id (from __NEXT_DATA__): %s", build_id)
-        return build_id
-
-    # Fallback: look for /_next/static/{build_id}/_buildManifest.js references
-    match = re.search(r"/_next/static/([A-Za-z0-9_-]+)/_buildManifest\.js", html)
-    if match:
-        build_id = match.group(1)
-        log.info("Discovered build_id (from static manifest path): %s", build_id)
-        return build_id
-
-    log.error("Could not locate build_id in homepage HTML.")
+    log.error("Could not find Kalibrr's build_id on any of: %s", ", ".join(tried))
     return None
+
+
+class BuildId:
+    """
+    The build id for job-detail URLs. Looked up only when a job detail is first needed,
+    remembered in `cache_file` for the next run, and looked up again (at most once every
+    REFRESH_GAP seconds) when Kalibrr seems to have redeployed.
+    """
+
+    def __init__(self, session, cache_file: Path | None = None, value: str | None = None):
+        self.session = session
+        self.cache_file = cache_file
+        self.value = value or self._read_cache()
+        if self.value and not value:
+            log.info("Using the build_id saved by the last run: %s", self.value)
+        self.checked_at = None          # time.monotonic() of the last lookup
+
+    def _read_cache(self) -> str | None:
+        try:
+            return self.cache_file.read_text(encoding="utf-8").strip() or None if self.cache_file else None
+        except OSError:
+            return None
+
+    def _save(self) -> None:
+        if not self.cache_file:
+            return
+        try:
+            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+            self.cache_file.write_text(self.value, encoding="utf-8")
+        except OSError as exc:
+            log.warning("Couldn't save the build_id to %s: %s", self.cache_file, exc)
+
+    def _can_check(self) -> bool:
+        return self.checked_at is None or time.monotonic() - self.checked_at >= REFRESH_GAP
+
+    def get(self, page_url: str | None = None) -> str | None:
+        """The build id, looking it up if there isn't one yet (None if that failed)."""
+        if not self.value and self._can_check():
+            self.refresh(page_url, force=True)
+        return self.value
+
+    def refresh(self, page_url: str | None = None, force: bool = False) -> bool:
+        """Look the build id up again; True when a new, different one was found."""
+        if not force and not self._can_check():
+            return False
+        self.checked_at = time.monotonic()
+        new = discover_build_id(self.session, [page_url] if page_url else None)
+        if not new or new == self.value:
+            return False
+        if self.value:
+            log.info("Kalibrr's build_id changed: %s -> %s", self.value, new)
+        self.value = new
+        self._save()
+        return True
 
 
 # --------------------------------------------------------------------------
@@ -212,16 +294,45 @@ def fetch_search_page(
     return get_json_with_retries(session, url)
 
 
+REDIRECT_RE = re.compile(r"^/(?:en/)?c/([^/]+)/jobs/(\d+)/([^/?#]+)")
+
+
 def fetch_job_detail(
     session: requests.Session, build_id: str, company_code: str, job_id, slug: str
 ) -> dict | None:
-    url = JOB_DETAIL_TEMPLATE.format(
-        build_id=build_id,
-        company_code=quote(str(company_code)),
-        job_id=job_id,
-        slug=quote(str(slug)),
-    )
-    return get_json_with_retries(session, url)
+    """The job page data ({"pageProps": {"job": {...}, ...}}), or None (why: LAST_ERROR).
+
+    When the slug or company code in the search result is out of date, Kalibrr answers
+    {"pageProps": {"__N_REDIRECT": "/c/<code>/jobs/<id>/<slug>"}}; that redirect is followed
+    once. Answers without a job in them are not returned, so they never get saved as job files.
+    """
+    global LAST_ERROR, LAST_STATUS
+    for _ in range(2):
+        url = JOB_DETAIL_TEMPLATE.format(
+            build_id=quote(str(build_id)),
+            company_code=quote(str(company_code)),
+            job_id=job_id,
+            slug=quote(str(slug)),
+        )
+        data = get_json_with_retries(session, url)
+        if data is None:
+            return None
+        props = data.get("pageProps") if isinstance(data, dict) else None
+        props = props if isinstance(props, dict) else {}
+        if isinstance(props.get("job"), dict):
+            return data
+        match = REDIRECT_RE.match(str(props.get("__N_REDIRECT") or ""))
+        if match and match.group(2) == str(job_id) and (match.group(1), match.group(3)) != (company_code, slug):
+            company_code, slug = match.group(1), match.group(3)
+            log.info("Job %s moved to /c/%s/jobs/%s/%s; following it.", job_id, company_code, job_id, slug)
+            continue
+        break
+    LAST_STATUS = None
+    LAST_ERROR = ("Kalibrr's answer had no job details (the posting may be closed or private)"
+                  if not (isinstance(data, dict) and data.get("notFound")) else
+                  "Kalibrr says the posting was not found")
+    log.warning("No job details for job %s: %s", job_id, LAST_ERROR)
+    return None
 
 
 def job_output_path(output_dir: Path, job_id, slug: str) -> Path:
@@ -244,12 +355,8 @@ def scrape(
     session = build_session()
     record = Recorder(report_dir, "kalibrr", text)
 
-    if not build_id:
-        build_id = discover_build_id(session)
-        if not build_id:
-            log.error("Aborting: no build_id available (pass --build-id to override).")
-            sys.exit(1)
-        random_delay(delay_min, delay_max)
+    # Only the job details need the build id, so it's looked up when the first one is needed.
+    build = BuildId(session, output_dir / BUILD_ID_FILE, build_id)
 
     offset = 0
     total_count = None
@@ -264,6 +371,13 @@ def scrape(
 
         page = fetch_search_page(session, text, limit, offset)
         random_delay(delay_min, delay_max)
+        if page is None and LAST_STATUS != 404:
+            # Kalibrr answers 500/502/503 for a minute or so now and then; wait it out once.
+            log.warning("Search failed at offset=%d (%s); trying once more in %ds.",
+                        offset, LAST_ERROR or "no response", SEARCH_COOLDOWN)
+            time.sleep(SEARCH_COOLDOWN)
+            page = fetch_search_page(session, text, limit, offset)
+            random_delay(delay_min, delay_max)
 
         if page is None:
             log.error("Search request failed at offset=%d; stopping.", offset)
@@ -308,9 +422,20 @@ def scrape(
                 skipped_existing += 1
                 continue
 
+            current = build.get(page_url)
+            if not current:
+                failed += 1
+                record.failed("Couldn't fetch the job details: Kalibrr's build id couldn't be found "
+                              "(its pages didn't load)", job_id, title, company, page_url)
+                continue
+
             log.info("Fetching job detail: id=%s slug=%s company=%s", job_id, slug, company_code)
-            detail = fetch_job_detail(session, build_id, company_code, job_id, slug)
+            detail = fetch_job_detail(session, current, company_code, job_id, slug)
             random_delay(delay_min, delay_max)
+            if detail is None and LAST_STATUS in (403, 404) and build.refresh(page_url):
+                # Kalibrr redeployed mid-run: the old build id's URLs stop working.
+                detail = fetch_job_detail(session, build.value, company_code, job_id, slug)
+                random_delay(delay_min, delay_max)
 
             if detail is None:
                 failed += 1
@@ -379,7 +504,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--build-id", default=None,
-        help="Override the Next.js build_id instead of auto-discovering it.",
+        help="Start from this Next.js build_id instead of looking it up (it's still "
+             "looked up again if Kalibrr redeploys during the run).",
     )
     parser.add_argument(
         "--max-jobs", type=int, default=None,

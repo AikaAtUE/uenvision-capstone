@@ -1,7 +1,7 @@
 /* Public pages: homepage, "check your skill gap", registration */
 .pub-header{display:flex; align-items:center; justify-content:space-between; padding:14px 28px; background:var(--surface); border-bottom:1px solid var(--line);}
 .pub-brand{display:flex; align-items:center;}
-.pub-logo{height:40px; width:auto;}
+.pub-logo{height:30px; width:auto; max-width:56vw;}
 .pub-nav{display:flex; gap:10px;}
 .pub-nav .btn{text-decoration:none;}
 .pub-logout{display:inline-flex; align-items:center; gap:6px;}
