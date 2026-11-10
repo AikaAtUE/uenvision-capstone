@@ -41,6 +41,8 @@ def notify_faculty_signup(request, new_user):
         )
     except Exception:
         log.exception("Could not email administrators about the sign-up of %s", new_user.email)
+        return
+    log.info("Emailed %d administrator(s) about the faculty sign-up of %s", len(to), new_user.email)
 
 
 def notify_approved(request, user):
@@ -88,4 +90,5 @@ def send_temporary_password(request, user, password, new_account=False):
     except Exception:
         log.exception("Could not email the temporary password to %s", user.email)
         return False
+    log.info("Emailed a temporary password to %s", user.email)
     return True

@@ -124,6 +124,7 @@ def send_reminder(request, user, missing):
     except Exception:
         log.exception("Could not send the survey reminder to %s", user.email)
         return False
+    log.info("Sent a survey reminder to %s", user.email)
     cache.set(_reminded_key(user.pk), timezone.now().isoformat(), REMIND_EVERY_SECONDS)
     return True
 

@@ -44,7 +44,7 @@
           <label class="checkbox"><input type="checkbox" name="ds_extract" checked><span>Extract skills with Gemini into <code>data/extracted_skills.csv</code></span></label>
           <label class="checkbox"><input type="checkbox" name="ds_standardize" checked><span>Standardize hard skills using the skills ontology</span></label>
           <label class="checkbox"><input type="checkbox" name="ds_ghost" checked><span>Ghost job detection: check the postings and report how many are marked</span></label>
-          <small class="field-hint">Ghost job detection checks postings that are in Extracted Skills, so a dataset's jobs are only checked once their skills have been extracted. Public datasets have no salary or "verified company" fields, so those signs are skipped for them.</small>
+          <small class="field-hint">Ghost job detection only checks the job board postings (Kalibrr, Trabajo, Foundit), so an imported dataset's jobs are never marked or listed, the same way they never count on the Dashboard.</small>
           <small class="field-hint">Uses the model ({{ extract_settings.model }}) and rows per prompt ({{ extract_settings.batch_size }}) from Data Extraction &gt; Skill Extraction, and its {{ key_count }} API key{{ key_count|pluralize }}. The steps run in the background and open the Console; running again resumes where it stopped. Untick all three to only import the file.</small>
         </fieldset>
       </div>

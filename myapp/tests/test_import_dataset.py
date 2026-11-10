@@ -104,20 +104,23 @@ class ImportDatasetTests(IsolatedDataMixin, TestCase):
         self.assertRedirects(resp, reverse("data_import"))
         self.assertFalse((settings.DATA_DIR / ".state" / "run.json").is_file())
 
-    def test_ghost_check_reads_dataset_descriptions_and_skips_salary(self):
+    def test_ghost_check_leaves_dataset_postings_out(self):
+        # Imported datasets such as Djinni are not job board postings, so ghost job detection
+        # neither checks nor lists them (like the Dashboard, which never counts them).
         pipeline.import_dataset("djinni", upload(), merge=True)
         pipeline.ensure_dirs()
         with open(pipeline.extracted_csv(), "w", encoding="utf-8-sig", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["job_id", "source", "job_name", "company_name", "date", "hard_skills"])
-            w.writerow(["djinni-JOB-000001", "djinni", "Front-end Developer", "Acme", "2023-01-03", "React"])
-            w.writerow(["djinni-JOB-000002", "djinni", "Data Analyst", "", "2023-01-04", "SQL"])
+            w.writerow(["job_id", "source", "job_name", "company_name", "date", "salary_shown", "hard_skills"])
+            w.writerow(["djinni-JOB-000001", "djinni", "Front-end Developer", "Acme", "2023-01-03", "", "React"])
+            w.writerow(["djinni-JOB-000002", "djinni", "Data Analyst", "", "2023-01-04", "", "SQL"])
+            w.writerow(["9", "kalibrr", "Data Analyst", "Beta", "2026-09-01", "False", "SQL"])
         ghost_jobs.save_settings({**ghost_jobs.DEFAULT_SETTINGS, "weak_signs_needed": 1})
         ghost_jobs._CACHE.update(key=None, value=None)
         found = ghost_jobs.detect()
-        info = found[("djinni", "djinni-JOB-000001")]
-        self.assertTrue(info["flagged"])
-        self.assertEqual(info["reasons"], ["Short description (25 characters)"])     # no "Salary hidden"
+        self.assertEqual(list(found), [("kalibrr", "9")])
+        self.assertEqual([r["source"] for r in ghost_jobs.flagged_postings()], ["kalibrr"])
         out = StringIO()
         call_command("ghost_job_check", stdout=out)
-        self.assertIn("djinni: 2 of 2 posting(s) marked", out.getvalue())
+        self.assertIn("kalibrr: 1 of 1 posting(s) marked", out.getvalue())
+        self.assertNotIn("djinni", out.getvalue())

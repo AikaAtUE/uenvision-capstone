@@ -2,6 +2,10 @@
 <nav class="data-tabs" aria-label="Data sections">
   <a class="data-tab{% if data_tab == 'view' %} is-active{% endif %}" href="{% url 'data' %}"{% if data_tab == 'view' %} aria-current="page"{% endif %}>View Data</a>
   <a class="data-tab{% if data_tab == 'professor_survey' %} is-active{% endif %}" href="{% url 'professor_survey' %}"{% if data_tab == 'professor_survey' %} aria-current="page"{% endif %}>Professor Survey</a>
+  {% if user.is_developer %}{# to test the learner surveys: answers sent from here are saved as dummy data (views.surveys._is_dummy) #}
+  <a class="data-tab" href="{% url 'student_survey' %}">Student Survey</a>
+  <a class="data-tab" href="{% url 'alumni_survey' %}">Alumni Survey</a>
+  {% endif %}
   {% if not user.is_administrator %}
   <a class="data-tab{% if data_tab == 'ghost' %} is-active{% endif %}" href="{% url 'data_ghost_jobs' %}"{% if data_tab == 'ghost' %} aria-current="page"{% endif %}>Ghost Jobs</a>
   {% endif %}

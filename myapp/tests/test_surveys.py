@@ -900,3 +900,39 @@ class LearnerElectiveTests(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         subj = CurriculumSurveyResponse.objects.get().data["subjects"][0]
         self.assertEqual((subj["code"], subj["programs"], subj["custom"]), ("CCS 4199", ["BSCS"], True))
+
+
+class DeveloperTriesLearnerSurveysTests(TestCase):
+    """Developers reach the Student / Alumni Surveys from the Data tabs to test them;
+    what they send is saved as dummy data, never as a real response."""
+
+    def setUp(self):
+        self.dev = CustomUser.objects.create_user(email="dev@ue.edu.ph", password="x" * 12, first_name="D",
+                                                  last_name="V", role=CustomUser.Role.DEVELOPER)
+        self.client.force_login(self.dev)
+
+    def test_data_tabs_link_both_learner_surveys(self):
+        html = self.client.get(reverse("data")).content.decode()
+        nav = html.split('class="data-tabs"', 1)[1].split("</nav>", 1)[0]
+        self.assertIn(f'href="{reverse("alumni_survey")}"', nav)
+        self.assertIn(f'href="{reverse("student_survey")}"', nav)
+        prof = CustomUser.objects.create_user(email="pf@ue.edu.ph", password="x" * 12, first_name="P",
+                                              last_name="F", role=CustomUser.Role.FACULTY)
+        self.client.force_login(prof)
+        nav = self.client.get(reverse("data")).content.decode().split('class="data-tabs"', 1)[1].split("</nav>", 1)[0]
+        self.assertNotIn(f'href="{reverse("alumni_survey")}"', nav)
+
+    def test_alumni_survey_try_out_is_saved_as_dummy(self):
+        page = self.client.get(reverse("alumni_survey"))
+        self.assertContains(page, "cs-banner--tryout")
+        payload = {"consent": True,
+                   "personal_info": {"name": "Dev Tester", "ue_email": "dev@ue.edu.ph", "course": "BSIT",
+                                     "student_number": "", "year_graduated": "2025"},
+                   "subjects": [{"code": "CPR 4970", "name": "Practicum for IT/IS", "term": "year4",
+                                 "skills": [{"name": "SQL", "level": "applied"}]}],
+                   "employment": {"status": "employed", "skills_to_learn": ["Docker"]}}
+        r = self.client.post(reverse("alumni_survey_submit"), content_type="application/json", data=json.dumps(payload))
+        self.assertEqual(r.status_code, 200, r.content)
+        saved = CurriculumSurveyResponse.objects.get(respondent_type=CurriculumSurveyResponse.ALUMNI)
+        self.assertTrue(saved.is_dummy)
+        self.assertIsNone(saved.user)

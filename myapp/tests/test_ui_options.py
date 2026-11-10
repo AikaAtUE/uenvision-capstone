@@ -141,11 +141,14 @@ class DeveloperViewTests(TestCase):
         self.dev = make_user("dev@ue.edu.ph", CustomUser.Role.DEVELOPER)
         self.admin = make_user("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR)
 
-    def test_developers_get_my_subjects_and_skills_under_data(self):
+    def test_developers_get_the_student_survey_tab_instead_of_my_subjects_and_skills(self):
         CurriculumSurveyResponse.objects.create(respondent_type="professor", user=self.dev, is_dummy=True,
                                                 data={"subjects": [{"code": "CCP 1101", "skills": []}]})
         self.client.force_login(self.dev)
-        self.assertContains(self.client.get(reverse("data")), f'href="{reverse("my_skills")}"')
+        data = self.client.get(reverse("data"))
+        self.assertNotContains(data, f'href="{reverse("my_skills")}"')   # the tab became Student Survey
+        self.assertContains(data, f'href="{reverse("student_survey")}">Student Survey</a>')
+        # the page itself still opens (by its address) as their faculty record
         page = self.client.get(reverse("my_skills"))
         self.assertEqual(page.status_code, 200)
         self.assertTrue(page.context["professor"])           # their faculty record, professor levels

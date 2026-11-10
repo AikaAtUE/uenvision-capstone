@@ -36,6 +36,9 @@ class GhostJobTests(IsolatedDataMixin, TestCase):
                         "date", "hard_skills", "soft_skills", "experience_level", "isTechJob"])
             for jid, name, company, sal, ver, date, hard, _ in ROWS:
                 w.writerow([jid, name, "kalibrr", company, ver, sal, date, hard, "Teamwork", "Entry", "True"])
+            # An imported dataset posting (Import Data): never checked or listed as a ghost job.
+            w.writerow(["djinni-1", "Android Developer", "djinni", "Acme Inc.", "False", "False", "2026-09-20",
+                        "Kotlin", "Teamwork", "Entry", "True"])
         with open(d / "compiled_kalibrr.csv", "w", encoding="utf-8-sig", newline="") as f:
             w = csv.writer(f)
             w.writerow(["job_id", "job_title", "description"])
@@ -113,6 +116,15 @@ class GhostJobTests(IsolatedDataMixin, TestCase):
         self.client.get(reverse("dashboard_skills"), {"ghost": "exclude"})
         self.client.logout()
         self.assertContains(self.client.get(reverse("home")), f"According to {len(ROWS)} IT/CS job postings")
+
+    def test_imported_datasets_are_not_checked(self):
+        from .. import ghost_jobs
+        found = ghost_jobs.detect()
+        self.assertNotIn(("djinni", "djinni-1"), found)
+        self.assertEqual(len(found), len(ROWS))
+        # Same company and title as kalibrr #1 / #2, but the dataset copy doesn't make them duplicates.
+        self.assertNotIn("djinni", " ".join(found[("kalibrr", "1")]["reasons"]))
+        self.assertTrue(all(r["source"] == "kalibrr" for r in ghost_jobs.flagged_postings()))
 
     # ---- Data -> Data Extraction -> Ghost Job Detection (Administrators) ----
     def test_ghost_jobs_page_and_settings(self):

@@ -26,6 +26,9 @@
     </ol>
   </div>
 
+  {% if user.is_authenticated and not user.is_learner %}
+  <div class="cs-banner cs-banner--tryout" role="note">You're trying this survey out as staff. Your answers are saved as test (dummy) data and never count in the real results. <a class="link-inline" href="{% url 'data' %}">Back to Data</a></div>
+  {% endif %}
   {% if is_placeholder_curriculum %}
   <div class="cs-banner">Sample curriculum shown below for preview/testing — the official BSIT/BSCS subject list will replace this before the survey goes live.</div>
   {% endif %}

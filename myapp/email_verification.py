@@ -59,6 +59,7 @@ def send_verification_email(request, user):
     except Exception:
         log.exception("Could not send the confirmation email to %s", user.email)
         return False
+    log.info("Sent a confirmation email to %s", user.email)
     cache.set(_resend_key(user.email), True, RESEND_WAIT_SECONDS)
     return True
 

@@ -21,9 +21,11 @@ Warning signs (each one can be turned on / off on Data -> Data Extraction -> Gho
       - company not verified on the job board (Kalibrr only)
 
 A sign that can't be checked for a posting (no compiled file to read the description
-from, no "verified" field on Trabajo, no salary fields at all in an imported public
-dataset) never counts against it. Imported datasets (Import Data) are checked like a source:
-their descriptions are read from data/datasets/<name>.csv.
+from, no "verified" field on Trabajo) never counts against it.
+
+Only the scraped job boards (pipeline/sources.py: Kalibrr, Trabajo, Foundit) are checked and
+listed. Imported public datasets (Import Data, e.g. Djinni) are left out, the same way
+job_roles.source_filter() keeps them off the Dashboard and every other result.
 """
 import contextvars
 import json
@@ -136,7 +138,7 @@ def _description_lengths() -> dict:
     """{(source, job_id): description length} from data/compiled_<source>.csv.
     A source without a compiled file just has no entries (the sign isn't checked)."""
     out = {}
-    for source in (*pipeline.SOURCES, *(f"dataset:{d}" for d in pipeline.list_datasets())):
+    for source in pipeline.SOURCES:
         loaded = pipeline.load_table(source)
         if loaded is None:
             continue
@@ -147,13 +149,13 @@ def _description_lengths() -> dict:
         for r in rows:
             if i_id < len(r):
                 desc = r[i_desc] if i_desc < len(r) else ""
-                out[(source.split(":", 1)[-1], r[i_id].strip())] = len(desc.strip())
+                out[(source, r[i_id].strip())] = len(desc.strip())
     return out
 
 
 def _stamp():
     parts = [get_settings_stamp()]
-    for key in ("extracted", *pipeline.SOURCES, *(f"dataset:{d}" for d in pipeline.list_datasets())):
+    for key in ("extracted", *pipeline.SOURCES):
         try:
             st = pipeline.table_path(key).stat()
             parts.append((key, st.st_mtime_ns, st.st_size))
@@ -170,8 +172,15 @@ def get_settings_stamp():
         return None
 
 
+def _checked_source(source) -> bool:
+    """A scraped job board ("" = rows saved before there was a source column). Imported
+    datasets such as Djinni are not checked, like job_roles.source_filter()."""
+    return source.lower() in {*pipeline.SOURCES, ""}
+
+
 def _rows():
-    """Every extracted posting as a dict of the columns detection needs."""
+    """Every extracted job board posting as a dict of the columns detection needs
+    (imported datasets are skipped, see _checked_source)."""
     loaded = pipeline.load_table("extracted")
     if loaded is None:
         return None
@@ -182,17 +191,16 @@ def _rows():
         i = idx.get(c)
         return r[i].strip() if i is not None and i < len(r) else ""
 
-    datasets = set(pipeline.list_datasets())
     out = []
     for r in rows:
+        if not _checked_source(get(r, "source")):
+            continue
         date = next((get(r, c) for c in ("date", "created_at", "date_posted", "activation_date") if get(r, c)), "")
         out.append({
             "source": get(r, "source"), "job_id": get(r, "job_id"),
             "job_name": get(r, "job_name"), "company_name": get(r, "company_name"),
             "job_url": get(r, "job_url"), "date": date,
             "salary_shown": _bool(get(r, "salary_shown")),
-            # Public datasets have no salary fields, so "salary hidden" can't be checked for them.
-            "salary_unknown": get(r, "source") in datasets,
             "has_salary": _has_number(get(r, "base_salary")) or _has_number(get(r, "maximum_salary")),
             "company_verified": _bool(get(r, "company_verified")),
         })
@@ -249,7 +257,7 @@ def detect(cfg: dict | None = None):
 
     for row in rows:
         info = result[(row["source"], row["job_id"])]
-        if cfg["flag_hidden_salary"] and not row.get("salary_unknown") and (row["salary_shown"] is False
+        if cfg["flag_hidden_salary"] and (row["salary_shown"] is False
                                           or (row["salary_shown"] is None and not row["has_salary"])):
             info["weak"] += 1
             info["reasons"].append("Salary hidden")

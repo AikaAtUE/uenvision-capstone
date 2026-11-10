@@ -229,11 +229,14 @@ LOGGING = {
     'disable_existing_loggers': False,
     'handlers': {'console': {'class': 'logging.StreamHandler'}},
     'root': {'handlers': ['console'], 'level': 'WARNING'},
-    # Account emails: every reset / confirmation email sent (or why not) shows in the server log
+    # Emails: every reset / confirmation / temporary password / admin alert / survey reminder
+    # sent (or why not) shows in the server log
     # (journalctl -u uenvision).
     'loggers': {
         'myapp.email_verification': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
         'myapp.views.auth': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'myapp.notifications': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'myapp.survey_tracker': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
     },
 }
 
