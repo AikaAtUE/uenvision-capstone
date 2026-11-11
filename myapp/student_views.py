@@ -514,7 +514,10 @@ def render_student_dashboard(request, active_page="student_dashboard", as_kind=N
 
     top_n = len(compare) or 1
     have_reported = max(have - plan["have_assumed"], 0)
+    from .recs_lab import live as recs_live   # the new recommendations ({} when the original system is on)
+    new_recs = recs_live.learner_context(request, user, is_alumni)
     return render(request, template, {
+        **new_recs,
         "active_page": active_page,
         "has_survey": has_survey,
         "survey_url": reverse("alumni_survey" if is_alumni else "student_survey"),

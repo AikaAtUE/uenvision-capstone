@@ -12,7 +12,7 @@ from django.urls import Resolver404, resolve, reverse
 # sends them back to their own dashboard.
 LEARNER_URL_NAMES = {
     "home", "role_skills", "check_gap", "skill_search", "skill_add", "register", "login", "logout",
-    "student_dashboard", "student_role", "student_generate", "my_skills", "my_skills_save", "assumed_skill",
+    "student_dashboard", "student_role", "student_generate", "recs_live_find", "my_skills", "my_skills_save", "assumed_skill",
     "student_survey", "student_survey_submit", "alumni_survey", "alumni_survey_submit", "learner_about_save",
     "feedback", "survey_submit", "feedback_later", "about", "help", "settings", "change_password", "session_ping",
     "update_account", "theme_save", "tour_seen", "send_my_verification", "verify_email", "resend_verification", "forgot_password", "reset_password", "reset_password_confirm",

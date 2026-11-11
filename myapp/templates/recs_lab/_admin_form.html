@@ -1,0 +1,23 @@
+{# The curriculum-gap filters. `form_action`: where it submits; `view` adds a hidden view field. #}
+<form class="rl-form" method="get" action="{{ form_action }}">
+  <label class="rl-field"><span>Program</span>
+    <select name="program" onchange="this.form.submit()">
+      <option value="">BSIT + BSCS</option>
+      <option value="BSIT"{% if program == 'BSIT' %} selected{% endif %}>BSIT</option>
+      <option value="BSCS"{% if program == 'BSCS' %} selected{% endif %}>BSCS</option>
+    </select>
+  </label>
+  <label class="rl-field"><span>Job postings</span>
+    <select name="levels" onchange="this.form.submit()">
+      <option value="entry"{% if levels == 'entry' %} selected{% endif %}>Entry-level only</option>
+      <option value="all"{% if levels == 'all' %} selected{% endif %}>All levels</option>
+    </select>
+  </label>
+  <label class="rl-field"><span>Minimum share of postings (%)</span>
+    <input type="number" name="floor" min="0.5" max="25" step="0.5" value="{{ floor }}" onchange="this.form.submit()">
+  </label>
+  {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+  {% if view %}<input type="hidden" name="view" value="{{ view }}">{% endif %}
+  <noscript><button class="btn btn-navy btn-sm" type="submit">Show</button></noscript>
+</form>
+

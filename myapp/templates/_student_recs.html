@@ -1,9 +1,12 @@
 {% comment %}Student / alumni recommendations (mockup layout): readiness, assumed skills, what to learn next, coming up.
-   Included in student_dashboard.html. Needs the render_student_dashboard context.{% endcomment %}
+   Included in student_dashboard.html. Needs the render_student_dashboard context.
+   With the new recommendation system on (new_recs, from recs_lab/live.py), the readiness panel and the
+   learning sections come from recs_lab/_learner_*.html; the assumed-skills panel stays as it is.{% endcomment %}
 <div class="rr" id="recommended">
 <h2 class="rr-title">Recommended for you</h2>
 <p class="muted rr-p">Updated automatically after your survey. Based on your skills, your year level and your target job role.</p>
     <div class="rr-top">
+      {% if new_recs %}{% include "recs_lab/_learner_ready.html" %}{% else %}
       <section class="panel rr-ready">
         <h3 class="rr-h">Job readiness{% if role %} for {{ role.label }}{% endif %}</h3>
         <p class="rr-ready-num"><span class="rr-big">{% if readiness is not None %}{{ readiness }}%{% else %}—{% endif %}</span>
@@ -17,6 +20,7 @@
         </ul>
         <p class="muted rc-small">Counts skills at Practiced or Applied, as in the tables above.</p>
       </section>
+      {% endif %}
 
       <section class="panel rr-assumed" id="assumed-skills">
         <h3 class="rr-h">Skills we assumed you have</h3>
@@ -47,6 +51,7 @@
       </section>
     </div>
 
+    {% if new_recs %}{% include "recs_lab/_learner_live.html" %}{% else %}
     <section class="rr-learn" id="learning-resources">
       <h2 class="rr-title rr-title--sm">What to learn next</h2>
       {% if not to_build %}
@@ -98,5 +103,6 @@
         {% for c in coming_up %}<li><strong>{{ c.skill }}</strong><span class="muted">Taught in {{ c.subject }}, {{ c.term }}</span></li>{% endfor %}
       </ul>
     </section>
+    {% endif %}
     {% endif %}
 </div>

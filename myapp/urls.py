@@ -2,6 +2,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 
 from . import google_auth, student_views, survey_admin, survey_tracker, views
+from .recs_lab import live as recs_live
 from .views import rec_admin
 
 urlpatterns = [
@@ -20,6 +21,7 @@ urlpatterns = [
     path("me/role/", student_views.student_role_view, name="student_role"),
     path("me/about/", student_views.learner_about_save_view, name="learner_about_save"),
     path("me/recommendations/generate/", student_views.student_generate_view, name="student_generate"),
+    path("me/recommendations/find/", recs_live.find_view, name="recs_live_find"),
     path("me/assumed-skills/", student_views.assumed_skill_view, name="assumed_skill"),
 
     path("login/", views.login_view, name="login"),
@@ -35,7 +37,9 @@ urlpatterns = [
     path("dashboard/skills/", views.dashboard_skills_view, name="dashboard_skills"),
     path("job-market/", views.job_market_view, name="job_market"),
     path("job-market/data/", views.job_market_data_view, name="job_market_data"),
-    path("recommendations/", views.recommendations_view, name="recommendations"),
+    # The new recommendation system (recs_lab/live.py). The original page keeps running at classic/, developers only.
+    path("recommendations/", recs_live.recommendations_view, name="recommendations"),
+    path("recommendations/classic/", recs_live.classic_view, name="recommendations_classic"),
     path("recommendations/generate/", views.recommendations_generate_view, name="recommendations_generate"),
     path("recommendations/download/", views.recommendations_download_view, name="recommendations_download"),
     path("data/", views.data_view, name="data"),

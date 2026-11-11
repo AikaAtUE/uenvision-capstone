@@ -402,3 +402,80 @@ class DummyAccountTests(IsolatedDataMixin, TestCase):
         self.assertEqual(r.context["preview"], role)
         s.refresh_from_db()
         self.assertEqual(s.target_role, "")
+
+
+class LiveTests(IsolatedDataMixin, TestCase):
+    """The new system on the real pages; the original page stays reachable by developers only."""
+    def setUp(self):
+        from django.test import override_settings
+        self._live = override_settings(RECS_SYSTEM="new")
+        self._live.enable()
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+        self._live.disable()
+
+    def test_faculty_get_the_new_page(self):
+        me = make_user("prof@ue.edu.ph", CustomUser.Role.FACULTY)
+        R.objects.create(respondent_type=R.PROFESSOR, user=me, data={"subjects": [
+            {"code": "CCS 1101", "name": "Fundamentals of Programming", "skills": [{"name": "Python", "level": "Applied"}]}]})
+        self.client.force_login(me)
+        r = self.client.get(reverse("recommendations"))
+        self.assertEqual(r.status_code, 200)
+        self.assertTemplateUsed(r, "recs_lab/live_recommendations.html")
+        self.assertEqual(r.context["view"], "subject")
+        self.assertEqual(r.context["code"], "CCS 1101")
+        self.assertNotContains(r, "Classic recommendations")
+        self.assertNotContains(r, "/recs-lab/")
+
+    def test_administrators_start_on_the_curriculum_gaps(self):
+        self.client.force_login(make_user("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR))
+        r = self.client.get(reverse("recommendations"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["view"], "gaps")
+        r = self.client.get(reverse("recommendations") + "?subject=CCS%201101")
+        self.assertEqual(r.context["view"], "subject")
+
+    def test_classic_page_is_for_developers_only(self):
+        for i, role in enumerate([CustomUser.Role.ADMINISTRATOR, CustomUser.Role.FACULTY]):
+            self.client.force_login(make_user(f"x{i}@ue.edu.ph", role))
+            self.assertEqual(self.client.get(reverse("recommendations_classic")).status_code, 404, role)
+        self.client.force_login(make_user("s@ue.edu.ph", CustomUser.Role.STUDENT))
+        self.assertEqual(self.client.get(reverse("recommendations_classic")).status_code, 302)   # learners: sent home
+        self.client.force_login(make_user("dev@ue.edu.ph", CustomUser.Role.DEVELOPER))
+        r = self.client.get(reverse("recommendations_classic"))
+        self.assertEqual(r.status_code, 200)
+        self.assertTemplateUsed(r, "recommendations.html")
+        r = self.client.get(reverse("recommendations"))
+        self.assertTemplateUsed(r, "recs_lab/live_recommendations.html")   # the menu item opens the new page
+        self.assertNotContains(r, "/recommendations/classic/")              # and nothing links to the original
+
+    def test_students_get_the_new_recommendations(self):
+        me = make_user("st@ue.edu.ph", CustomUser.Role.STUDENT, learner_info={"course": "BSCS", "year_level": 2})
+        self.client.force_login(me)
+        r = self.client.get(reverse("student_dashboard"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("new_recs", r.context)
+        self.assertFalse(r.context["new_recs_alumni"] if "new_recs_alumni" in r.context else False)
+
+    def test_learner_find_button(self):
+        me = make_user("st@ue.edu.ph", CustomUser.Role.STUDENT)
+        self.client.force_login(me)
+        with mock.patch("myapp.recs_lab.engine.student_view", return_value={"exists": True, "units": [
+                {"status": "build_now", "pick_skill": "Python"}]}), \
+                mock.patch("myapp.recs_lab.worker.start") as start:
+            r = self.client.post(reverse("recs_live_find"), {"next": "/me/#recommended"})
+        self.assertRedirects(r, "/me/#recommended", fetch_redirect_response=False)
+        start.assert_called_once()
+        from ..recs_lab import worker
+        self.assertEqual(len(worker.jobs()), 1)
+        r = self.client.post(reverse("recs_live_find"), {"next": "https://evil.example/"})
+        self.assertRedirects(r, reverse("student_dashboard"), fetch_redirect_response=False)
+
+    def test_classic_setting_brings_the_original_back(self):
+        from django.test import override_settings
+        self.client.force_login(make_user("prof@ue.edu.ph", CustomUser.Role.FACULTY))
+        with override_settings(RECS_SYSTEM="classic"):
+            r = self.client.get(reverse("recommendations"))
+        self.assertTemplateUsed(r, "recommendations.html")

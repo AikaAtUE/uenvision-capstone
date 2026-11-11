@@ -9,3 +9,7 @@ _settings.REQUIRE_PROFESSOR_SURVEY = False
 _settings.REQUIRE_LEARNER_SURVEY = False
 # The recommendations queue never starts its background thread (and never calls Gemini) in tests.
 _settings.REC_QUEUE_AUTOSTART = False
+# The Recommendations Lab's resource finder doesn't start either, and the site keeps showing the
+# classic recommendation pages unless a test turns the new system on (test_recs_lab.LiveTests).
+_settings.RECS_LAB_WORKER_AUTOSTART = False
+_settings.RECS_SYSTEM = "classic"   # the original pages; LiveTests turn the new system on

@@ -1,0 +1,18 @@
+{# Job readiness panel on the student / alumni page with the new recommendation system (in _student_recs.html). #}
+{% with r=new_recs %}
+<section class="panel rr-ready">
+  <h3 class="rr-h">Job readiness{% if r.role_label %} for {{ r.role_label }}{% endif %}</h3>
+  {% if r.exists %}
+  <p class="rr-ready-num"><span class="rr-big">{% if r.readiness is not None %}{{ r.readiness }}%{% else %}—{% endif %}</span>
+    <span class="muted">{{ r.met }} of the {% if r.role_label %}role's {% endif %}{{ r.units|length }} main needs met</span></p>
+  <div class="rr-bar" role="img" aria-label="{{ r.met }} of {{ r.units|length }} needs met">
+    <span class="rr-bar-mine" style="width: {% if r.readiness %}{{ r.readiness }}{% else %}0{% endif %}%"></span>
+  </div>
+  <p class="muted rc-small">A need is one thing employers ask for, like "a general-purpose language". Any one of its skills at
+    Practiced or Applied meets it, so Java isn't pushed on you if you already have Python.</p>
+  {% if not r.role_label %}<p class="muted rc-small">Pick a target job role above for a readiness score made for that role.</p>{% endif %}
+  {% else %}
+  <p class="muted rr-p">Not available until job postings are loaded.</p>
+  {% endif %}
+</section>
+{% endwith %}

@@ -1,4 +1,5 @@
-{# The page's resource controls. Needs res_missing, res_total, res_status; `free_toggle` for learner pages. #}
+{% comment %}The page's resource controls. Needs res_missing, res_total, res_status; `free_toggle` for learner pages;
+   `res_find_url` when the Find button posts somewhere else (the student / alumni page); `res_anchor` keeps the place.{% endcomment %}
 {% if res_total %}
 <div class="rl-resbar"{% if res_status.pending %} data-refresh="20"{% endif %}>
   <div class="rl-resbar-text">
@@ -6,14 +7,14 @@
       <span>Finding resources for {{ res_status.pending }} item{{ res_status.pending|pluralize }}. This page refreshes by itself.</span>
     {% elif res_missing %}<span><b>{{ res_missing }} of {{ res_total }}</b> items here have no learning resources yet.</span>
     {% else %}<span>Every item here has learning resources saved.</span>{% endif %}
-    {% if res_status.failed %}<span class="rl-why">· {{ res_status.failed }} failed (see <a class="link-inline" href="{% url 'recs_lab_resources' %}">Resources</a>)</span>{% endif %}
+    {% if res_status.failed and user.is_developer %}<span class="rl-why">· {{ res_status.failed }} failed (see <a class="link-inline" href="{% url 'recs_lab_resources' %}">Resources</a>)</span>{% endif %}
   </div>
   <div class="rl-actions">
     {% if free_toggle %}
-      <a class="rl-tab{% if free_only %} is-active{% endif %}" href="?{% if person and not self_only %}user={{ person.pk }}&{% endif %}{% if preview %}role={{ preview }}&{% endif %}{% if not free_only %}free=1{% endif %}">Free only</a>
+      <a class="rl-tab{% if free_only %} is-active{% endif %}" href="?{% if person and not self_only %}user={{ person.pk }}&{% endif %}{% if preview %}role={{ preview }}&{% endif %}{% if not free_only %}free=1{% endif %}{{ res_anchor }}">Free only</a>
     {% endif %}
     {% if res_missing and not res_status.pending %}
-    <form method="post">{% csrf_token %}<button class="btn btn-navy btn-sm" type="submit" name="action" value="find_resources">Find resources with Gemini</button></form>
+    <form method="post"{% if res_find_url %} action="{{ res_find_url }}"{% endif %}>{% csrf_token %}{% if res_find_url %}<input type="hidden" name="next" value="{{ request.get_full_path }}{{ res_anchor }}">{% endif %}<button class="btn btn-navy btn-sm" type="submit" name="action" value="find_resources">Find resources with Gemini</button></form>
     {% endif %}
   </div>
 </div>

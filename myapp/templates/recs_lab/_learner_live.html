@@ -1,0 +1,44 @@
+{% comment %}"What to learn next" on the student / alumni page with the new recommendation system (recs_lab/live.py).
+  Needs new_recs (engine.student_view / alumni_view with resources attached) and the resource bar context.{% endcomment %}
+{% with r=new_recs %}
+<section class="rr-learn rl-live" id="learning-resources">
+  <h2 class="rr-title rr-title--sm">What to learn next</h2>
+  {% if not r.exists %}
+    <p class="empty-note">Recommendations appear once job postings are loaded.</p>
+  {% else %}
+  <p class="muted rr-p">The {{ r.units|length }} things {% if r.role_label %}{{ r.role_label }}{% else %}IT/CS{% endif %} job postings ask for most,
+    {% if new_recs_alumni %}across all experience levels{% else %}at entry level{% endif %}. Each comes with learning resources picked for where you are with it.</p>
+  {% include "recs_lab/_res_bar.html" with free_toggle=True %}
+  <p class="form-msg rec-caveat">Resources are suggested by AI. Links marked ✓ link checked were opened automatically, but no person has reviewed them yet. Check a course before paying for it.</p>
+
+  {% if new_recs_alumni and r.wants %}
+  <h3 class="rl-section">Skills you said you want to learn</h3>
+  <div class="rl-units">
+    {% for w in r.wants %}
+    <div class="rl-unit">
+      <div class="rl-unit-head"><b>{{ w.skill }}</b>
+        {% if w.status == 'met' %}<span class="rl-pill rl-pill--ok">Already at {{ w.level }}</span>{% elif w.status == 'building' %}<span class="rl-pill rl-pill--warn">At {{ w.level|default:"Introduced" }}</span>{% else %}<span class="rl-pill rl-pill--bad">To learn</span>{% endif %}</div>
+      <p>{% if w.pct %}In {{ w.pct }}% of {{ r.role_label|default:"IT/CS" }} postings.{% else %}Not among the role's top skills, but you asked for it.{% endif %}</p>
+      {% include "recs_lab/_res_list.html" with items=w.resources saved=w.resources_saved compact=True %}
+    </div>
+    {% endfor %}
+  </div>
+  <h3 class="rl-section">For {{ r.role_label|default:"your target role" }}</h3>
+  {% endif %}
+
+  <div class="rl-units">
+    {% for u in r.units %}
+    <div class="rl-unit">
+      <div class="rl-unit-head"><b>{{ u.label }}</b><span class="rl-pill rl-pill--{{ u.tone }}">{{ u.status_label }}</span></div>
+      <span class="rl-k">{{ u.kind_label }} · in postings: {{ u.members_text }}</span>
+      <p>{{ u.why }}</p>
+      {% include "recs_lab/_res_list.html" with items=u.resources label=u.resources_label saved=u.resources_saved %}
+    </div>
+    {% endfor %}
+  </div>
+  {% if not new_recs_alumni %}
+  <p class="muted rc-small">"Coming up" means a later subject in your program teaches it, so you get one optional preview instead of a full course.</p>
+  {% endif %}
+  {% endif %}
+</section>
+{% endwith %}

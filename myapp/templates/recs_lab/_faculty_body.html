@@ -1,0 +1,64 @@
+{% comment %}One subject judged against its blueprint, with resources. Used by the lab and the live Recommendations page.
+   Needs result, prof, lab_pages (for the blueprint link), and the resource bar context.{% endcomment %}
+
+{% if no_survey %}<p class="rl-note">You haven't answered the Professor Survey with this account yet, so every subject is listed. Answer it to see only the subjects you teach, judged by what you reported.</p>{% endif %}
+{% if not result.exists %}
+  <p class="empty-note">{{ result.error|default:"Pick a subject." }}</p>
+{% else %}
+<div class="rl-head">
+  <div>
+    <h2>{{ result.info.name }}</h2>
+    <p class="rl-sub">{{ result.info.code }} · {% for p, y in result.info.years.items %}{{ p }} year {{ y }}{% if not forloop.last %}, {% endif %}{% endfor %} ·
+      blueprint <span class="rl-pill rl-pill--{% if result.bp.status == 'approved' %}ok{% elif result.bp.status == 'draft' %}warn{% else %}mute{% endif %}">{% if result.bp.status == 'approved' %}Approved{% elif result.bp.status == 'draft' %}Draft{% else %}Automatic draft{% endif %}</span>
+      {% if "blueprints" in lab_pages %}<a class="link-inline" href="{% url 'recs_lab_blueprints' %}?subject={{ result.info.code }}">Edit blueprint</a>{% endif %}</p>
+  </div>
+</div>
+<ul class="rl-facts">
+  <li>Students who answered for it<strong>{{ result.learners }}</strong></li>
+  <li>Professors who reported it<strong>{{ result.professors }}</strong></li>
+  <li>Answers needed for a status<strong>{{ result.need }}</strong></li>
+  <li>Job postings used<strong>{{ result.demand_postings }}</strong></li>
+</ul>
+{% include "recs_lab/_res_bar.html" %}
+
+{% if result.cards %}
+<div class="rl-cards">
+  {% for c in result.cards %}
+  <div class="rl-card rl-card--{{ c.tone }}">
+    <span class="rl-pill rl-pill--{{ c.tone }}">{{ c.title }}</span>
+    <span class="rl-card-title">{{ c.name }}</span>
+    <p class="rl-why">{{ c.why }}</p>
+    {% include "recs_lab/_res_list.html" with items=c.resources label=c.resources_label saved=c.resources_saved %}
+  </div>
+  {% endfor %}
+</div>
+{% elif result.enough %}
+<p class="rl-note">Nothing to act on: every core concept and required slot is on track.</p>
+{% endif %}
+
+<div class="rl-table-wrap">
+  <table class="rl-table">
+    <thead><tr><th>Blueprint item</th><th>Kind</th><th>{% if prof %}You teach{% else %}Taught here{% endif %}</th><th>Students at Practiced+</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for r in result.core %}{% include "recs_lab/_faculty_row.html" %}{% endfor %}
+    {% for r in result.slots %}{% include "recs_lab/_faculty_row.html" %}{% endfor %}
+    {% for r in result.extensions %}{% include "recs_lab/_faculty_row.html" %}{% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="rl-note">"Students at Practiced+" is the share of students who answered for this subject and rated the skill Practiced or Applied
+  there. A taught core concept under 50% is "Not landing". Below {{ result.need }} answers, a row shows "Not enough answers yet".
+  Slots are filled by any one skill of their family, so a second language or framework is never suggested.
+  {% if result.year_weight == 0 %}This is a 1st-year subject, so job demand only helps pick a slot's option; it never adds topics.{% endif %}</p>
+
+{% if result.bp.out_of_scope %}
+<h3 class="rl-section">Out of scope here</h3>
+<div class="rl-chips">{% for x in result.bp.out_of_scope %}<span class="rl-chip rl-chip--out">{{ x }}</span>{% endfor %}</div>
+{% endif %}
+
+{% if result.extras %}
+<h3 class="rl-section">Reported here but not in the blueprint</h3>
+<p class="rl-note">Skills professors or students reported for this subject that the blueprint doesn't mention. Add them to the blueprint if they belong, or leave them as they are.</p>
+<div class="rl-chips">{% for e in result.extras %}<span class="rl-chip">{{ e.skill }} · {{ e.people }}</span>{% endfor %}</div>
+{% endif %}
+{% endif %}
