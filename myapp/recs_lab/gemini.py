@@ -1,9 +1,9 @@
 """
-The Recommendations Lab's two Gemini jobs. Both run only when a developer clicks the
-button, and both only produce data a developer then reviews:
+The Recommendations Lab's Gemini jobs. All run only after a developer clicks a button:
 
   tag_skills(names)        kind + family for skills the built-in rules don't know
   draft_blueprint(info)    a first blueprint for one subject (saved as "draft")
+  ask_search(...)          learning resources (resources.py), with Google Search grounding
 
 Gemini is never asked to score or rank anything: the engine does that with counts.
 Keys and error handling are the same as recommendations.py (api_keys.txt + GEMINI_API_KEYS).
@@ -60,6 +60,50 @@ def _ask(system, prompt, max_tokens=8192):
     raise LabGeminiError("Gemini didn't answer: " + (errors[-1] if errors else "unknown error"))
 
 
+_SEARCH_OFF = {"off": False}   # set once Google Search grounding fails for quota/tool reasons
+
+
+def ask_search(system, prompt, max_tokens=4096):
+    """One JSON answer using Google Search grounding (real pages), like recommendations.py.
+    Grounding isn't on every key's tier: then the same request is asked without it."""
+    from google import genai
+    from google.genai import types
+
+    keys = _keys()
+    if not keys:
+        raise LabGeminiError("No Gemini API key is set. Add one on Data → Data Extraction first.")
+    errors = []
+    for k in keys:
+        client = genai.Client(api_key=k)
+        for attempt in range(3):
+            grounded = not _SEARCH_OFF["off"]
+            try:
+                if grounded:
+                    cfg = types.GenerateContentConfig(system_instruction=system, max_output_tokens=max_tokens,
+                                                      tools=[types.Tool(google_search=types.GoogleSearch())])
+                else:
+                    cfg = types.GenerateContentConfig(system_instruction=system, max_output_tokens=max_tokens,
+                                                      response_mime_type="application/json")
+                resp = client.models.generate_content(model=MODEL, contents=prompt, config=cfg)
+                return recommendations._extract_json(getattr(resp, "text", "") or "")
+            except recommendations.RecommendationError as e:
+                errors.append(str(e))
+                continue
+            except Exception as e:  # noqa: BLE001
+                low = str(e).lower()
+                if grounded and (getattr(e, "code", None) == 429 or "resource_exhausted" in low
+                                 or any(w in low for w in ("tool", "search", "grounding"))):
+                    _SEARCH_OFF["off"] = True     # retry the same key without search
+                    continue
+                kind = recommendations.classify_error(e)
+                errors.append(recommendations.short_error(e))
+                if kind in ("retry", "wait") and attempt < 2:
+                    time.sleep(3 * (attempt + 1))
+                    continue
+                break
+    raise LabGeminiError("Gemini didn't answer: " + (errors[-1] if errors else "unknown error"))
+
+
 # ---------------------------------------------------------------------------
 # Skill tags
 # ---------------------------------------------------------------------------
@@ -84,7 +128,7 @@ def tag_skills(names):
     todo = [n for n in dict.fromkeys(names) if data["skills"].get(taxonomy.key_of(n), {}).get("source") != "manual"]
     todo = todo[:MAX_TAG_BATCH]
     if not todo:
-        return {"tagged": 0, "new_families": []}
+        return {"tagged": 0, "new_families": [], "tried": []}
     fams = taxonomy.families(data)
     fam_text = "\n".join(f"{k}: {f['label']} ({f['kind']})" for k, f in fams.items())
     prompt = f"Family keys:\n{fam_text}\n\nSkills:\n" + "\n".join(todo)
@@ -110,7 +154,7 @@ def tag_skills(names):
                 new_labels.append(label)
         taxonomy.set_tag(name, kind, fam, source="gemini")
         tagged += 1
-    return {"tagged": tagged, "new_families": new_labels}
+    return {"tagged": tagged, "new_families": new_labels, "tried": todo}
 
 
 # ---------------------------------------------------------------------------

@@ -26,6 +26,7 @@
 {% if not result.exists %}
   <p class="empty-note">No extracted job-market data yet.</p>
 {% else %}
+{% include "recs_lab/_res_bar.html" %}
 <p class="rl-intro">Ranked by <strong>how uncovered</strong> a skill is, not by how popular: share of postings × (1 − share of
   learners at Practiced or higher anywhere in the curriculum). Only skills in at least {{ floor }}% of postings qualify.
   Interchangeable skills are one row (a family), shown with each member's own share and ranked by its highest member.</p>
@@ -42,17 +43,18 @@
 </div>
 <div class="rl-table-wrap">
   <table class="rl-table">
-    <thead><tr><th>#</th><th>Gap</th><th>In postings</th><th>Learners at Practiced+</th><th>Alumni needed it</th><th>Suggested home</th></tr></thead>
+    <thead><tr><th>#</th><th>Gap</th><th>In postings</th><th>Learners at Practiced+</th><th>Alumni needed it</th><th>Suggested home &amp; faculty training</th></tr></thead>
     <tbody>
     {% for r in rows %}
       <tr>
         <td class="rl-num">{{ forloop.counter }}</td>
-        <td><strong>{{ r.label }}</strong><div class="rl-why">{{ r.kind_label }} · {{ r.category }}</div></td>
+        <td class="rl-gapcell"><strong>{{ r.label }}</strong><div class="rl-why">{{ r.kind_label }} · {{ r.category }}</div></td>
         <td><div class="rl-members">{{ r.members_text }}</div></td>
         <td class="rl-num">{% if r.coverage is None %}<span class="rl-why">No answers yet</span>{% else %}{{ r.coverage }}% <span class="rl-why">({{ r.strong }} of {{ r.learners }})</span><div class="rl-meter {% if r.coverage >= 50 %}rl-meter--g{% elif r.coverage >= 20 %}rl-meter--w{% else %}rl-meter--r{% endif %}"><i style="width:{{ r.coverage }}%"></i></div>{% endif %}</td>
         <td class="rl-num">{{ r.alumni_needed }} alumni{% if r.alumni_used %}<div class="rl-why">{{ r.alumni_used }} used it at work</div>{% endif %}</td>
         <td><div class="rl-home">{% if r.home %}<a class="link-inline" href="{% url 'recs_lab_faculty' %}?subject={{ r.home.code }}">{{ r.home.name }}</a><div class="rl-why">{% if r.home.year %}Year {{ r.home.year }} · {% endif %}{{ r.home.where }}</div>{% else %}<span class="rl-pill rl-pill--bad">No subject fits</span>{% endif %}
-          {% if r.taught_in %}<div class="rl-why">Taught now in {{ r.taught_in|join:", " }}</div>{% endif %}</div></td>
+          {% if r.taught_in %}<div class="rl-why">Taught now in {{ r.taught_in|join:", " }}</div>{% endif %}
+          {% if r.home %}<div class="rl-train"><span class="rl-k">Faculty training</span>{% if r.resources %}{% include "recs_lab/_res_list.html" with items=r.resources compact=True %}{% elif r.resources_saved %}<span class="rl-why">None found</span>{% else %}<span class="rl-why">Not looked up yet</span>{% endif %}</div>{% endif %}</div></td>
       </tr>
     {% empty %}
       <tr><td colspan="6" class="rl-why">No skill of this kind reaches {{ floor }}% of postings.</td></tr>
@@ -62,7 +64,8 @@
 </div>
 <p class="rl-note">"Suggested home" comes from the subject blueprints: the subject whose slot, extension or core list includes the skill,
   earliest year first. "No subject fits" means no blueprint has room for it, which is itself a finding for curriculum review.
-  "Alumni needed it" counts alumni who listed it under skills they still need or are upskilling in.</p>
+  "Alumni needed it" counts alumni who listed it under skills they still need or are upskilling in.
+  "Faculty training" is one training or academy program for the professors of that home subject.</p>
 
 {% if result.heat %}
 <h3 class="rl-section">Coverage by category and year</h3>

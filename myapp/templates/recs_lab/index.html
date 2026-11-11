@@ -23,6 +23,7 @@
   <a class="rl-link" href="{% url 'recs_lab_alumni' %}{% if first_alumni %}?user={{ first_alumni }}{% endif %}"><b>Alumni view</b><span>Upskilling for their job, starting from their own "skills to learn" answers.</span></a>
   <a class="rl-link" href="{% url 'recs_lab_blueprints' %}"><b>Subject blueprints</b><span>Review, edit, re-draft with Gemini, and approve each subject's blueprint.</span></a>
   <a class="rl-link" href="{% url 'recs_lab_skills' %}"><b>Skill categories</b><span>Each in-demand skill's kind and family. Fix a tag, or let Gemini tag the ones the rules don't know.</span></a>
+  <a class="rl-link" href="{% url 'recs_lab_resources' %}"><b>Learning resources</b><span>Every resource Gemini found, by who it's for and why. Refresh one, or hide a bad resource.</span></a>
 </div>
 <p class="rl-note">Real / Dummy answers (top right) picks which survey answers every lab page uses. It is the same switch as the developer view on the Dashboard.</p>
 {% endblock %}

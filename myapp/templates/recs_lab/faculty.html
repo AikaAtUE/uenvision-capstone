@@ -34,6 +34,7 @@
   <li>Answers needed for a status<strong>{{ result.need }}</strong></li>
   <li>Job postings used<strong>{{ result.demand_postings }}</strong></li>
 </ul>
+{% include "recs_lab/_res_bar.html" %}
 
 {% if result.cards %}
 <div class="rl-cards">
@@ -42,6 +43,7 @@
     <span class="rl-pill rl-pill--{{ c.tone }}">{{ c.title }}</span>
     <span class="rl-card-title">{{ c.name }}</span>
     <p class="rl-why">{{ c.why }}</p>
+    {% include "recs_lab/_res_list.html" with items=c.resources label=c.resources_label saved=c.resources_saved %}
   </div>
   {% endfor %}
 </div>

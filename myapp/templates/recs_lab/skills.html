@@ -10,10 +10,23 @@
   <li>Tagged by Gemini<strong>{{ by_source.gemini|default:0 }}</strong></li>
   <li>Tagged by hand<strong>{{ by_source.manual|default:0 }}</strong></li>
 </ul>
-<div class="rl-actions" style="margin:0 0 16px">
-  <form method="post">{% csrf_token %}<button class="btn btn-navy btn-sm" type="submit" name="action" value="gemini">Tag rule-tagged skills with Gemini</button></form>
-  <span class="rl-why">Up to {{ max_batch }} skills per click, most frequent first. Hand tags are never overwritten.</span>
+<div class="rl-resbar">
+  <div class="rl-resbar-text">
+    {% if tag_job.running %}<span class="rl-spinner" aria-hidden="true"></span>
+      <span><b>Tagging with Gemini:</b> {{ tag_job.done }} of about {{ tag_job.total }} skills tagged, {{ tag_job.batches }} batch{{ tag_job.batches|pluralize:"es" }} of {{ max_batch }} so far. This page refreshes by itself.</span>
+    {% elif tag_job.status == 'done' %}<span><b>Done:</b> Gemini tagged {{ tag_job.done }} skills in {{ tag_job.batches }} batch{{ tag_job.batches|pluralize:"es" }}{% if tag_job.new_families %} and added families: {{ tag_job.new_families|join:", " }}{% endif %}.{% if by_source.rules %} {{ by_source.rules }} are still tagged by the rules: Gemini was asked about them but gave no usable tag.{% endif %}</span>
+    {% elif tag_job.status == 'paused' or tag_job.status == 'running' %}<span><b>Paused</b> after {{ tag_job.done }} of about {{ tag_job.total }} skills{% if tag_job.error %}: {{ tag_job.error }}{% endif %}. Press the button to continue where it stopped.</span>
+    {% else %}<span>Gemini tags every rule-tagged skill, {{ max_batch }} per call, most frequent first, until none are left. Hand tags are never overwritten.</span>{% endif %}
+  </div>
+  <div class="rl-actions">
+    {% if tag_job.running %}
+      <form method="post">{% csrf_token %}<button class="btn btn-ghost btn-sm" type="submit" name="action" value="gemini_stop">Stop</button></form>
+    {% elif by_source.rules %}
+      <form method="post">{% csrf_token %}<button class="btn btn-navy btn-sm" type="submit" name="action" value="gemini">{% if tag_job.status == 'paused' %}Continue tagging{% else %}Tag all {{ by_source.rules }} rule-tagged skills with Gemini{% endif %}</button></form>
+    {% endif %}
+  </div>
 </div>
+{% if tag_job.running %}<script>setTimeout(function () { location.reload(); }, 15000);</script>{% endif %}
 
 {% if editing %}
 <div class="rl-box" id="edit" style="margin:0 0 16px">

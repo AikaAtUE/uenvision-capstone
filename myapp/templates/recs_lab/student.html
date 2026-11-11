@@ -27,17 +27,21 @@
   <li>{% if result.scope == 'entry' %}Entry-level{% else %}All{% endif %} postings{% if result.role_label %} for the role{% endif %}<strong>{{ result.postings }}</strong></li>
   {% if result.assumed %}<li>Skills assumed from earlier subjects<strong>{{ result.assumed }}</strong></li>{% endif %}
 </ul>
+{% include "recs_lab/_res_bar.html" with free_toggle=True %}
 <div class="rl-units">
   {% for u in result.units %}
   <div class="rl-unit">
     <div class="rl-unit-head"><b>{{ u.label }}</b><span class="rl-pill rl-pill--{{ u.tone }}">{{ u.status_label }}</span></div>
     <span class="rl-k">{{ u.kind_label }} · in postings: {{ u.members_text }}</span>
     <p>{{ u.why }}</p>
+    {% include "recs_lab/_res_list.html" with items=u.resources label=u.resources_label saved=u.resources_saved %}
   </div>
   {% endfor %}
 </div>
 <p class="rl-note">The role's {{ result.units|length }} most-asked-for needs, from its top skills. Interchangeable skills are one need: a student
   with Python at Practiced has a general-purpose language, so Java is not pushed on them, while each language still shows its own
-  share of postings. "Coming up" comes from the blueprints of later subjects in their program. Readiness = needs met ÷ needs.</p>
+  share of postings. "Coming up" comes from the blueprints of later subjects in their program. Readiness = needs met ÷ needs.
+  Resources follow the status: Build now gets beginner material, Keep building gets practice, Coming up gets one optional preview,
+  and Need met gets something to go further with the skill they already have.</p>
 {% endif %}
 {% endblock %}

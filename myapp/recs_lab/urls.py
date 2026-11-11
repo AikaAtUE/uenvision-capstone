@@ -11,5 +11,6 @@ urlpatterns = [
     path("alumni/", views.alumni_view, name="recs_lab_alumni"),
     path("blueprints/", views.blueprints_view, name="recs_lab_blueprints"),
     path("skills/", views.skills_view, name="recs_lab_skills"),
+    path("resources/", views.resources_view, name="recs_lab_resources"),
     path("data/", views.data_switch_view, name="recs_lab_data"),
 ]

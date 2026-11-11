@@ -9,7 +9,7 @@ from ..models import CurriculumSurveyResponse as R, CustomUser
 from ..recs_lab import blueprints, engine, gemini, taxonomy
 from .helpers import IsolatedDataMixin
 
-LAB_PAGES = ["recs_lab", "recs_lab_faculty", "recs_lab_admin", "recs_lab_student", "recs_lab_alumni",
+LAB_PAGES = ["recs_lab", "recs_lab_faculty", "recs_lab_admin", "recs_lab_student", "recs_lab_alumni", "recs_lab_resources",
              "recs_lab_blueprints", "recs_lab_skills"]
 
 
@@ -163,3 +163,176 @@ class AdminGapTests(IsolatedDataMixin, TestCase):
         gaps = [r["gap"] for r in res["rows"]]
         self.assertEqual(gaps, sorted(gaps, reverse=True))
         self.assertLessEqual(len(res["rows"]), 10)
+
+
+class ResourceTests(IsolatedDataMixin, TestCase):
+    ANSWER = {"resources": [
+        {"type": "course", "name": "Intro to Git", "provider": "Coursera", "link": "https://example.org/git", "cost": "audit",
+         "level": "beginner", "why": "Start here."},
+        {"type": "practice", "name": "Branching game", "provider": "Example", "link": "https://game.example.org/",
+         "cost": "free", "level": "beginner", "why": "Practice."},
+        {"type": "certification", "name": "Fake Cert", "provider": "X", "link": "https://dead.example.org/cert", "cost": "paid"},
+        {"type": "weird thing", "name": "No link"},
+    ]}
+
+    def setUp(self):
+        from django.test import override_settings
+        self._no_thread = override_settings(RECS_LAB_WORKER_AUTOSTART=False)   # before the data-dir override,
+        self._no_thread.enable()                                               # so they unwind in order
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+        self._no_thread.disable()
+
+    def _patches(self):
+        from ..recs_lab import resources
+        verdict = lambda link, name: "dead" if "dead" in link else "ok"  # noqa: E731
+        return [mock.patch.object(resources.recommendations, "verify_resource", side_effect=verdict),
+                mock.patch.object(resources, "_homepage_verdict", return_value="ok"),
+                mock.patch.object(resources, "page_image", side_effect=lambda link: "https://img.example.org/a.png"
+                                  if "git" in link else "")]
+
+    def test_find_checks_links_and_takes_pictures_from_the_page(self):
+        from ..recs_lab import resources
+        sp = resources.spec("start", "Git", "Back-End Developer")
+        p = self._patches()
+        for x in p:
+            x.start()
+            self.addCleanup(x.stop)
+        items = resources.find(sp, ask=lambda system, prompt: self.ANSWER)
+        self.assertEqual([i["name"] for i in items], ["Intro to Git", "Branching game"])   # dead link + no link dropped
+        self.assertEqual(items[0]["image"], "https://img.example.org/a.png")
+        self.assertEqual(items[1]["image"], "")              # no picture -> the page shows the icon tile
+        self.assertEqual(items[0]["cost"], "audit")
+
+    def test_prompt_depends_on_purpose(self):
+        from ..recs_lab import resources
+        seen = {}
+
+        def ask(system, prompt):
+            seen["p"] = prompt
+            return self.ANSWER
+        for x in self._patches():
+            x.start()
+            self.addCleanup(x.stop)
+        resources.find(resources.spec("class_landing", "Debugging", "CCS 1101"), ask=ask)
+        self.assertIn("classroom activities", seen["p"])
+        self.assertIn("Not courses for the professor", seen["p"])
+
+    def test_queue_and_worker_save_results_once_per_need(self):
+        from ..recs_lab import resources, worker
+        for x in self._patches():
+            x.start()
+            self.addCleanup(x.stop)
+        a = resources.spec("start", "Git")
+        self.assertEqual(worker.enqueue([a, a, resources.spec("start", "git")]), 1)   # same skill key: one request
+        calls = []
+        out = worker.process(ask=lambda s, p: calls.append(p) or self.ANSWER, pace=0)
+        self.assertEqual(out, "1 found, 0 failed.")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(resources.items_for(a["key"], limit=5)), 2)
+        self.assertEqual(worker.enqueue([a]), 0)   # saved now, so not queued again
+
+    def test_no_api_key_leaves_the_job_queued(self):
+        from ..recs_lab import resources, worker
+        worker.enqueue([resources.spec("start", "Docker")])
+
+        def ask(system, prompt):
+            raise gemini.LabGeminiError("No Gemini API key is set.")
+        self.assertIn("Paused", worker.process(ask=ask, pace=0))
+        self.assertEqual(worker.status()["pending"], 1)
+
+    def test_free_first_and_free_only(self):
+        from ..recs_lab import resources
+        sp = resources.spec("start", "SQL")
+        resources.save_entry(sp, [
+            {"type": "course", "name": "Paid one", "link": "https://a/1", "cost": "paid", "verified": "ok"},
+            {"type": "practice", "name": "Free one", "link": "https://a/2", "cost": "free", "verified": "ok"}])
+        self.assertEqual([i["name"] for i in resources.items_for(sp["key"])], ["Free one", "Paid one"])
+        self.assertEqual([i["name"] for i in resources.items_for(sp["key"], free_only=True)], ["Free one"])
+        resources.hide_item(sp["key"], "https://a/2")
+        self.assertEqual([i["name"] for i in resources.items_for(sp["key"])], ["Paid one"])
+
+    def test_student_resources_follow_their_own_language(self):
+        """A student with Java at Practiced gets "go further with Java", never a second language."""
+        from ..recs_lab import resources
+        result = {"role_label": "Back-End Developer", "units": [
+            {"status": "met", "pick_skill": "Java", "label": "General-purpose language"},
+            {"status": "build_now", "pick_skill": "Git", "label": "Version control"},
+            {"status": "coming_up", "pick_skill": "MySQL", "label": "Relational database"}]}
+        specs = resources.plan_student(result)
+        self.assertEqual([(s["purpose"], s["skill"]) for s in specs],
+                         [("deepen", "Java"), ("start", "Git"), ("preview", "MySQL")])
+
+    def test_faculty_plan_follows_status(self):
+        from ..recs_lab import resources
+        result = {"info": {"code": "CCS 1101", "name": "Fundamentals of Programming"}, "cards": [], "core": [
+            {"item": "Debugging", "kind": "Concept", "status": "not_landing"},
+            {"item": "Loops", "kind": "Concept", "status": "on_track"},
+            {"item": "Pseudocode", "kind": "Concept", "status": "not_reported"}],
+            "slots": [{"item": "Language ×1", "kind": "Slot", "status": "open", "options": [{"skill": "Python"}]},
+                      {"item": "IDE ×1", "kind": "Slot", "status": "filled", "options": [{"skill": "VS Code"}]}],
+            "extensions": [{"item": "Git", "kind": "Extension", "status": "optional"}]}
+        got = {(s["purpose"], s["skill"]) for s in resources.plan_faculty(result)}
+        self.assertEqual(got, {("class_landing", "Debugging"), ("class_add", "Pseudocode"),
+                               ("self_academy", "Python"), ("self_training", "Git")})
+
+    def test_pages_show_saved_resources_and_find_button(self):
+        from ..recs_lab import resources, worker
+        dev = make_user("dev@ue.edu.ph", CustomUser.Role.DEVELOPER)
+        self.client.force_login(dev)
+        r = self.client.get(reverse("recs_lab_resources"))
+        self.assertEqual(r.status_code, 200)
+        sp = resources.spec("class_landing", "Debugging")
+        resources.save_entry(sp, [{"type": "tool", "name": "Python Tutor", "link": "https://pythontutor.com/",
+                                   "cost": "free", "verified": "ok", "image": ""}])
+        r = self.client.get(reverse("recs_lab_resources") + "?who=professor")
+        self.assertContains(r, "Python Tutor")
+        r = self.client.post(reverse("recs_lab_resources"), {"action": "refresh", "key": sp["key"]})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(worker.status()["pending"], 1)
+
+    def test_resources_page_is_developer_only(self):
+        self.client.force_login(make_user("fac@ue.edu.ph", CustomUser.Role.FACULTY))
+        self.assertIn(self.client.get(reverse("recs_lab_resources")).status_code, (302, 404))
+
+
+class TagAllTests(IsolatedDataMixin, TestCase):
+    def test_runs_batches_until_nothing_is_left_and_never_resends(self):
+        from ..recs_lab import tagjob
+        names = [f"Skill {i}" for i in range(250)]
+        sent = []
+
+        def fake_tag(batch):
+            sent.append(list(batch))
+            for n in batch[:-1]:              # Gemini skips one name per batch
+                taxonomy.set_tag(n, "tool", "", source="gemini")
+            return {"tagged": len(batch) - 1, "new_families": [], "tried": batch}
+        with mock.patch.object(tagjob, "todo_names", side_effect=lambda skipped=(): [
+                n for n in names if taxonomy.tag(n)["source"] == "rules" and taxonomy.key_of(n) not in set(skipped)]):
+            self.assertEqual(tagjob.run(tag=fake_tag, pace=0), "done")
+        self.assertEqual([len(b) for b in sent], [120, 120, 10])
+        flat = [n for b in sent for n in b]
+        self.assertEqual(len(flat), len(set(flat)))       # nothing sent twice
+        st = tagjob.state()
+        self.assertEqual((st["status"], st["done"], st["batches"]), ("done", 247, 3))
+
+    def test_quota_pauses_and_continue_resumes(self):
+        from ..recs_lab import tagjob
+        names = [f"Skill {i}" for i in range(130)]
+        calls = {"n": 0}
+
+        def fake_tag(batch):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise gemini.LabGeminiError("Gemini didn't answer: quota")
+            for n in batch:
+                taxonomy.set_tag(n, "tool", "", source="gemini")
+            return {"tagged": len(batch), "new_families": [], "tried": batch}
+        todo = lambda skipped=(): [n for n in names if taxonomy.tag(n)["source"] == "rules"]  # noqa: E731
+        with mock.patch.object(tagjob, "todo_names", side_effect=todo):
+            self.assertEqual(tagjob.run(tag=fake_tag, pace=0), "paused")
+            self.assertIn("quota", tagjob.state()["error"])
+            self.assertEqual(tagjob.run(tag=fake_tag, pace=0), "done")
+        self.assertEqual(tagjob.state()["done"], 130)

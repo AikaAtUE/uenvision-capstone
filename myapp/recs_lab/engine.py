@@ -554,6 +554,7 @@ def student_view(user, dummy=False):
     met = 0
     for u in units:
         st, pick = _mine_status(u, ctx["mine"], known)
+        u["pick_skill"] = pick[1]["skill"] if pick else u["members"][0]["skill"]
         u["members_text"] = ", ".join(f"{m['skill']} {m['pct']}%" for m in u["members"][:4])
         u["top_pct"] = u["members"][0]["pct"]
         if st == "met":
@@ -629,6 +630,7 @@ def alumni_view(user, dummy=False):
     met = 0
     for u in units:
         st, pick = _mine_status(u, mine, known)
+        u["pick_skill"] = pick[1]["skill"] if pick else u["members"][0]["skill"]
         u["members_text"] = ", ".join(f"{m['skill']} {m['pct']}%" for m in u["members"][:4])
         u["top_pct"] = u["members"][0]["pct"]
         if st == "met":

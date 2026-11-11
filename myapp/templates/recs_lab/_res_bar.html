@@ -1,0 +1,21 @@
+{# The page's resource controls. Needs res_missing, res_total, res_status; `free_toggle` for learner pages. #}
+{% if res_total %}
+<div class="rl-resbar"{% if res_status.pending %} data-refresh="20"{% endif %}>
+  <div class="rl-resbar-text">
+    {% if res_status.pending %}<span class="rl-spinner" aria-hidden="true"></span>
+      <span>Finding resources for {{ res_status.pending }} item{{ res_status.pending|pluralize }}. This page refreshes by itself.</span>
+    {% elif res_missing %}<span><b>{{ res_missing }} of {{ res_total }}</b> items here have no learning resources yet.</span>
+    {% else %}<span>Every item here has learning resources saved.</span>{% endif %}
+    {% if res_status.failed %}<span class="rl-why">· {{ res_status.failed }} failed (see <a class="link-inline" href="{% url 'recs_lab_resources' %}">Resources</a>)</span>{% endif %}
+  </div>
+  <div class="rl-actions">
+    {% if free_toggle %}
+      <a class="rl-tab{% if free_only %} is-active{% endif %}" href="?{% if person %}user={{ person.pk }}&{% endif %}{% if not free_only %}free=1{% endif %}">Free only</a>
+    {% endif %}
+    {% if res_missing and not res_status.pending %}
+    <form method="post">{% csrf_token %}<button class="btn btn-navy btn-sm" type="submit" name="action" value="find_resources">Find resources with Gemini</button></form>
+    {% endif %}
+  </div>
+</div>
+{% if res_status.pending %}<script>setTimeout(function () { location.reload(); }, 20000);</script>{% endif %}
+{% endif %}

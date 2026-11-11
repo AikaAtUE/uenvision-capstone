@@ -1,0 +1,25 @@
+{# Resource cards. Needs `items`; optional `label` (shown above), `saved` (a request was answered), `compact`. #}
+{% if items %}
+<div class="rl-res{% if compact %} rl-res--compact{% endif %}">
+  {% if label %}<span class="rl-k">{{ label }}</span>{% endif %}
+  {% for i in items %}
+  <a class="rl-res-item" href="{{ i.link }}" target="_blank" rel="noopener noreferrer">
+    <span class="rl-thumb rl-thumb--{{ i.group }}" aria-hidden="true">
+      {% if i.group == 'do' %}<svg viewBox="0 0 24 24"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4"/></svg>
+      {% elif i.group == 'cert' %}<svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M9 13l-2 7 5-3 5 3-2-7"/></svg>
+      {% else %}<svg viewBox="0 0 24 24"><path d="M12 4 2 9l10 5 10-5z"/><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>{% endif %}
+      {% if i.image %}<img src="{{ i.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">{% endif %}
+    </span>
+    <span class="rl-res-body">
+      <span class="rl-res-type">{{ i.type_label }}{% if i.local %} · Philippines{% endif %}</span>
+      <b>{{ i.name }}</b>
+      {% if i.meta %}<span class="rl-res-meta">{{ i.meta }}</span>{% endif %}
+      {% if i.why and not compact %}<span class="rl-res-why">{{ i.why }}</span>{% endif %}
+    </span>
+    {% if i.verified == 'ok' %}<span class="rl-res-ok">✓ link checked</span>{% else %}<span class="rl-res-unk" title="The site didn't let the link checker look">unchecked</span>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% elif saved %}
+<p class="rl-res-none">{% if label %}{{ label }}: {% endif %}no resources found{% if free_only %} that are free{% endif %}.</p>
+{% endif %}

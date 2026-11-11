@@ -16,6 +16,7 @@
         <a class="rl-tab{% if lab_tab == 'alumni' %} is-active{% endif %}" href="{% url 'recs_lab_alumni' %}">Alumni</a>
         <a class="rl-tab{% if lab_tab == 'blueprints' %} is-active{% endif %}" href="{% url 'recs_lab_blueprints' %}">Subject blueprints</a>
         <a class="rl-tab{% if lab_tab == 'skills' %} is-active{% endif %}" href="{% url 'recs_lab_skills' %}">Skill categories</a>
+        <a class="rl-tab{% if lab_tab == 'resources' %} is-active{% endif %}" href="{% url 'recs_lab_resources' %}">Resources</a>
       </nav>
       <form class="rl-switch" method="post" action="{% url 'recs_lab_data' %}" aria-label="Which survey answers to use">
         {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">

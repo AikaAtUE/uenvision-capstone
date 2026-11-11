@@ -1,5 +1,7 @@
 <tr>
-  <td><strong>{{ r.item }}</strong>{% if r.kind == "Slot" and r.options %}<div class="rl-why">{% for o in r.options %}{{ o.skill }}{% if o.pct %} {{ o.pct }}%{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}</td>
+  <td><strong>{{ r.item }}</strong>{% if r.kind == "Slot" and r.options %}<div class="rl-why">{% for o in r.options %}{{ o.skill }}{% if o.pct %} {{ o.pct }}%{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+    {% if r.resources %}<details class="rl-res-details"><summary>{{ r.resources_label }} · {{ r.resources|length }} resource{{ r.resources|length|pluralize }}</summary>
+      {% include "recs_lab/_res_list.html" with items=r.resources compact=True %}</details>{% endif %}</td>
   <td>{{ r.kind }}</td>
   <td>{{ r.taught }}</td>
   <td class="rl-num">{% if r.share is not None %}{{ r.strong }} / {{ r.n }} · {{ r.share }}%<div class="rl-meter {% if r.share >= 70 %}rl-meter--g{% elif r.share >= 50 %}rl-meter--w{% else %}rl-meter--r{% endif %}"><i style="width:{{ r.share }}%"></i></div>{% else %}<span class="rl-why">No answers</span>{% endif %}</td>

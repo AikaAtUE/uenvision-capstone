@@ -14,7 +14,7 @@ from .. import job_roles
 from ..context_processors import DEV_DUMMY_VIEW_KEY
 from ..models import CurriculumSurveyResponse, CustomUser
 from ..views.common import _sees_dummy_results
-from . import blueprints, engine, gemini, taxonomy
+from . import blueprints, engine, gemini, resources, tagjob, taxonomy, worker
 
 
 def developer_only(view):
@@ -36,6 +36,27 @@ def _back(request, fallback):
     if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
         return redirect(nxt)
     return redirect(fallback)
+
+
+def _resources_step(request, specs):
+    """Handles the page's "Find resources" button and returns the context for the resource bar.
+    -> (redirect response or None, context dict)."""
+    if request.method == "POST" and request.POST.get("action") == "find_resources":
+        n = worker.enqueue(specs)
+        worker.start()
+        if n:
+            messages.success(request, f"Looking for resources for {n} item{'s' if n != 1 else ''} in the background. "
+                                      "This page refreshes by itself while it works (about 15 seconds each).")
+        elif worker.status({s["key"] for s in specs})["pending"]:
+            messages.info(request, "Already looking for this page's resources.")
+        else:
+            messages.info(request, "Everything on this page already has resources saved.")
+        return redirect(request.get_full_path()), {}
+    keys = {s["key"] for s in specs}
+    have = resources.saved()
+    st = worker.status(keys)
+    return None, {"res_missing": sum(1 for k in keys if k not in have), "res_total": len(keys), "res_status": st,
+                  "free_only": request.GET.get("free") == "1"}
 
 
 @developer_only
@@ -73,9 +94,13 @@ def faculty_view(request):
     except ValueError:
         prof = None
     result = engine.faculty_view(code, professor_id=prof, dummy=dummy) if code else {"exists": False}
+    specs = resources.plan_faculty(result) if result.get("exists") else []
+    resp, res = _resources_step(request, specs)
+    if resp:
+        return resp
     return render(request, "recs_lab/faculty.html", _ctx(
         request, "faculty", subjects=subs, code=code, prof=prof, result=result,
-        professors=engine.professors_for(code, dummy) if code else []))
+        professors=engine.professors_for(code, dummy) if code else [], **res))
 
 
 @developer_only
@@ -92,9 +117,12 @@ def admin_view(request):
     rows = []
     if result.get("exists"):
         rows = [r for r in result["all_rows"] if not kind or r["kind"] == kind][:10]
+    resp, res = _resources_step(request, resources.plan_admin(rows))
+    if resp:
+        return resp
     return render(request, "recs_lab/admin.html", _ctx(
         request, "admin", result=result, rows=rows, program=program, levels=levels, floor=floor, kind=kind,
-        kinds=taxonomy.KINDS))
+        kinds=taxonomy.KINDS, **res))
 
 
 def _learner_choices(kind, dummy):
@@ -114,10 +142,17 @@ def learner_view(request, kind):
         pk = 0
     person = next((u for u in people if u.pk == pk), people[0] if people else None)
     result = None
+    specs = []
+    free_only = request.GET.get("free") == "1"
     if person:
         result = engine.alumni_view(person, dummy) if kind == "alumni" else engine.student_view(person, dummy)
+        if result.get("exists"):
+            specs = (resources.plan_alumni if kind == "alumni" else resources.plan_student)(result, free_only)
+    resp, res = _resources_step(request, specs)
+    if resp:
+        return resp
     return render(request, f"recs_lab/{kind}.html", _ctx(
-        request, kind, people=people, person=person, result=result, roles=job_roles.ROLE_LABELS))
+        request, kind, people=people, person=person, result=result, roles=job_roles.ROLE_LABELS, **res))
 
 
 @developer_only
@@ -188,11 +223,14 @@ def skills_view(request):
                 taxonomy.add_family(request.POST.get("label", ""), request.POST.get("kind", ""))
                 messages.success(request, "Family added.")
             elif action == "gemini" and d:
-                untagged = [d["label"][k] for k, _c in sorted(d["counts"].items(), key=lambda kv: -kv[1])
-                            if tagger(d["label"][k])["source"] == "rules"]
-                res = gemini.tag_skills(untagged)
-                messages.success(request, f"Gemini tagged {res['tagged']} skills"
-                                 + (f" and added families: {', '.join(res['new_families'])}." if res["new_families"] else "."))
+                if tagjob.start():
+                    messages.success(request, "Tagging every rule-tagged skill with Gemini in the background, "
+                                              f"{gemini.MAX_TAG_BATCH} at a time. This page shows the progress.")
+                else:
+                    messages.info(request, "Tagging is already running.")
+            elif action == "gemini_stop":
+                tagjob.stop()
+                messages.info(request, "Tagging will stop after the current batch.")
         except (ValueError, gemini.LabGeminiError) as e:
             messages.error(request, str(e))
         return _back(request, reverse("recs_lab_skills"))
@@ -220,4 +258,46 @@ def skills_view(request):
     return render(request, "recs_lab/skills.html", _ctx(
         request, "skills", rows=rows[:300], total=len(rows), editing=editing, kinds=taxonomy.KINDS, kind=kind, q=request.GET.get("q", ""),
         families=taxonomy.families(), by_source=by_source, postings=d["postings"] if d else 0,
-        max_batch=gemini.MAX_TAG_BATCH))
+        max_batch=gemini.MAX_TAG_BATCH, tag_job=tagjob.state()))
+
+
+# ---------------------------------------------------------------------------
+@developer_only
+def resources_view(request):
+    """Every saved resource request: refresh one, hide a bad resource, or clear the queue."""
+    if request.method == "POST":
+        action, k = request.POST.get("action"), request.POST.get("key", "")
+        entry = resources.saved().get(k) or worker.jobs().get(k)
+        if action == "refresh" and entry:
+            worker.requeue({"key": k, "purpose": entry["purpose"], "skill": entry["skill"],
+                            "context": entry.get("context", "")})
+            worker.start()
+            messages.success(request, f"Finding resources for {entry['skill']} again in the background.")
+        elif action == "delete" and k:
+            resources.delete_entry(k)
+            worker.drop(k)
+            messages.success(request, "Removed.")
+        elif action == "hide" and k:
+            resources.hide_item(k, request.POST.get("link", ""))
+            messages.success(request, "That resource won't be shown again.")
+        elif action == "run":
+            messages.info(request, "Started." if worker.start() else "Already running.")
+        elif action == "clear_failed":
+            for jk, j in worker.jobs().items():
+                if j["status"] == "failed":
+                    worker.drop(jk)
+            messages.success(request, "Cleared the failed requests.")
+        return _back(request, reverse("recs_lab_resources"))
+    who = request.GET.get("who") if request.GET.get("who") in ("learner", "professor") else ""
+    entries = []
+    for k, e in resources.saved().items():
+        aud, label = resources.PURPOSES.get(e.get("purpose"), ("", ""))
+        if who and aud != who:
+            continue
+        entries.append({"key": k, "audience": aud, "label": label, **e,
+                        "shown": [i for i in e.get("items") or [] if not i.get("hidden")]})
+    entries.sort(key=lambda e: e.get("generated_at", ""), reverse=True)
+    queue = sorted(worker.jobs().items(), key=lambda kv: kv[1].get("queued_at", ""))
+    return render(request, "recs_lab/resources.html", _ctx(
+        request, "resources", entries=entries, queue=[{"key": k, **j} for k, j in queue], who=who,
+        status=worker.status(), purposes=resources.PURPOSES))
