@@ -521,12 +521,14 @@ def _mine_status(unit, mine, known):
     return ("met" if strong else "building" if have else "missing"), pick
 
 
-def student_view(user, dummy=False):
+def student_view(user, dummy=False, role=None):
+    """`role`: a job role to preview instead of the student's saved target role (developers)."""
     from .. import rec_context
 
     ctx = rec_context.student_context(user)
     program, year = ctx["program"], ctx["year"]
-    role = user.target_role if user.target_role in job_roles.ROLE_LABELS else ""
+    role = role if role is not None else user.target_role
+    role = role if role in job_roles.ROLE_LABELS else ""
     d = demand(program, entry_only=True, role=role)
     if d is None:
         return {"exists": False}
@@ -579,12 +581,12 @@ def student_view(user, dummy=False):
     order = {"build_now": 0, "building": 1, "coming_up": 2, "met": 3}
     units.sort(key=lambda u: (order[u["status"]], -u["top_pct"]))
     return {"exists": True, "user": user, "program": program, "year": year, "term": ctx.get("term", ""),
-            "role_label": job_roles.ROLE_LABELS.get(role, ""), "postings": d["postings"], "scope": d["scope"],
+            "role": role, "role_label": job_roles.ROLE_LABELS.get(role, ""), "postings": d["postings"], "scope": d["scope"],
             "units": units, "met": met, "readiness": pct(met, len(units)) if units else None,
             "assumed": len(ctx.get("assumed") or {})}
 
 
-def alumni_view(user, dummy=False):
+def alumni_view(user, dummy=False, role=None):
     from ..student_views import _my_skills, latest_response
 
     latest = latest_response(user)
@@ -593,7 +595,8 @@ def alumni_view(user, dummy=False):
     mine = _my_skills(user)
     program = str(((data or {}).get("personal_info") or {}).get("course") or (user.learner_info or {}).get("course") or "")
     program = program if program in curriculum_data.PROGRAMS else ""
-    role = user.target_role if user.target_role in job_roles.ROLE_LABELS else ""
+    role = role if role is not None else user.target_role
+    role = role if role in job_roles.ROLE_LABELS else ""
     d = demand(program, entry_only=False, role=role)
     if d is None:
         return {"exists": False}
@@ -646,5 +649,5 @@ def alumni_view(user, dummy=False):
     units.sort(key=lambda u: (order[u["status"]], -u["top_pct"]))
     return {"exists": True, "user": user, "program": program, "employment": emp,
             "employed": emp.get("status") == "employed", "current_role": emp.get("current_role") or "",
-            "role_label": job_roles.ROLE_LABELS.get(role, ""), "postings": d["postings"], "units": units,
+            "role": role, "role_label": job_roles.ROLE_LABELS.get(role, ""), "postings": d["postings"], "units": units,
             "met": met, "readiness": pct(met, len(units)) if units else None, "wants": wants, "applied": applied}

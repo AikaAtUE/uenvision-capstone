@@ -2,14 +2,33 @@
 {% block lab_title %}Lab · Alumni view{% endblock %}
 {% block lab_heading %}Recommendations Lab · Alumni{% endblock %}
 {% block lab_body %}
+{% if self_only %}
+<form class="rl-form" method="post">{% csrf_token %}
+  <label class="rl-field rl-field--grow"><span>Your target job role</span>
+    <select name="role" onchange="this.form.submit()">
+      <option value="">Pick a role</option>
+      {% for k, label in roles.items %}<option value="{{ k }}"{% if k == person.target_role %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <input type="hidden" name="action" value="set_role">
+  <noscript><button class="btn btn-navy btn-sm" type="submit">Save</button></noscript>
+</form>
+{% else %}
 <form class="rl-form" method="get" action="{% url 'recs_lab_alumni' %}">
   <label class="rl-field rl-field--grow"><span>Alumni</span>
-    <select name="user" onchange="this.form.submit()">
+    <select name="user" onchange="this.form.role.value='';this.form.submit()">
       {% for u in people %}<option value="{{ u.pk }}"{% if person and u.pk == person.pk %} selected{% endif %}>{{ u.get_full_name|default:u.email }}{% if u.learner_info.course %} · {{ u.learner_info.course }}{% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="rl-field"><span>Preview another role</span>
+    <select name="role" onchange="this.form.submit()">
+      <option value="">Their own target role</option>
+      {% for k, label in roles.items %}<option value="{{ k }}"{% if k == preview %} selected{% endif %}>{{ label }}</option>{% endfor %}
     </select>
   </label>
   <noscript><button class="btn btn-navy btn-sm" type="submit">Show</button></noscript>
 </form>
+{% endif %}
 {% if not person %}
   <p class="empty-note">No alumni with survey answers in this data set yet. Switch to Dummy answers, or answer the alumni survey with a dummy alumni account.</p>
 {% elif not result.exists %}

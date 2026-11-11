@@ -4,19 +4,20 @@
 {% block lab_body %}
 <form class="rl-form" method="get" action="{% url 'recs_lab_faculty' %}">
   <label class="rl-field rl-field--grow"><span>Subject</span>
-    <select name="subject" onchange="this.form.prof.value='';this.form.submit()">
+    <select name="subject" onchange="if(this.form.prof)this.form.prof.value='';this.form.submit()">
       {% for s in subjects %}<option value="{{ s.code }}"{% if s.code == code %} selected{% endif %}>{{ s.code }} · {{ s.name }}</option>{% endfor %}
     </select>
   </label>
-  <label class="rl-field"><span>See it as</span>
+  {% if not own_only %}<label class="rl-field"><span>See it as</span>
     <select name="prof" onchange="this.form.submit()">
       <option value="">All professors of this subject</option>
       {% for pid, pname in professors %}<option value="{{ pid }}"{% if pid == prof %} selected{% endif %}>{{ pname }}</option>{% endfor %}
     </select>
-  </label>
+  </label>{% endif %}
   <noscript><button class="btn btn-navy btn-sm" type="submit">Show</button></noscript>
 </form>
 
+{% if no_survey %}<p class="rl-note">You haven't answered the Professor Survey with this account yet, so every subject is listed. Answer it to see only the subjects you teach, judged by what you reported.</p>{% endif %}
 {% if not result.exists %}
   <p class="empty-note">{{ result.error|default:"Pick a subject." }}</p>
 {% else %}
@@ -25,7 +26,7 @@
     <h2>{{ result.info.name }}</h2>
     <p class="rl-sub">{{ result.info.code }} · {% for p, y in result.info.years.items %}{{ p }} year {{ y }}{% if not forloop.last %}, {% endif %}{% endfor %} ·
       blueprint <span class="rl-pill rl-pill--{% if result.bp.status == 'approved' %}ok{% elif result.bp.status == 'draft' %}warn{% else %}mute{% endif %}">{% if result.bp.status == 'approved' %}Approved{% elif result.bp.status == 'draft' %}Draft{% else %}Automatic draft{% endif %}</span>
-      <a class="link-inline" href="{% url 'recs_lab_blueprints' %}?subject={{ result.info.code }}">Edit blueprint</a></p>
+      {% if "blueprints" in lab_pages %}<a class="link-inline" href="{% url 'recs_lab_blueprints' %}?subject={{ result.info.code }}">Edit blueprint</a>{% endif %}</p>
   </div>
 </div>
 <ul class="rl-facts">

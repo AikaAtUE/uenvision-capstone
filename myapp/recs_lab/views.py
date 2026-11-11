@@ -17,18 +17,59 @@ from ..views.common import _sees_dummy_results
 from . import blueprints, engine, gemini, resources, tagjob, taxonomy, worker
 
 
-def developer_only(view):
-    @wraps(view)
-    @login_required
-    def wrapper(request, *args, **kwargs):
-        if not getattr(request.user, "is_developer", False):
-            raise Http404
-        return view(request, *args, **kwargs)
-    return wrapper
+# Who can open which lab page. Developers see everything and can switch between accounts.
+# Dummy (test) accounts see the lab the way that kind of account would: a dummy student only
+# their own Student page, a dummy professor only their own subjects, a dummy administrator the
+# Admin, Faculty and Blueprint pages. Real (non-dummy) accounts never see the lab at all.
+PAGES = {
+    "developer": {"dev", "index", "faculty", "admin", "student", "alumni", "blueprints", "skills", "resources"},
+    "student": {"student"},
+    "alumni": {"alumni"},
+    "faculty": {"faculty"},
+    "admin": {"admin", "faculty", "blueprints"},
+}
+HOME = {"student": "recs_lab_student", "alumni": "recs_lab_alumni", "faculty": "recs_lab_faculty",
+        "admin": "recs_lab_admin"}
+
+
+def lab_role(user):
+    """"developer", "student", "alumni", "faculty", "admin" (dummy accounts), or None (no access)."""
+    if not getattr(user, "is_authenticated", False):
+        return None
+    if user.is_developer:
+        return "developer"
+    if not user.is_dummy:
+        return None
+    return {CustomUser.Role.STUDENT: "student", CustomUser.Role.ALUMNI: "alumni",
+            CustomUser.Role.FACULTY: "faculty", CustomUser.Role.ADMINISTRATOR: "admin"}.get(user.role)
+
+
+def lab_page(page):
+    """Only the lab roles whose PAGES include `page`; everyone else gets a plain 404."""
+    def deco(view):
+        @wraps(view)
+        @login_required
+        def wrapper(request, *args, **kwargs):
+            role = lab_role(request.user)
+            if role is None:
+                raise Http404
+            if page not in PAGES[role]:
+                if page == "index":
+                    return redirect(HOME[role])
+                raise Http404
+            request.lab_role = role
+            return view(request, *args, **kwargs)
+        return wrapper
+    return deco
+
+
+developer_only = lab_page("dev")   # the Real / Dummy switch, which only developers have
 
 
 def _ctx(request, tab, **extra):
-    return {"active_page": "", "lab_tab": tab, "lab_dummy": _sees_dummy_results(request), **extra}
+    role = getattr(request, "lab_role", None) or lab_role(request.user)
+    return {"active_page": "", "lab_tab": tab, "lab_dummy": _sees_dummy_results(request), "lab_role": role,
+            "lab_pages": PAGES.get(role, set()), "lab_is_dev": role == "developer", **extra}
 
 
 def _back(request, fallback):
@@ -68,7 +109,7 @@ def data_switch_view(request):
 
 
 # ---------------------------------------------------------------------------
-@developer_only
+@lab_page("index")
 def index_view(request):
     dummy = _sees_dummy_results(request)
     bps = blueprints.all_blueprints()
@@ -84,26 +125,38 @@ def index_view(request):
 
 
 # ---------------------------------------------------------------------------
-@developer_only
+@lab_page("faculty")
 def faculty_view(request):
     dummy = _sees_dummy_results(request)
     subs = [s for s in blueprints.subjects()]
-    code = request.GET.get("subject") or (subs[0]["code"] if subs else "")
-    try:
-        prof = int(request.GET.get("prof") or 0) or None
-    except ValueError:
-        prof = None
+    own_only = request.lab_role == "faculty"
+    mine = []
+    if own_only:
+        # a (dummy) professor sees it as themselves, for the subjects of their Professor Survey
+        prof = request.user.pk
+        taught = {c for r in engine.responses(dummy) if r["type"] == CurriculumSurveyResponse.PROFESSOR
+                  and r["user_id"] == prof for c in r["subjects"]}
+        mine = [s for s in subs if s["code"] in taught]
+        subs = mine or subs
+    code = request.GET.get("subject") if any(s["code"] == request.GET.get("subject") for s in subs) else (
+        subs[0]["code"] if subs else "")
+    if not own_only:
+        try:
+            prof = int(request.GET.get("prof") or 0) or None
+        except ValueError:
+            prof = None
     result = engine.faculty_view(code, professor_id=prof, dummy=dummy) if code else {"exists": False}
     specs = resources.plan_faculty(result) if result.get("exists") else []
     resp, res = _resources_step(request, specs)
     if resp:
         return resp
     return render(request, "recs_lab/faculty.html", _ctx(
-        request, "faculty", subjects=subs, code=code, prof=prof, result=result,
-        professors=engine.professors_for(code, dummy) if code else [], **res))
+        request, "faculty", subjects=subs, code=code, prof=prof, result=result, own_only=own_only,
+        no_survey=own_only and not mine,
+        professors=[] if own_only else (engine.professors_for(code, dummy) if code else []), **res))
 
 
-@developer_only
+@lab_page("admin")
 def admin_view(request):
     dummy = _sees_dummy_results(request)
     program = request.GET.get("program") if request.GET.get("program") in ("BSIT", "BSCS") else ""
@@ -132,41 +185,55 @@ def _learner_choices(kind, dummy):
     return list(CustomUser.objects.filter(pk__in=ids, role=role).order_by("last_name", "first_name"))
 
 
-@developer_only
 def learner_view(request, kind):
     dummy = _sees_dummy_results(request)
-    people = _learner_choices(kind, dummy)
-    try:
-        pk = int(request.GET.get("user") or 0)
-    except ValueError:
-        pk = 0
-    person = next((u for u in people if u.pk == pk), people[0] if people else None)
+    self_only = request.lab_role == kind          # a dummy student / alumni sees it as themselves
+    if self_only and request.method == "POST" and request.POST.get("action") == "set_role":
+        role = request.POST.get("role", "")
+        request.user.target_role = role if role in job_roles.ROLE_LABELS else ""
+        request.user.save(update_fields=["target_role"])
+        messages.success(request, "Target role saved." if request.user.target_role else "Target role cleared.")
+        return redirect(request.get_full_path())
+    if self_only:
+        people, person = [], request.user
+        preview = None
+    else:
+        people = _learner_choices(kind, dummy)
+        try:
+            pk = int(request.GET.get("user") or 0)
+        except ValueError:
+            pk = 0
+        person = next((u for u in people if u.pk == pk), people[0] if people else None)
+        # developers try another role without changing the account's saved one
+        preview = request.GET.get("role") if request.GET.get("role") in job_roles.ROLE_LABELS else None
     result = None
     specs = []
     free_only = request.GET.get("free") == "1"
     if person:
-        result = engine.alumni_view(person, dummy) if kind == "alumni" else engine.student_view(person, dummy)
+        view = engine.alumni_view if kind == "alumni" else engine.student_view
+        result = view(person, dummy, role=preview)
         if result.get("exists"):
             specs = (resources.plan_alumni if kind == "alumni" else resources.plan_student)(result, free_only)
     resp, res = _resources_step(request, specs)
     if resp:
         return resp
     return render(request, f"recs_lab/{kind}.html", _ctx(
-        request, kind, people=people, person=person, result=result, roles=job_roles.ROLE_LABELS, **res))
+        request, kind, people=people, person=person, result=result, roles=job_roles.ROLE_LABELS,
+        self_only=self_only, preview=preview, **res))
 
 
-@developer_only
+@lab_page("student")
 def student_view(request):
     return learner_view(request, "student")
 
 
-@developer_only
+@lab_page("alumni")
 def alumni_view(request):
     return learner_view(request, "alumni")
 
 
 # ---------------------------------------------------------------------------
-@developer_only
+@lab_page("blueprints")
 def blueprints_view(request):
     dummy = _sees_dummy_results(request)
     subs = blueprints.subjects()
@@ -205,7 +272,7 @@ def blueprints_view(request):
         families=taxonomy.families(), targets=blueprints.TARGET_LABELS, code=code))
 
 
-@developer_only
+@lab_page("skills")
 def skills_view(request):
     d = engine.demand("", entry_only=False)
     tagger = taxonomy.Tagger()
@@ -262,7 +329,7 @@ def skills_view(request):
 
 
 # ---------------------------------------------------------------------------
-@developer_only
+@lab_page("resources")
 def resources_view(request):
     """Every saved resource request: refresh one, hide a bad resource, or clear the queue."""
     if request.method == "POST":

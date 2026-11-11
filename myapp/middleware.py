@@ -20,8 +20,9 @@ LEARNER_URL_NAMES = {
 }
 
 # Dummy (test) students can also open the overall Dashboard, which for them is
-# computed from dummy answers only.
-DUMMY_LEARNER_URL_NAMES = {"dashboard", "dashboard_skills"}
+# computed from dummy answers only, and their own page of the Recommendations Lab
+# (reached by link only; recs_lab/views.py decides what each account sees).
+DUMMY_LEARNER_URL_NAMES = {"dashboard", "dashboard_skills", "recs_lab", "recs_lab_student", "recs_lab_alumni"}
 
 
 class LearnerAccessMiddleware:

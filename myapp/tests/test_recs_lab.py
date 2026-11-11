@@ -336,3 +336,69 @@ class TagAllTests(IsolatedDataMixin, TestCase):
             self.assertIn("quota", tagjob.state()["error"])
             self.assertEqual(tagjob.run(tag=fake_tag, pace=0), "done")
         self.assertEqual(tagjob.state()["done"], 130)
+
+
+class DummyAccountTests(IsolatedDataMixin, TestCase):
+    """Dummy (test) accounts see the lab as that kind of account would; real accounts never do."""
+    def dummy(self, email, role, **kw):
+        u = make_user(email, role, **kw)
+        u.is_dummy = True
+        u.save()
+        return u
+
+    def test_dummy_student_sees_only_their_own_page(self):
+        other = make_user("real@ue.edu.ph", CustomUser.Role.STUDENT)
+        me = self.dummy("dummy@ue.edu.ph", CustomUser.Role.STUDENT, learner_info={"course": "BSCS", "year_level": 2})
+        self.client.force_login(me)
+        r = self.client.get(reverse("recs_lab"))
+        self.assertRedirects(r, reverse("recs_lab_student"), fetch_redirect_response=False)
+        r = self.client.get(reverse("recs_lab_student") + f"?user={other.pk}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["person"], me)                 # ?user= is ignored
+        self.assertContains(r, "Your target job role")
+        self.assertNotContains(r, "Preview another role")
+        self.assertNotContains(r, "Real answers")                 # no Real / Dummy switch
+        for name in ("recs_lab_faculty", "recs_lab_admin", "recs_lab_alumni", "recs_lab_skills",
+                     "recs_lab_blueprints", "recs_lab_resources"):
+            self.assertIn(self.client.get(reverse(name)).status_code, (302, 404), name)
+
+    def test_dummy_student_picks_their_target_role(self):
+        from .. import job_roles
+        me = self.dummy("dummy@ue.edu.ph", CustomUser.Role.STUDENT)
+        self.client.force_login(me)
+        role = next(iter(job_roles.ROLE_LABELS))
+        self.client.post(reverse("recs_lab_student"), {"action": "set_role", "role": role})
+        me.refresh_from_db()
+        self.assertEqual(me.target_role, role)
+
+    def test_dummy_faculty_sees_it_as_themselves(self):
+        me = self.dummy("dprof@ue.edu.ph", CustomUser.Role.FACULTY)
+        R.objects.create(respondent_type=R.PROFESSOR, user=me, is_dummy=True, data={"subjects": [
+            {"code": "CCS 1101", "name": "Fundamentals of Programming", "skills": [{"name": "Python", "level": "Applied"}]}]})
+        self.client.force_login(me)
+        r = self.client.get(reverse("recs_lab_faculty"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([s["code"] for s in r.context["subjects"]], ["CCS 1101"])
+        self.assertEqual(r.context["prof"], me.pk)
+        self.assertNotContains(r, "See it as")
+        self.assertEqual(self.client.get(reverse("recs_lab_admin")).status_code, 404)
+
+    def test_dummy_admin_gets_admin_faculty_and_blueprints(self):
+        self.client.force_login(self.dummy("dadmin@ue.edu.ph", CustomUser.Role.ADMINISTRATOR))
+        for name in ("recs_lab_admin", "recs_lab_faculty", "recs_lab_blueprints"):
+            self.assertEqual(self.client.get(reverse(name)).status_code, 200, name)
+        for name in ("recs_lab_student", "recs_lab_skills", "recs_lab_resources"):
+            self.assertEqual(self.client.get(reverse(name)).status_code, 404, name)
+
+    def test_developer_role_preview_does_not_change_the_account(self):
+        from .. import job_roles
+        dev = make_user("dev@ue.edu.ph", CustomUser.Role.DEVELOPER)
+        s = make_user("s@ue.edu.ph", CustomUser.Role.STUDENT, learner_info={"course": "BSCS", "year_level": 2})
+        R.objects.create(respondent_type=R.STUDENT, user=s, data={"subjects": []})
+        self.client.force_login(dev)
+        role = list(job_roles.ROLE_LABELS)[1]
+        r = self.client.get(reverse("recs_lab_student") + f"?user={s.pk}&role={role}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["preview"], role)
+        s.refresh_from_db()
+        self.assertEqual(s.target_role, "")

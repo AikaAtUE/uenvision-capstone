@@ -8,21 +8,21 @@
   <header class="page-header"><h1>{% block lab_heading %}Recommendations Lab{% endblock %}</h1></header>
   <div class="page-body">
     <div class="rl-top">
-      <nav class="rl-tabs" aria-label="Recommendations Lab pages">
-        <a class="rl-tab{% if lab_tab == 'index' %} is-active{% endif %}" href="{% url 'recs_lab' %}">Overview</a>
-        <a class="rl-tab{% if lab_tab == 'faculty' %} is-active{% endif %}" href="{% url 'recs_lab_faculty' %}">Faculty</a>
-        <a class="rl-tab{% if lab_tab == 'admin' %} is-active{% endif %}" href="{% url 'recs_lab_admin' %}">Admin</a>
-        <a class="rl-tab{% if lab_tab == 'student' %} is-active{% endif %}" href="{% url 'recs_lab_student' %}">Student</a>
-        <a class="rl-tab{% if lab_tab == 'alumni' %} is-active{% endif %}" href="{% url 'recs_lab_alumni' %}">Alumni</a>
-        <a class="rl-tab{% if lab_tab == 'blueprints' %} is-active{% endif %}" href="{% url 'recs_lab_blueprints' %}">Subject blueprints</a>
-        <a class="rl-tab{% if lab_tab == 'skills' %} is-active{% endif %}" href="{% url 'recs_lab_skills' %}">Skill categories</a>
-        <a class="rl-tab{% if lab_tab == 'resources' %} is-active{% endif %}" href="{% url 'recs_lab_resources' %}">Resources</a>
-      </nav>
-      <form class="rl-switch" method="post" action="{% url 'recs_lab_data' %}" aria-label="Which survey answers to use">
+      {% if lab_pages|length > 1 %}<nav class="rl-tabs" aria-label="Recommendations Lab pages">
+        {% if "index" in lab_pages %}<a class="rl-tab{% if lab_tab == 'index' %} is-active{% endif %}" href="{% url 'recs_lab' %}">Overview</a>{% endif %}
+        {% if "faculty" in lab_pages %}<a class="rl-tab{% if lab_tab == 'faculty' %} is-active{% endif %}" href="{% url 'recs_lab_faculty' %}">Faculty</a>{% endif %}
+        {% if "admin" in lab_pages %}<a class="rl-tab{% if lab_tab == 'admin' %} is-active{% endif %}" href="{% url 'recs_lab_admin' %}">Admin</a>{% endif %}
+        {% if "student" in lab_pages %}<a class="rl-tab{% if lab_tab == 'student' %} is-active{% endif %}" href="{% url 'recs_lab_student' %}">Student</a>{% endif %}
+        {% if "alumni" in lab_pages %}<a class="rl-tab{% if lab_tab == 'alumni' %} is-active{% endif %}" href="{% url 'recs_lab_alumni' %}">Alumni</a>{% endif %}
+        {% if "blueprints" in lab_pages %}<a class="rl-tab{% if lab_tab == 'blueprints' %} is-active{% endif %}" href="{% url 'recs_lab_blueprints' %}">Subject blueprints</a>{% endif %}
+        {% if "skills" in lab_pages %}<a class="rl-tab{% if lab_tab == 'skills' %} is-active{% endif %}" href="{% url 'recs_lab_skills' %}">Skill categories</a>{% endif %}
+        {% if "resources" in lab_pages %}<a class="rl-tab{% if lab_tab == 'resources' %} is-active{% endif %}" href="{% url 'recs_lab_resources' %}">Resources</a>{% endif %}
+      </nav>{% else %}<span></span>{% endif %}
+      {% if lab_is_dev %}<form class="rl-switch" method="post" action="{% url 'recs_lab_data' %}" aria-label="Which survey answers to use">
         {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
         <button type="submit" name="results" value="real" class="{% if not lab_dummy %}is-active{% endif %}" aria-pressed="{% if lab_dummy %}false{% else %}true{% endif %}">Real answers</button>
         <button type="submit" name="results" value="dummy" class="{% if lab_dummy %}is-active{% endif %}" aria-pressed="{% if lab_dummy %}true{% else %}false{% endif %}">Dummy answers</button>
-      </form>
+      </form>{% else %}<span class="rl-badge">Test account · preview of the new recommendations</span>{% endif %}
     </div>
     {% if messages %}<div class="rl-msgs">{% include "_messages.html" %}</div>{% endif %}
     {% block lab_body %}{% endblock %}

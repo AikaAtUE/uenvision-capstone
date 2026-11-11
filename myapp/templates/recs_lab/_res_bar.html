@@ -10,7 +10,7 @@
   </div>
   <div class="rl-actions">
     {% if free_toggle %}
-      <a class="rl-tab{% if free_only %} is-active{% endif %}" href="?{% if person %}user={{ person.pk }}&{% endif %}{% if not free_only %}free=1{% endif %}">Free only</a>
+      <a class="rl-tab{% if free_only %} is-active{% endif %}" href="?{% if person and not self_only %}user={{ person.pk }}&{% endif %}{% if preview %}role={{ preview }}&{% endif %}{% if not free_only %}free=1{% endif %}">Free only</a>
     {% endif %}
     {% if res_missing and not res_status.pending %}
     <form method="post">{% csrf_token %}<button class="btn btn-navy btn-sm" type="submit" name="action" value="find_resources">Find resources with Gemini</button></form>
