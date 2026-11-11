@@ -64,12 +64,25 @@ def recommendations_view(request):
     codes = {s["code"] for s in subs}
 
     code = request.GET.get("subject") if request.GET.get("subject") in codes else ""
-    view = "subject" if code else ("gaps" if is_admin else "subject")
+    # Administrators get three tabs: Curriculum gaps (their start page), Faculty view (any subject) and Subject
+    # blueprints. Faculty only get the faculty view of their subjects.
+    views = ("gaps", "subject", "blueprints") if is_admin else ("subject",)
+    view = request.GET.get("view") if request.GET.get("view") in views else ("subject" if code else views[0])
     if view == "subject" and not code:
         code = (mine or subs)[0]["code"] if (mine or subs) else ""
 
+    base = reverse("recommendations")
     ctx = {"active_page": "recommendations", "subjects": subs, "mine": mine, "is_admin": is_admin,
-           "view": view, "code": code, "lab_pages": set(), "subject_url": reverse("recommendations")}
+           "view": view, "code": code, "lab_pages": set(), "subject_url": base,
+           "bp_url": f"{base}?view=blueprints&" if is_admin else "", "faculty_url": f"{base}?view=subject&"}
+    if view == "blueprints":
+        from .views import blueprint_action, blueprint_context
+        bp_code = request.GET.get("subject") or request.POST.get("subject") or ""
+        if request.method == "POST":
+            blueprint_action(request, bp_code, dummy)
+            return redirect(f"{base}?view=blueprints&subject={bp_code}")
+        ctx.update(blueprint_context(bp_code))
+        return render(request, "recs_lab/live_recommendations.html", ctx)
     if view == "gaps":
         program = request.GET.get("program") if request.GET.get("program") in ("BSIT", "BSCS") else ""
         levels = "all" if request.GET.get("levels") == "all" else "entry"

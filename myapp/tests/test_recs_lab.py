@@ -436,6 +436,49 @@ class LiveTests(IsolatedDataMixin, TestCase):
         self.assertEqual(r.context["view"], "gaps")
         r = self.client.get(reverse("recommendations") + "?subject=CCS%201101")
         self.assertEqual(r.context["view"], "subject")
+        self.assertContains(r, "Subject blueprints")
+
+    def test_administrators_see_and_approve_blueprints(self):
+        from ..recs_lab import blueprints as bps
+        self.client.force_login(make_user("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR))
+        url = reverse("recommendations")
+        r = self.client.get(url + "?view=blueprints")
+        self.assertEqual(r.context["view"], "blueprints")
+        self.assertContains(r, "CCS 1101")
+        r = self.client.get(url + "?view=blueprints&subject=CCS%201101")
+        self.assertContains(r, "Save as draft")
+        r = self.client.post(url + "?view=blueprints&subject=CCS%201101", {"subject": "CCS 1101", "action": "approve"})
+        self.assertRedirects(r, url + "?view=blueprints&subject=CCS 1101", fetch_redirect_response=False)
+        self.assertEqual(bps.all_blueprints()["CCS 1101"]["status"], "approved")
+
+    def test_administrators_get_skill_categories_and_resources(self):
+        from ..recs_lab import resources as res
+        self.client.force_login(make_user("adm@ue.edu.ph", CustomUser.Role.ADMINISTRATOR))
+        url = reverse("recommendations")
+        for view in ("skills", "resources"):
+            r = self.client.get(url + f"?view={view}")
+            self.assertEqual(r.context["view"], view)
+        sp = {"key": "student|start|python", "purpose": "start", "skill": "Python", "context": ""}
+        res.save_entry(sp, [{"name": "X", "link": "https://example.com/x", "type": "course"}])
+        r = self.client.post(url + "?view=resources", {"action": "delete", "key": sp["key"]})
+        self.assertRedirects(r, url + "?view=resources", fetch_redirect_response=False)
+        self.assertNotIn(sp["key"], res.saved())
+        with mock.patch("myapp.recs_lab.tagjob.start", return_value=True) as start:
+            self.client.post(url + "?view=skills", {"action": "gemini"})
+        self.assertLessEqual(start.call_count, 1)   # only when there are job postings to tag
+
+    def test_faculty_get_no_blueprint_editor(self):
+        from ..recs_lab import blueprints as bps
+        self.client.force_login(make_user("prof2@ue.edu.ph", CustomUser.Role.FACULTY))
+        url = reverse("recommendations")
+        r = self.client.get(url + "?view=blueprints")
+        self.assertEqual(r.context["view"], "subject")
+        self.assertNotContains(r, "Subject blueprints")
+        for view in ("skills", "resources"):
+            self.assertEqual(self.client.get(url + f"?view={view}").context["view"], "subject")
+        self.assertNotContains(r, "Edit blueprint")
+        self.client.post(url + "?view=blueprints", {"subject": "CCS 1101", "action": "approve"})
+        self.assertNotEqual(bps.all_blueprints()["CCS 1101"]["status"], "approved")
 
     def test_classic_page_is_for_developers_only(self):
         for i, role in enumerate([CustomUser.Role.ADMINISTRATOR, CustomUser.Role.FACULTY]):

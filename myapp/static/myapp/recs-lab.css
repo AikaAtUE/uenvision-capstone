@@ -179,3 +179,4 @@ td.rl-gapcell{width:200px; min-width:200px; white-space:normal;}
   .rl-thumb{width:48px; height:34px;}
   .rl-res-ok, .rl-res-unk{grid-column:2;}
 }
+.rl-tabs--live{margin:0 0 18px;}

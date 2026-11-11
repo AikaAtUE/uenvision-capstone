@@ -1,7 +1,7 @@
 {% extends "app_base.html" %}
 {% load static %}
 {% comment %}The Recommendations page (recs_lab/live.py). Faculty see their subjects
-  judged against each subject's blueprint; administrators also get the top 10 curriculum gaps.{% endcomment %}
+  judged against each subject's blueprint; administrators also get the top 10 curriculum gaps and the subject blueprints.{% endcomment %}
 {% block title %}Recommendations{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/recs-lab.css' %}?v={% now 'U' %}">{% endblock %}
 {% block page_content %}
@@ -10,35 +10,41 @@
   <div class="page-body">
     {% if user.is_developer %}<div class="rec-switch-row">{% include "_results_switch.html" %}</div>{% endif %}
     {% include "_messages.html" %}
-    <p class="rl-intro">{% if view == "gaps" %}The skills the curriculum covers least compared with what job postings ask for, with a
-      suggested subject for each and trainings for its professors.{% else %}Each subject is checked against what it's
-      <strong>for</strong> (its blueprint): which core concepts students are really getting, which needs are filled, and
-      learning materials for what isn't landing yet.{% endif %}</p>
-
-    <form class="rl-form" method="get" action="{% url 'recommendations' %}">
-      <label class="rl-field rl-field--grow"><span>Show</span>
-        <select name="subject" onchange="this.form.submit()">
-          {% if is_admin %}<option value=""{% if view == "gaps" %} selected{% endif %}>Curriculum gaps: top 10 across all subjects</option>{% endif %}
-          {% if mine %}<optgroup label="Subjects you teach (from your Professor Survey)">
-            {% for s in mine %}<option value="{{ s.code }}"{% if view == "subject" and s.code == code %} selected{% endif %}>{{ s.code }} · {{ s.name }}</option>{% endfor %}
-          </optgroup>{% endif %}
-          <optgroup label="All subjects">
-            {% for s in subjects %}<option value="{{ s.code }}"{% if view == "subject" and s.code == code and s not in mine %} selected{% endif %}>{{ s.code }} · {{ s.name }}</option>{% endfor %}
-          </optgroup>
-        </select>
-      </label>
-      <noscript><button class="btn btn-navy btn-sm" type="submit">Show</button></noscript>
-    </form>
-    {% if not mine and not is_admin %}
-    <p class="rl-note">Answer the <a class="link-inline" href="{% url 'professor_survey' %}">Professor Survey</a> (under Data) and your own subjects are listed first, judged by what you teach.</p>
-    {% elif view == "subject" and not teaches %}
-    <p class="rl-note">{% if mine %}You didn't report this subject in your Professor Survey, so it shows{% else %}This shows{% endif %} what every professor of this subject reported.</p>
-    {% endif %}
+    {% if is_admin %}<nav class="rl-tabs rl-tabs--live" aria-label="Recommendations views">
+      <a class="rl-tab{% if view == 'gaps' %} is-active{% endif %}" href="?view=gaps">Curriculum gaps</a>
+      <a class="rl-tab{% if view == 'subject' %} is-active{% endif %}" href="?view=subject">Faculty view</a>
+      <a class="rl-tab{% if view == 'blueprints' %} is-active{% endif %}" href="?view=blueprints">Subject blueprints</a>
+    </nav>{% endif %}
 
     {% if view == "gaps" %}
+      <p class="rl-intro">The skills the curriculum covers least compared with what job postings ask for, with a suggested subject
+        for each and trainings for its professors.</p>
       {% include "recs_lab/_admin_form.html" %}
       {% include "recs_lab/_admin_body.html" %}
+    {% elif view == "blueprints" %}
+      {% include "recs_lab/_blueprints_body.html" %}
     {% else %}
+      <p class="rl-intro">Each subject is checked against what it's <strong>for</strong> (its blueprint): which core concepts students
+        are really getting, which needs are filled, and learning materials for what isn't landing yet.</p>
+      <form class="rl-form" method="get" action="{% url 'recommendations' %}">
+        <input type="hidden" name="view" value="subject">
+        <label class="rl-field rl-field--grow"><span>Subject</span>
+          <select name="subject" onchange="this.form.submit()">
+            {% if mine %}<optgroup label="Subjects you teach (from your Professor Survey)">
+              {% for s in mine %}<option value="{{ s.code }}"{% if s.code == code %} selected{% endif %}>{{ s.code }} · {{ s.name }}</option>{% endfor %}
+            </optgroup>{% endif %}
+            <optgroup label="All subjects">
+              {% for s in subjects %}<option value="{{ s.code }}"{% if s.code == code and s not in mine %} selected{% endif %}>{{ s.code }} · {{ s.name }}</option>{% endfor %}
+            </optgroup>
+          </select>
+        </label>
+        <noscript><button class="btn btn-navy btn-sm" type="submit">Show</button></noscript>
+      </form>
+      {% if not mine and not is_admin %}
+      <p class="rl-note">Answer the <a class="link-inline" href="{% url 'professor_survey' %}">Professor Survey</a> (under Data) and your own subjects are listed first, judged by what you teach.</p>
+      {% elif not teaches %}
+      <p class="rl-note">{% if mine %}You didn't report this subject in your Professor Survey, so it shows{% else %}This shows{% endif %} what every professor of this subject reported.</p>
+      {% endif %}
       {% include "recs_lab/_faculty_body.html" %}
     {% endif %}
   </div>

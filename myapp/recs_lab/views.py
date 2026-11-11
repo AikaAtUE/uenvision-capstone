@@ -235,41 +235,52 @@ def alumni_view(request):
 # ---------------------------------------------------------------------------
 @lab_page("blueprints")
 def blueprints_view(request):
-    dummy = _sees_dummy_results(request)
-    subs = blueprints.subjects()
     code = request.GET.get("subject") or request.POST.get("subject") or ""
+    if request.method == "POST":
+        blueprint_action(request, code, _sees_dummy_results(request))
+        return redirect(f"{reverse('recs_lab_blueprints')}?subject={code}")
+    return render(request, "recs_lab/blueprints.html", _ctx(
+        request, "blueprints", **blueprint_context(code), bp_url=reverse("recs_lab_blueprints") + "?",
+        faculty_url=reverse("recs_lab_faculty") + "?"))
+
+
+def blueprint_action(request, code, dummy):
+    """The blueprint editor's buttons (save / approve / reset / Draft with Gemini), shared by the lab and the
+    administrators' Recommendations page. Messages say what happened."""
+    if not blueprints.subject(code):
+        return
+    action = request.POST.get("action")
+    try:
+        if action == "save":
+            bp, problems = blueprints.from_text(request.POST)
+            for p in problems:
+                messages.error(request, p)
+            if not problems:
+                blueprints.save(code, bp, status="draft", source="manual")
+                messages.success(request, "Blueprint saved as a draft.")
+        elif action == "approve":
+            blueprints.approve(code, request.user)
+            messages.success(request, "Blueprint approved.")
+        elif action == "reset":
+            blueprints.reset(code)
+            messages.success(request, "Blueprint reset to the automatic draft.")
+        elif action == "gemini":
+            reported = [r["names"][k] for r in engine.responses(dummy) for k in r["subjects"].get(code, {})]
+            gemini.draft_blueprint(code, list(dict.fromkeys(reported)))
+            messages.success(request, "Gemini drafted a new blueprint. Review it, then approve it.")
+    except (ValueError, gemini.LabGeminiError) as e:
+        messages.error(request, str(e))
+
+
+def blueprint_context(code):
+    """The blueprint list, or one subject's blueprint and its editor text."""
     info = blueprints.subject(code) if code else None
-    if request.method == "POST" and info:
-        action = request.POST.get("action")
-        url = f"{reverse('recs_lab_blueprints')}?subject={code}"
-        try:
-            if action == "save":
-                bp, problems = blueprints.from_text(request.POST)
-                for p in problems:
-                    messages.error(request, p)
-                if not problems:
-                    blueprints.save(code, bp, status="draft", source="manual")
-                    messages.success(request, "Blueprint saved as a draft.")
-            elif action == "approve":
-                blueprints.approve(code, request.user)
-                messages.success(request, "Blueprint approved.")
-            elif action == "reset":
-                blueprints.reset(code)
-                messages.success(request, "Blueprint reset to the automatic draft.")
-            elif action == "gemini":
-                reported = [r["names"][k] for r in engine.responses(dummy) for k in r["subjects"].get(code, {})]
-                gemini.draft_blueprint(code, list(dict.fromkeys(reported)))
-                messages.success(request, "Gemini drafted a new blueprint. Review it, then approve it.")
-        except (ValueError, gemini.LabGeminiError) as e:
-            messages.error(request, str(e))
-        return redirect(url)
     bps = blueprints.all_blueprints()
     bp = bps.get(code) if info else None
     rows = [{**s, "status": bps[s["code"]]["status"], "core": len(bps[s["code"]]["core"]),
-             "slots": len(bps[s["code"]]["slots"])} for s in subs]
-    return render(request, "recs_lab/blueprints.html", _ctx(
-        request, "blueprints", rows=rows, info=info, bp=bp, text=blueprints.to_text(bp) if bp else None,
-        families=taxonomy.families(), targets=blueprints.TARGET_LABELS, code=code))
+             "slots": len(bps[s["code"]]["slots"])} for s in blueprints.subjects()]
+    return {"rows": rows, "info": info, "bp": bp, "text": blueprints.to_text(bp) if bp else None,
+            "families": taxonomy.families(), "targets": blueprints.TARGET_LABELS, "code": code}
 
 
 @lab_page("skills")

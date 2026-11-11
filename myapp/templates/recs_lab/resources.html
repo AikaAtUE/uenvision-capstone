@@ -2,57 +2,5 @@
 {% block lab_title %}Lab · Learning resources{% endblock %}
 {% block lab_heading %}Recommendations Lab · Learning resources{% endblock %}
 {% block lab_body %}
-<p class="rl-intro">Resources Gemini found with web search, saved per <strong>skill + who it's for + why</strong>, so everyone with
-  the same need shares one search. Every link was opened before it was kept, and each picture comes from the resource's own page.
-  The Student, Alumni, Faculty and Admin pages each have a <strong>Find resources with Gemini</strong> button for their missing ones.</p>
-<ul class="rl-facts">
-  <li>Saved requests<strong>{{ entries|length }}</strong></li>
-  <li>Waiting<strong>{{ status.pending }}</strong></li>
-  <li>Failed<strong>{{ status.failed }}</strong></li>
-  <li>Finder<strong>{% if status.running %}Running{% else %}Idle{% endif %}</strong></li>
-</ul>
-{% if queue %}
-<h3 class="rl-section">Queue</h3>
-<div class="rl-table-wrap"><table class="rl-table">
-  <thead><tr><th>Skill</th><th>Why</th><th>Status</th><th>Tries</th><th>Last error</th><th></th></tr></thead>
-  <tbody>{% for j in queue %}<tr>
-    <td><strong>{{ j.skill }}</strong>{% if j.context %}<div class="rl-why">{{ j.context }}</div>{% endif %}</td>
-    <td>{{ j.purpose }}</td>
-    <td><span class="rl-pill rl-pill--{% if j.status == 'failed' %}bad{% elif j.status == 'running' %}info{% else %}mute{% endif %}">{{ j.status }}</span></td>
-    <td class="rl-num">{{ j.attempts }}</td><td class="rl-why">{{ j.error|default:"—" }}</td>
-    <td><form method="post">{% csrf_token %}<input type="hidden" name="key" value="{{ j.key }}"><button class="link-inline link-inline--sm" name="action" value="delete">Remove</button></form></td>
-  </tr>{% endfor %}</tbody>
-</table></div>
-<div class="rl-actions" style="margin:0 0 16px">
-  <form method="post">{% csrf_token %}<button class="btn btn-navy btn-sm" name="action" value="run">Run the queue now</button></form>
-  {% if status.failed %}<form method="post">{% csrf_token %}<button class="btn btn-ghost btn-sm" name="action" value="clear_failed">Clear failed</button></form>{% endif %}
-</div>
-{% endif %}
-
-<div class="rl-filters" role="group" aria-label="Who it's for">
-  <a href="?" class="{% if not who %}is-active{% endif %}">All</a>
-  <a href="?who=learner" class="{% if who == 'learner' %}is-active{% endif %}">Students &amp; alumni</a>
-  <a href="?who=professor" class="{% if who == 'professor' %}is-active{% endif %}">Professors</a>
-</div>
-<div class="rl-units">
-  {% for e in entries %}
-  <div class="rl-box">
-    <div class="rl-unit-head"><b>{{ e.skill }}</b>
-      <span class="rl-actions">
-        <span class="rl-pill rl-pill--{% if e.audience == 'professor' %}info{% else %}ok{% endif %}">{{ e.label }} · {{ e.purpose }}</span>
-        <form method="post">{% csrf_token %}<input type="hidden" name="key" value="{{ e.key }}"><button class="btn btn-ghost btn-sm" name="action" value="refresh">Find again</button></form>
-        <form method="post">{% csrf_token %}<input type="hidden" name="key" value="{{ e.key }}"><button class="link-inline link-inline--sm" name="action" value="delete">Delete</button></form>
-      </span></div>
-    <span class="rl-why">{% if e.context %}{{ e.context }} · {% endif %}found {{ e.generated_at|slice:":16"|cut:"T" }}{% if e.error %} · {{ e.error }}{% endif %}</span>
-    {% for i in e.shown %}
-    <div class="rl-res-row">
-      <a class="link-inline" href="{{ i.link }}" target="_blank" rel="noopener noreferrer">{{ i.name }}</a>
-      <span class="rl-why">{{ i.type }}{% if i.provider %} · {{ i.provider }}{% endif %}{% if i.cost %} · {{ i.cost }}{% endif %} · {% if i.verified == 'ok' %}link checked{% else %}unchecked{% endif %} · {% if i.image %}picture{% else %}icon tile{% endif %}</span>
-      <form method="post">{% csrf_token %}<input type="hidden" name="key" value="{{ e.key }}"><input type="hidden" name="link" value="{{ i.link }}"><button class="link-inline link-inline--sm" name="action" value="hide">Hide</button></form>
-    </div>
-    {% empty %}<p class="rl-why">Nothing found for this one.</p>{% endfor %}
-  </div>
-  {% empty %}<p class="empty-note">No resources found yet. Open the Student, Alumni, Faculty or Admin page and press "Find resources with Gemini".</p>
-  {% endfor %}
-</div>
+{% include "recs_lab/_resources_body.html" %}
 {% endblock %}

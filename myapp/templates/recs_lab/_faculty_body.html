@@ -10,7 +10,7 @@
     <h2>{{ result.info.name }}</h2>
     <p class="rl-sub">{{ result.info.code }} · {% for p, y in result.info.years.items %}{{ p }} year {{ y }}{% if not forloop.last %}, {% endif %}{% endfor %} ·
       blueprint <span class="rl-pill rl-pill--{% if result.bp.status == 'approved' %}ok{% elif result.bp.status == 'draft' %}warn{% else %}mute{% endif %}">{% if result.bp.status == 'approved' %}Approved{% elif result.bp.status == 'draft' %}Draft{% else %}Automatic draft{% endif %}</span>
-      {% if "blueprints" in lab_pages %}<a class="link-inline" href="{% url 'recs_lab_blueprints' %}?subject={{ result.info.code }}">Edit blueprint</a>{% endif %}</p>
+      {% if bp_url %}<a class="link-inline" href="{{ bp_url }}subject={{ result.info.code }}">Edit blueprint</a>{% elif "blueprints" in lab_pages %}<a class="link-inline" href="{% url 'recs_lab_blueprints' %}?subject={{ result.info.code }}">Edit blueprint</a>{% endif %}</p>
   </div>
 </div>
 <ul class="rl-facts">
