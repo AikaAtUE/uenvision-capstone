@@ -1,0 +1,67 @@
+{% extends "recs_lab/_base.html" %}
+{% block lab_title %}Lab · Alumni view{% endblock %}
+{% block lab_heading %}Recommendations Lab · Alumni{% endblock %}
+{% block lab_body %}
+<form class="rl-form" method="get" action="{% url 'recs_lab_alumni' %}">
+  <label class="rl-field rl-field--grow"><span>Alumni</span>
+    <select name="user" onchange="this.form.submit()">
+      {% for u in people %}<option value="{{ u.pk }}"{% if person and u.pk == person.pk %} selected{% endif %}>{{ u.get_full_name|default:u.email }}{% if u.learner_info.course %} · {{ u.learner_info.course }}{% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  <noscript><button class="btn btn-navy btn-sm" type="submit">Show</button></noscript>
+</form>
+{% if not person %}
+  <p class="empty-note">No alumni with survey answers in this data set yet. Switch to Dummy answers, or answer the alumni survey with a dummy alumni account.</p>
+{% elif not result.exists %}
+  <p class="empty-note">No extracted job-market data yet.</p>
+{% else %}
+<div class="rl-head">
+  <div>
+    <h2>{{ person.get_full_name }}{% if result.current_role %} · {{ result.current_role }}{% endif %}</h2>
+    <p class="rl-sub">{{ result.program|default:"Program not set" }} ·
+      {% if result.employed %}Employed{% elif result.employment.status %}Looking for work{% else %}Employment not answered{% endif %}
+      · target role: {{ result.role_label|default:"none picked" }}</p>
+  </div>
+</div>
+<ul class="rl-facts">
+  <li>Role needs met<strong>{{ result.met }} of {{ result.units|length }}</strong></li>
+  <li>Postings for the role (all levels)<strong>{{ result.postings }}</strong></li>
+  <li>Skills they want to learn<strong>{{ result.wants|length }}</strong></li>
+</ul>
+
+<div class="rl-grid2">
+  <div class="rl-box">
+    <span class="rl-k">Their own upskilling list</span>
+    {% if result.wants %}
+    <div class="rl-units" style="margin:0">
+      {% for w in result.wants %}
+      <div class="rl-unit">
+        <div class="rl-unit-head"><b>{{ w.skill }}</b>
+          {% if w.status == 'met' %}<span class="rl-pill rl-pill--ok">Already at {{ w.level }}</span>{% elif w.status == 'building' %}<span class="rl-pill rl-pill--warn">At {{ w.level|default:"Introduced" }}</span>{% else %}<span class="rl-pill rl-pill--bad">To learn</span>{% endif %}</div>
+        <p>{% if w.pct %}In {{ w.pct }}% of {{ result.role_label|default:"IT/CS" }} postings.{% else %}Not in the role's postings in this data set.{% endif %}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="rl-why">They didn't list skills to learn or upskilling skills.</p>{% endif %}
+  </div>
+  <div class="rl-box">
+    <span class="rl-k">Used at work</span>
+    {% if result.applied %}<div class="rl-chips">{% for s in result.applied %}<span class="rl-chip">{{ s }}</span>{% endfor %}</div>
+    {% else %}<p class="rl-why">No "skills applied at work" answer.</p>{% endif %}
+    <p class="rl-why">These answers also feed the Admin view's "Alumni needed it" column.</p>
+  </div>
+</div>
+
+<h3 class="rl-section">For their target role</h3>
+<div class="rl-units">
+  {% for u in result.units %}
+  <div class="rl-unit">
+    <div class="rl-unit-head"><b>{{ u.label }}</b><span class="rl-pill rl-pill--{{ u.tone }}">{{ u.status_label }}</span></div>
+    <span class="rl-k">{{ u.kind_label }} · in postings: {{ u.members_text }}</span>
+    <p>{{ u.why }}</p>
+  </div>
+  {% endfor %}
+</div>
+<p class="rl-note">Alumni are no longer on a curriculum path, so there is no year-level or "coming up" logic here, and all experience levels count.</p>
+{% endif %}
+{% endblock %}

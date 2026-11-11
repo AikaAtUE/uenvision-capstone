@@ -1,0 +1,69 @@
+{% extends "recs_lab/_base.html" %}
+{% block lab_title %}Lab · Skill categories{% endblock %}
+{% block lab_heading %}Recommendations Lab · Skill categories{% endblock %}
+{% block lab_body %}
+<p class="rl-intro">Every skill in the {{ postings }} IT/CS job postings, with its <strong>kind</strong> and, for languages, frameworks and
+  tools, its <strong>family</strong>: the skills that can stand in for each other. Tags never change a count; each skill keeps its own share.
+  Tags come from a developer (manual), Gemini, or the built-in rules.</p>
+<ul class="rl-facts">
+  <li>Tagged by the built-in rules<strong>{{ by_source.rules|default:0 }}</strong></li>
+  <li>Tagged by Gemini<strong>{{ by_source.gemini|default:0 }}</strong></li>
+  <li>Tagged by hand<strong>{{ by_source.manual|default:0 }}</strong></li>
+</ul>
+<div class="rl-actions" style="margin:0 0 16px">
+  <form method="post">{% csrf_token %}<button class="btn btn-navy btn-sm" type="submit" name="action" value="gemini">Tag rule-tagged skills with Gemini</button></form>
+  <span class="rl-why">Up to {{ max_batch }} skills per click, most frequent first. Hand tags are never overwritten.</span>
+</div>
+
+{% if editing %}
+<div class="rl-box" id="edit" style="margin:0 0 16px">
+  <span class="rl-k">Tag {{ editing.skill }}</span>
+  <form class="rl-tagform" method="post">{% csrf_token %}
+    <input type="hidden" name="skill" value="{{ editing.skill }}"><input type="hidden" name="next" value="{{ request.path }}?kind={{ kind }}&q={{ q|urlencode }}">
+    <select name="kind" aria-label="Kind">{% for k, label in kinds.items %}<option value="{{ k }}"{% if k == editing.kind %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <select name="family" aria-label="Family"><option value="">No family</option>{% for k, f in families.items %}<option value="{{ k }}"{% if k == editing.family %} selected{% endif %}>{{ f.label }}</option>{% endfor %}</select>
+    <button class="btn btn-navy btn-sm" type="submit" name="action" value="tag">Save</button>
+    {% if editing.source != 'rules' %}<button class="btn btn-ghost btn-sm" type="submit" name="action" value="clear">Reset to rules</button>{% endif %}
+    <a class="link-inline link-inline--sm" href="?kind={{ kind }}&q={{ q|urlencode }}">Cancel</a>
+  </form>
+</div>
+{% endif %}
+
+<form class="rl-form" method="get">
+  <label class="rl-field"><span>Kind</span>
+    <select name="kind" onchange="this.form.submit()"><option value="">All kinds</option>
+      {% for k, label in kinds.items %}<option value="{{ k }}"{% if k == kind %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label class="rl-field rl-field--grow"><span>Search</span><input type="search" name="q" value="{{ q }}" placeholder="e.g. Java"></label>
+  <button class="btn btn-ghost btn-sm" type="submit">Filter</button>
+</form>
+
+<div class="rl-table-wrap">
+  <table class="rl-table">
+    <thead><tr><th>Skill</th><th>In postings</th><th>Kind</th><th>Family</th><th>Category</th><th>Tag</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td><strong>{{ r.skill }}</strong></td>
+        <td class="rl-num">{{ r.pct }}% <span class="rl-why">({{ r.count }})</span></td>
+        <td>{{ r.kind_label }}</td>
+        <td>{{ r.family_label|default:"—" }}</td>
+        <td>{{ r.category }}</td>
+        <td>
+          <span class="rl-pill rl-pill--{% if r.source == 'manual' %}ok{% elif r.source == 'gemini' %}info{% else %}mute{% endif %}">{{ r.source }}</span>
+          <a class="link-inline link-inline--sm" href="?kind={{ kind }}&q={{ q|urlencode }}&edit={{ r.skill|urlencode }}#edit">Edit</a>
+        </td>
+      </tr>
+    {% empty %}<tr><td colspan="6" class="rl-why">No skills match.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if total > rows|length %}<p class="rl-note">Showing the first {{ rows|length }} of {{ total }}. Use the filter to find the rest.</p>{% endif %}
+
+<h3 class="rl-section">Add a family</h3>
+<form class="rl-form" method="post">{% csrf_token %}
+  <label class="rl-field rl-field--grow"><span>Family name</span><input name="label" maxlength="60" placeholder="e.g. Low-code platform"></label>
+  <label class="rl-field"><span>Kind</span><select name="kind"><option value="tool">Tool / platform</option><option value="framework">Framework / library</option><option value="language">Language</option></select></label>
+  <button class="btn btn-ghost btn-sm" type="submit" name="action" value="family">Add family</button>
+</form>
+{% endblock %}

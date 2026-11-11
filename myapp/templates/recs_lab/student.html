@@ -1,0 +1,43 @@
+{% extends "recs_lab/_base.html" %}
+{% block lab_title %}Lab · Student view{% endblock %}
+{% block lab_heading %}Recommendations Lab · Student{% endblock %}
+{% block lab_body %}
+<form class="rl-form" method="get" action="{% url 'recs_lab_student' %}">
+  <label class="rl-field rl-field--grow"><span>Student</span>
+    <select name="user" onchange="this.form.submit()">
+      {% for u in people %}<option value="{{ u.pk }}"{% if person and u.pk == person.pk %} selected{% endif %}>{{ u.get_full_name|default:u.email }}{% if u.learner_info.course %} · {{ u.learner_info.course }}{% endif %}{% if u.learner_info.year_level %} {{ u.learner_info.year_level }}{% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  <noscript><button class="btn btn-navy btn-sm" type="submit">Show</button></noscript>
+</form>
+{% if not person %}
+  <p class="empty-note">No student with survey answers in this data set yet. Switch to Dummy answers, or answer the student survey with a dummy student account.</p>
+{% elif not result.exists %}
+  <p class="empty-note">No extracted job-market data yet.</p>
+{% else %}
+<div class="rl-head">
+  <div>
+    <h2>{{ person.get_full_name }} · {% if result.role_label %}{{ result.role_label }}{% else %}No target role yet{% endif %}</h2>
+    <p class="rl-sub">{{ result.program|default:"Program not set" }}{% if result.year %} · year {{ result.year }}{% endif %}{% if result.term %} · {{ result.term }}{% endif %}</p>
+  </div>
+</div>
+<ul class="rl-facts">
+  <li>Job readiness<strong>{% if result.readiness is not None %}{{ result.readiness }}%{% else %}—{% endif %}</strong></li>
+  <li>Needs met<strong>{{ result.met }} of {{ result.units|length }}</strong></li>
+  <li>{% if result.scope == 'entry' %}Entry-level{% else %}All{% endif %} postings{% if result.role_label %} for the role{% endif %}<strong>{{ result.postings }}</strong></li>
+  {% if result.assumed %}<li>Skills assumed from earlier subjects<strong>{{ result.assumed }}</strong></li>{% endif %}
+</ul>
+<div class="rl-units">
+  {% for u in result.units %}
+  <div class="rl-unit">
+    <div class="rl-unit-head"><b>{{ u.label }}</b><span class="rl-pill rl-pill--{{ u.tone }}">{{ u.status_label }}</span></div>
+    <span class="rl-k">{{ u.kind_label }} · in postings: {{ u.members_text }}</span>
+    <p>{{ u.why }}</p>
+  </div>
+  {% endfor %}
+</div>
+<p class="rl-note">The role's {{ result.units|length }} most-asked-for needs, from its top skills. Interchangeable skills are one need: a student
+  with Python at Practiced has a general-purpose language, so Java is not pushed on them, while each language still shows its own
+  share of postings. "Coming up" comes from the blueprints of later subjects in their program. Readiness = needs met ÷ needs.</p>
+{% endif %}
+{% endblock %}

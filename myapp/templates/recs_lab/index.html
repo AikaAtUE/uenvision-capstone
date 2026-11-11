@@ -1,0 +1,28 @@
+{% extends "recs_lab/_base.html" %}
+{% block lab_body %}
+<p class="rl-intro"><span class="rl-badge">Developers only · not linked anywhere</span><br>
+  A second recommendation system that runs next to the current one without changing it. It adds two things the current
+  one is missing: <strong>skill categories</strong> (what kind of skill it is, and which skills can stand in for each other)
+  and <strong>subject blueprints</strong> (what each subject is for). Job postings and survey answers then rank what is left.
+  Every number is a count from the extracted skills and hard skills data sets.</p>
+
+<ul class="rl-facts" aria-label="Lab status">
+  <li>Subjects with a blueprint<strong>{{ subjects }}</strong></li>
+  <li>Approved<strong>{{ bp_counts.approved }}</strong></li>
+  <li>Drafts<strong>{{ bp_counts.draft }}</strong></li>
+  <li>Automatic drafts<strong>{{ bp_counts.auto }}</strong></li>
+  <li>Student answers<strong>{{ n_resps.student }}</strong></li>
+  <li>Alumni answers<strong>{{ n_resps.alumni }}</strong></li>
+  <li>Professor answers<strong>{{ n_resps.professor }}</strong></li>
+</ul>
+
+<div class="rl-links">
+  <a class="rl-link" href="{% url 'recs_lab_faculty' %}"><b>Faculty view</b><span>One subject checked item by item against its blueprint: what's landing, what isn't, and which slot is open.</span></a>
+  <a class="rl-link" href="{% url 'recs_lab_admin' %}"><b>Admin view</b><span>Top 10 curriculum gaps ranked by how uncovered they are, with a suggested home subject, plus coverage by category and year.</span></a>
+  <a class="rl-link" href="{% url 'recs_lab_student' %}{% if first_student %}?user={{ first_student }}{% endif %}"><b>Student view</b><span>Next skills for a target role, measured against entry-level postings, slot-aware.</span></a>
+  <a class="rl-link" href="{% url 'recs_lab_alumni' %}{% if first_alumni %}?user={{ first_alumni }}{% endif %}"><b>Alumni view</b><span>Upskilling for their job, starting from their own "skills to learn" answers.</span></a>
+  <a class="rl-link" href="{% url 'recs_lab_blueprints' %}"><b>Subject blueprints</b><span>Review, edit, re-draft with Gemini, and approve each subject's blueprint.</span></a>
+  <a class="rl-link" href="{% url 'recs_lab_skills' %}"><b>Skill categories</b><span>Each in-demand skill's kind and family. Fix a tag, or let Gemini tag the ones the rules don't know.</span></a>
+</div>
+<p class="rl-note">Real / Dummy answers (top right) picks which survey answers every lab page uses. It is the same switch as the developer view on the Dashboard.</p>
+{% endblock %}

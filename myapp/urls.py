@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 from django.views.generic import RedirectView
 
 from . import google_auth, student_views, survey_admin, survey_tracker, views
@@ -99,4 +99,7 @@ urlpatterns = [
     path("data/professor-survey/", views.professor_survey_view, name="professor_survey"),
     path("data/professor-survey/submit/", views.professor_survey_submit_view, name="professor_survey_submit"),
     path("survey/professor/", RedirectView.as_view(pattern_name="professor_survey", permanent=False)),
+
+    # Recommendations Lab: the experimental recommendation system, developers only, not linked anywhere.
+    path("recs-lab/", include("myapp.recs_lab.urls")),
 ]

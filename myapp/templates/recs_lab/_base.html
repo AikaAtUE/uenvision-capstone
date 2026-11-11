@@ -1,0 +1,30 @@
+{% extends "app_base.html" %}
+{% load static %}
+{% comment %}Recommendations Lab: developers only, reached by link. Nothing in the site links here.{% endcomment %}
+{% block title %}{% block lab_title %}Recommendations Lab{% endblock %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'myapp/recs-lab.css' %}?v={% now 'U' %}">{% endblock %}
+{% block page_content %}
+<section class="page is-active" id="page-recs-lab">
+  <header class="page-header"><h1>{% block lab_heading %}Recommendations Lab{% endblock %}</h1></header>
+  <div class="page-body">
+    <div class="rl-top">
+      <nav class="rl-tabs" aria-label="Recommendations Lab pages">
+        <a class="rl-tab{% if lab_tab == 'index' %} is-active{% endif %}" href="{% url 'recs_lab' %}">Overview</a>
+        <a class="rl-tab{% if lab_tab == 'faculty' %} is-active{% endif %}" href="{% url 'recs_lab_faculty' %}">Faculty</a>
+        <a class="rl-tab{% if lab_tab == 'admin' %} is-active{% endif %}" href="{% url 'recs_lab_admin' %}">Admin</a>
+        <a class="rl-tab{% if lab_tab == 'student' %} is-active{% endif %}" href="{% url 'recs_lab_student' %}">Student</a>
+        <a class="rl-tab{% if lab_tab == 'alumni' %} is-active{% endif %}" href="{% url 'recs_lab_alumni' %}">Alumni</a>
+        <a class="rl-tab{% if lab_tab == 'blueprints' %} is-active{% endif %}" href="{% url 'recs_lab_blueprints' %}">Subject blueprints</a>
+        <a class="rl-tab{% if lab_tab == 'skills' %} is-active{% endif %}" href="{% url 'recs_lab_skills' %}">Skill categories</a>
+      </nav>
+      <form class="rl-switch" method="post" action="{% url 'recs_lab_data' %}" aria-label="Which survey answers to use">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" name="results" value="real" class="{% if not lab_dummy %}is-active{% endif %}" aria-pressed="{% if lab_dummy %}false{% else %}true{% endif %}">Real answers</button>
+        <button type="submit" name="results" value="dummy" class="{% if lab_dummy %}is-active{% endif %}" aria-pressed="{% if lab_dummy %}true{% else %}false{% endif %}">Dummy answers</button>
+      </form>
+    </div>
+    {% if messages %}<div class="rl-msgs">{% include "_messages.html" %}</div>{% endif %}
+    {% block lab_body %}{% endblock %}
+  </div>
+</section>
+{% endblock %}
