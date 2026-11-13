@@ -77,7 +77,8 @@ class KalibrrScraperTests(SimpleTestCase):
     def test_search_runs_without_a_build_id_when_nothing_new_needs_details(self):
         self.out.mkdir()
         for job in SEARCH["jobs"]:
-            (self.out / f"{job['id']}_{job['slug']}.json").write_text("{}")
+            (self.out / f"{job['id']}_{job['slug']}.json").write_text(
+                json.dumps(detail_json(job["id"], job["slug"], job["company"]["code"])))
         site = FakeKalibrr(down={ks.HOME_URL, "https://www.kalibrr.com/home"})
         self.scrape(site)                # used to stop with "no build_id available"
         self.assertTrue(all("/kjs/job_board/search" in u for u in site.urls))
@@ -127,6 +128,35 @@ class KalibrrScraperTests(SimpleTestCase):
         self.assertIn("https://www.kalibrr.com/_next/data/NEW/en/c/acme/jobs/270007/qa-tester.json"
                       "?code=acme&param=270007&param=qa-tester", events)
         self.assertNotIn("https://www.kalibrr.com/c/acme/jobs/270007/qa-tester,", events)
+
+    def test_a_saved_file_without_job_details_is_downloaded_again(self):
+        # An older scraper saved Kalibrr's redirect answer as the job file; the compile step skips it.
+        self.out.mkdir()
+        broken = self.out / "270006_quality-assurance-specialist-2.json"
+        broken.write_text(json.dumps({"pageProps": {"__N_REDIRECT": "/c/tikwiz-llc/jobs/270006/x"}}))
+        good = self.out / "270007_qa-tester.json"
+        good.write_text(json.dumps(detail_json(270007, "qa-tester", "acme")))
+        site = FakeKalibrr()
+        self.scrape(site, build_id="NEW")
+        self.assertIn("job", json.loads(broken.read_text())["pageProps"])
+        self.assertTrue(any("/jobs/270006/" in u for u in site.urls))
+        self.assertFalse(any("/jobs/270007/" in u and "/_next/data/" in u for u in site.urls))
+
+    def test_a_broken_file_stays_when_kalibrr_still_has_no_details(self):
+        self.out.mkdir()
+        broken = self.out / "270007_qa-tester.json"
+        broken.write_text("{}")
+        self.scrape(FakeKalibrr(detail={270007: {"notFound": True}}), build_id="NEW")
+        self.assertEqual(broken.read_text(), "{}")
+
+    def test_has_job_details(self):
+        self.out.mkdir()
+        cases = {"good": json.dumps(detail_json(1, "a", "b")), "redirect": '{"pageProps": {"__N_REDIRECT": "/c/x"}}',
+                 "empty": "{}", "list": "[]", "half": '{"pageProps": {"jo'}
+        for name, text in cases.items():
+            (self.out / name).write_text(text)
+        self.assertEqual([n for n in cases if ks.has_job_details(self.out / n)], ["good"])
+        self.assertFalse(ks.has_job_details(self.out / "missing"))
 
     def test_a_search_outage_is_waited_out(self):
         site = FakeKalibrr(search_fail=ks.MAX_RETRIES + 1)   # every retry fails, then the cooldown try works

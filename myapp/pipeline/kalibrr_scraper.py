@@ -340,6 +340,21 @@ def job_output_path(output_dir: Path, job_id, slug: str) -> Path:
     return output_dir / f"{job_id}_{safe_slug}.json"
 
 
+def has_job_details(path: Path) -> bool:
+    """True if the saved file holds a job ({"pageProps": {"job": {...}}}).
+
+    Older scraper versions saved Kalibrr's redirect-only answers ({"pageProps": {"__N_REDIRECT": ...}});
+    the compile step skips those, so they must be downloaded again instead of counted as "already have".
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return False
+    props = data.get("pageProps") if isinstance(data, dict) else None
+    return isinstance(props, dict) and isinstance(props.get("job"), dict)
+
+
 def scrape(
     text: str,
     limit: int,
@@ -418,9 +433,12 @@ def scrape(
 
             out_path = job_output_path(output_dir, job_id, slug)
             if out_path.exists():
-                log.info("Already have job %s (%s); skipping.", job_id, slug)
-                skipped_existing += 1
-                continue
+                if has_job_details(out_path):
+                    log.info("Already have job %s (%s); skipping.", job_id, slug)
+                    skipped_existing += 1
+                    continue
+                # The old file is only replaced once a good answer arrives (the write below).
+                log.info("Saved file for job %s (%s) has no job details; downloading it again.", job_id, slug)
 
             current = build.get(page_url)
             if not current:
